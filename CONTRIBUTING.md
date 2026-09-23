@@ -25,7 +25,7 @@ Use the machine's existing toolchain and default cache locations. Submit changes
 | `examples/`               | Consumer and third-party provider examples                                        |
 | `tests/`                  | Public contract, HTTP fixture, and lifecycle checks                               |
 | `scripts/`                | Package checks and explicit backend/host probes                                   |
-| `docs/en/`, `docs/zh-CN/` | English and Simplified Chinese API and release guides                             |
+| `docs/`                    | Chinese API and release guides; English versions use the `.en.md` suffix         |
 
 The generated `lib/` JavaScript, declarations, and source maps are committed so dsh can install this package directly from GitHub. The pre-commit hook runs `pnpm build` and stages the updated `lib/`. Stage build inputs before committing; the hook stops if it finds unstaged or untracked source changes that could make the generated output differ from the commit.
 
@@ -57,4 +57,4 @@ pnpm probe:host <path-to-node_modules/@deepseek-ai/dsh/package.json>
 
 For TypeSafe protocol changes, set up `.env.local` and explicitly run `pnpm probe:live`. It exits with code 2 when credentials are missing and code 1 when a question fails. A single response is an interface sample; latency and decision quality need evaluation in their actual use cases.
 
-Describe the problem, behavior change, and verification in a pull request. Generated output, credentials, and local research records are ignored by Git, except the committed `lib/` output required for GitHub installation. See the [release process](docs/en/releasing.md).
+Describe the problem, behavior change, and verification in a pull request. Generated output, credentials, and local research records are ignored by Git, except the committed `lib/` output required for GitHub installation. See the [release process](docs/releasing.en.md).

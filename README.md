@@ -80,7 +80,7 @@ export async function apply(ctx: Context) {
 
 `noul` returns `probabilityTrue`; `choice` returns a candidate key and its full distribution; `score` returns an expected level and probabilities ordered by `criteria`. These are model outputs, so consumer plugins choose their own decision thresholds and actions. Runtime failures are reported per question with `status: 'error'`; malformed call structures throw `System1InputError`.
 
-See [API and provider development](docs/en/api.md) for the full contract and [the consumer example](examples/consumer.ts). Supported TypeSafe models are `jev-1.13.0` and `jev-latest`.
+See [API and provider development](docs/api.en.md) for the full contract and [the consumer example](examples/consumer.ts). Supported TypeSafe models are `jev-1.13.0` and `jev-latest`.
 
 ## Development
 
@@ -93,7 +93,7 @@ pnpm verify
 
 For an explicit live request, set `TYPESAFE_API_KEY` in `.env.local`, then run `pnpm probe:live`. The probe reads `.env.local`; the dsh plugin reads the process environment. Regular CI uses local fixtures.
 
-See the [contribution guide](CONTRIBUTING.md) and [release process](docs/en/releasing.md).
+See the [contribution guide](CONTRIBUTING.md) and [release process](docs/releasing.en.md).
 
 ## License
 

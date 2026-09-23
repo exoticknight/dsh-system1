@@ -1,6 +1,6 @@
 # 发布流程
 
-[English](../en/releasing.md) | [简体中文](releasing.md)
+[简体中文](releasing.md) | [English](releasing.en.md)
 
 推送 `v*` tag 会触发 Release workflow。工作流检查 tag 是否与 `package.json.version` 一致，复用 CI 矩阵，并创建包含自动生成发布说明的 GitHub Release。GitHub 会为每个 tag 自动提供源码压缩包。带预发布后缀的版本会标记为预发布。
 

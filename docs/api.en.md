@@ -1,6 +1,6 @@
 # API and provider development
 
-[English](api.md) | [简体中文](../zh-CN/api.md)
+[简体中文](api.md) | [English](api.en.md)
 
 ## Requests and results
 
@@ -8,7 +8,7 @@
 
 Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types only; `dsh-system1/providers/typesafe` exports the provider plugin and `createTypesafeProvider`.
 
-Consumer plugins declare `inject: ['system1']`. See the [consumer example](../../examples/consumer.ts).
+Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
 
 ```ts
 const result = await ctx.system1.decide({
@@ -47,7 +47,7 @@ Malformed call structures throw `System1InputError`. Runtime failures for a stru
 
 ## Implementing a provider
 
-Import types from `dsh-system1/contracts` and `System1ProviderError` from the package root. Error messages must be safe to display. Implement `describe(model, signal)` and `evaluate(request, signal)` and return standard per-question answers. Treat request parameters as read-only. See the [provider example](../../examples/provider.ts).
+Import types from `dsh-system1/contracts` and `System1ProviderError` from the package root. Error messages must be safe to display. Implement `describe(model, signal)` and `evaluate(request, signal)` and return standard per-question answers. Treat request parameters as read-only. See the [provider example](../examples/provider.ts).
 
 ```ts
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))

@@ -77,7 +77,7 @@ export async function apply(ctx: Context) {
 
 `noul` 返回 `probabilityTrue`；`choice` 返回候选键及完整分布；`score` 返回期望等级和按 `criteria` 排列的概率。它们都是模型输出，阈值和后续动作由消费插件决定。运行故障通过逐题 `status: 'error'` 返回；调用结构无效时抛出 `System1InputError`。
 
-完整契约见 [API 与 provider 开发](docs/zh-CN/api.md)，调用示例见[消费插件示例](examples/consumer.ts)。当前支持 TypeSafe 模型 `jev-1.13.0` 和 `jev-latest`。
+完整契约见 [API 与 provider 开发](docs/api.md)，调用示例见[消费插件示例](examples/consumer.ts)。当前支持 TypeSafe 模型 `jev-1.13.0` 和 `jev-latest`。
 
 ## 开发
 
@@ -90,7 +90,7 @@ pnpm verify
 
 如需显式调用真实后端，在 `.env.local` 中设置 `TYPESAFE_API_KEY`，然后运行 `pnpm probe:live`。探针读取 `.env.local`；dsh 插件读取进程环境。常规 CI 使用本地 fixture。
 
-更多内容见[贡献指南](CONTRIBUTING.zh-CN.md)和[发布流程](docs/zh-CN/releasing.md)。
+更多内容见[贡献指南](CONTRIBUTING.zh-CN.md)和[发布流程](docs/releasing.md)。
 
 ## 许可证
 

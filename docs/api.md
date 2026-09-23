@@ -1,6 +1,6 @@
 # API 与 provider 开发
 
-[English](../en/api.md) | [简体中文](api.md)
+[简体中文](api.md) | [English](api.en.md)
 
 ## 请求与结果
 
@@ -8,7 +8,7 @@
 
 公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 只导出类型；`dsh-system1/providers/typesafe` 导出 provider 插件和 `createTypesafeProvider`。
 
-消费插件声明 `inject: ['system1']`。参见[消费插件示例](../../examples/consumer.ts)。
+消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 
 ```ts
 const result = await ctx.system1.decide({
@@ -44,7 +44,7 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 
 ## 实现 provider
 
-从 `dsh-system1/contracts` 导入类型，从包根入口导入 `System1ProviderError`。错误消息必须安全可展示。实现 `describe(model, signal)` 和 `evaluate(request, signal)`，并返回标准逐题答案。请求参数按只读处理。参见[provider 示例](../../examples/provider.ts)。
+从 `dsh-system1/contracts` 导入类型，从包根入口导入 `System1ProviderError`。错误消息必须安全可展示。实现 `describe(model, signal)` 和 `evaluate(request, signal)`，并返回标准逐题答案。请求参数按只读处理。参见[provider 示例](../examples/provider.ts)。
 
 ```ts
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))

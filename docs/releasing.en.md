@@ -1,6 +1,6 @@
 # Release process
 
-[English](releasing.md) | [简体中文](../zh-CN/releasing.md)
+[简体中文](releasing.md) | [English](releasing.en.md)
 
 Pushing a `v*` tag starts the Release workflow. It checks that the tag matches `package.json.version`, reuses the CI matrix, and creates a GitHub Release with generated release notes. GitHub automatically provides a source archive for each tag. Versions with a prerelease suffix are marked as prereleases.
 

@@ -25,7 +25,7 @@ pnpm verify
 | `examples/`               | 消费者与第三方 provider 示例                       |
 | `tests/`                  | 公共契约、HTTP fixture 和生命周期检查              |
 | `scripts/`                | 安装包检查以及显式运行的后端/宿主探针              |
-| `docs/en/`、`docs/zh-CN/` | 英文和简体中文 API、发布指南                       |
+| `docs/`                    | 简体中文 API 与发布指南；英文版本使用 `.en.md` 后缀 |
 
 生成的 `lib/` JavaScript、类型声明和 source map 会提交到仓库，供 dsh 直接从 GitHub 安装。提交前钩子会运行 `pnpm build` 并暂存更新后的 `lib/`。提交前请先暂存构建输入；如果发现 source 有未暂存或未跟踪的改动，钩子会停止提交，避免生成物与提交中的源文件不一致。
 
@@ -57,4 +57,4 @@ pnpm probe:host <path-to-node_modules/@deepseek-ai/dsh/package.json>
 
 修改 TypeSafe 协议时，在 `.env.local` 中配置凭据后显式运行 `pnpm probe:live`。缺少凭据时退出码为 2，题目失败时退出码为 1。单次响应仅作为接口样本；延迟和判断质量需要在实际场景中评估。
 
-提交 PR 时说明问题、行为变化和验证结果。除 GitHub 安装所需的 `lib/` 外，生成物、凭据和本地调研记录由 Git 忽略。发布流程见[发布指南](docs/zh-CN/releasing.md)。
+提交 PR 时说明问题、行为变化和验证结果。除 GitHub 安装所需的 `lib/` 外，生成物、凭据和本地调研记录由 Git 忽略。发布流程见[发布指南](docs/releasing.md)。
