@@ -55,14 +55,12 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/*.test.js",
-    "format": "prettier --write src tests examples scripts package.json tsconfig*.json cordis.patch.yml README.md README.zh-CN.md CONTRIBUTING.md CONTRIBUTING.zh-CN.md docs .github/workflows",
-    "format:check": "prettier --check src tests examples scripts package.json tsconfig*.json cordis.patch.yml README.md README.zh-CN.md CONTRIBUTING.md CONTRIBUTING.zh-CN.md docs .github/workflows",
     "check:package": "node scripts/check-package.mjs",
     "probe:live": "node scripts/probe-live.mjs",
     "prepack": "pnpm build",
     "probe:host": "node --expose-internals scripts/probe-host.mjs",
     "hooks:install": "simple-git-hooks",
-    "verify": "pnpm typecheck && pnpm format:check && pnpm test && pnpm build && pnpm check:package"
+    "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm check:package"
   },
   "simple-git-hooks": {
     "pre-commit": "node scripts/build-before-commit.mjs"
@@ -79,7 +77,6 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
     "@types/node": "^22.0.0",
-    "prettier": "3.9.8",
     "simple-git-hooks": "2.14.0",
     "typescript": "7.0.2"
   },
@@ -88,6 +85,10 @@
     "url": "https://github.com/exoticknight/dsh-system1.git"
   },
   "homepage": "https://github.com/exoticknight/dsh-system1#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "bugs": {
     "url": "https://github.com/exoticknight/dsh-system1/issues"
   }

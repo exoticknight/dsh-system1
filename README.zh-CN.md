@@ -1,11 +1,16 @@
+<div align="center">
+
 # dsh-system1
 
-[English](README.md) | [简体中文](README.zh-CN.md)
-
-[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml)
-[![使用 RED 维护](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
-
 **为 DeepSeek Harness 插件提供类型安全的 System One 判断服务。** 消费插件调用 `ctx.system1.decide()`，解释返回结果并自行决定后续动作。
+
+[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) ![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
+
+[![dsh.pub registry 状态](https://dsh.pub/api/badges/exoticknight/dsh-system1.svg)](https://dsh.pub/en/plugins/?q=exoticknight%2Fdsh-system1)
+
+简体中文 | [English](README.md)
+
+</div>
 
 | 原语     | 返回结果                            |
 | -------- | ----------------------------------- |
@@ -30,6 +35,12 @@ dsh plugin --profile headless add github:exoticknight/dsh-system1
 随包提供的 patch 会挂载服务和 TypeSafe provider。默认模型为 `jev-1.13.0`、provider id 为 `typesafe`、总超时为 800 ms。启动 dsh 前，在进程环境中设置 `TYPESAFE_API_KEY`。可根据后端延迟调整 `timeoutMs`。
 
 ## 消费插件调用
+
+在消费插件项目中添加本包依赖：
+
+```sh
+pnpm add dsh-system1
+```
 
 声明 `inject: ['system1']`，并导入本包提供的 Cordis 类型扩展：
 

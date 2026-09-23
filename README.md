@@ -1,11 +1,16 @@
+<div align="center">
+
 # dsh-system1
 
-[English](README.md) | [简体中文](README.zh-CN.md)
-
-[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml)
-[![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
-
 **A typed System One decision service for DeepSeek Harness plugins.** Consumer plugins call `ctx.system1.decide()`, interpret the results, and choose their own actions.
+
+[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) ![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
+
+[![dsh.pub registry status](https://dsh.pub/api/badges/exoticknight/dsh-system1.svg)](https://dsh.pub/en/plugins/?q=exoticknight%2Fdsh-system1)
+
+English | [简体中文](README.zh-CN.md)
+
+</div>
 
 | Primitive | Result                                                     |
 | --------- | ---------------------------------------------------------- |
@@ -30,6 +35,12 @@ The repository includes the compiled `lib/` files required by the plugin, so ins
 The bundled patch mounts the service and TypeSafe provider. Defaults are model `jev-1.13.0`, provider id `typesafe`, and an 800 ms total timeout. Set `TYPESAFE_API_KEY` in the dsh process environment before startup. Adjust `timeoutMs` to fit the backend latency.
 
 ## Use from a consumer plugin
+
+Install the package in your consumer plugin project:
+
+```sh
+pnpm add dsh-system1
+```
 
 Declare `inject: ['system1']` and import this package's Cordis type augmentation:
 

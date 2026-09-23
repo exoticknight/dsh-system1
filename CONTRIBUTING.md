@@ -43,11 +43,10 @@ The hook uses the dev-only `simple-git-hooks` package. Its install script is app
 ## Before submitting
 
 ```sh
-pnpm format
 pnpm verify
 ```
 
-`verify` runs type checking, formatting checks, Node tests, a build, and an isolated tarball installation plus consumer compilation. Tests use local responses and do not need backend credentials. CI runs the same command on Windows and Linux with Node 22.19 and 24.
+`verify` runs type checking, Node tests, a build, and an isolated tarball installation plus consumer compilation. Tests use local responses and do not need backend credentials. CI runs the same command on Windows and Linux with Node 22.19 and 24.
 
 For host integration changes, the installed dsh `0.1.5-rc.2` can be used for a Loader probe:
 

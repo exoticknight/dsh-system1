@@ -43,11 +43,10 @@ pnpm verify
 ## 提交前检查
 
 ```sh
-pnpm format
 pnpm verify
 ```
 
-`verify` 会执行类型检查、格式检查、Node 测试、构建，以及独立目录中的 tarball 安装和消费者编译。测试使用本地响应，不需要后端凭据。CI 在 Windows/Linux 和 Node 22.19/24 上执行同一命令。
+`verify` 会执行类型检查、Node 测试、构建，以及独立目录中的 tarball 安装和消费者编译。测试使用本地响应，不需要后端凭据。CI 在 Windows/Linux 和 Node 22.19/24 上执行同一命令。
 
 修改宿主接入时，可使用已安装的 dsh `0.1.5-rc.2` 执行 Loader 探针：
 
