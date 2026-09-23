@@ -27,3 +27,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
+      - name: Verify committed lib/ is current
+        shell: bash
+        run: |
+          git diff --exit-code -- lib || {
+            echo "::error::lib/ is stale. Run 'pnpm build' and commit lib/."
+            exit 1
+          }

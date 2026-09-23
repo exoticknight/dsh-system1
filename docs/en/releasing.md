@@ -2,7 +2,7 @@
 
 [English](releasing.md) | [简体中文](../zh-CN/releasing.md)
 
-Pushing a `v*` tag starts the Release workflow. It checks that the tag matches `package.json.version`, reuses the CI matrix, builds a package archive, and creates a GitHub Release with the `.tgz` archive and `SHA256SUMS`. Versions with a prerelease suffix are marked as prereleases.
+Pushing a `v*` tag starts the Release workflow. It checks that the tag matches `package.json.version`, reuses the CI matrix, and creates a GitHub Release with generated release notes. GitHub automatically provides a source archive for each tag. Versions with a prerelease suffix are marked as prereleases.
 
 ## Prepare a release
 
@@ -16,29 +16,20 @@ git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-## Install a release archive
+## Install a release
 
-The default installation uses the GitHub repository directly. To install a `.tgz` archive instead, download one from [GitHub Releases](https://github.com/exoticknight/dsh-system1/releases), change to the download folder, and pass its resolved path.
-
-PowerShell:
-
-```powershell
-$package = (Get-ChildItem .\dsh-system1-*.tgz | Select-Object -First 1).FullName
-dsh plugin --profile headless add $package
-```
-
-macOS or Linux:
+Install a tagged release directly from GitHub:
 
 ```sh
-dsh plugin --profile headless add "$(realpath dsh-system1-*.tgz)"
+dsh plugin --profile headless add github:exoticknight/dsh-system1#vX.Y.Z
 ```
+
+GitHub Releases contain release notes and GitHub's automatically generated source archives. Use the GitHub tag reference above to install the plugin.
 
 ## Workflow behavior
 
 - All checks in the Windows/Linux × Node 22.19/24 matrix must pass before publication.
-- The release job uses Node 24 to build the archive, calculate its SHA-256 checksum, generate release notes with GitHub CLI, and upload the files.
+- The release job creates the GitHub Release and generates release notes with GitHub CLI. It does not build or upload package files.
 - The release job uses the repository's `GITHUB_TOKEN` with `contents: write`; TypeSafe and npm credentials are not required.
 - The workflow publishes to GitHub Releases. Publishing to the npm registry is a separate process.
 - Runs for the same tag are serialized. An existing Release is not overwritten. After a failure, inspect the tag and Release state before retrying or publishing a fix version.
-
-After downloading the assets, verify the checksum with `sha256sum -c SHA256SUMS`. On Windows, compare with `Get-FileHash -Algorithm SHA256 <file>`.
