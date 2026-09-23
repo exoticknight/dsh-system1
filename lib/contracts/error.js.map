@@ -1,0 +1,1 @@
+{"version":3,"file":"error.js","sourceRoot":"","sources":["../../src/contracts/error.ts"],"names":[],"mappings":"AAeA,+DAA+D;AAC/D,MAAM,OAAO,iBAAkB,SAAQ,KAAK;IACxB,IAAI,GAAG,mBAAmB,CAAA;CAC7C;AAED,+EAA+E;AAC/E,MAAM,OAAO,oBAAqB,SAAQ,KAAK;IAExB,MAAM;IADT,IAAI,GAAG,sBAAsB,CAAA;IAC/C,YAAqB,MAAqB;QACxC,KAAK,CAAC,MAAM,CAAC,OAAO,CAAC,CAAA;sBADF,MAAM;IAE3B,CAAC;CACF"}

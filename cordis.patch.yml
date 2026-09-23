@@ -1,0 +1,11 @@
+- insert:
+    - id: system1
+      name: dsh-system1
+      config:
+        defaultModel: { provider: typesafe, model: jev-1.13.0 }
+        timeoutMs: 800
+    - id: system1-typesafe
+      name: dsh-system1/providers/typesafe
+      config:
+        id: typesafe
+        apiKeyEnv: TYPESAFE_API_KEY

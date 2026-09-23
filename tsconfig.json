@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "dsh-system1": ["./src/index.ts"],
+      "dsh-system1/contracts": ["./src/contracts/index.ts"],
+      "dsh-system1/providers/typesafe": ["./src/providers/typesafe/index.ts"]
+    },
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
+}

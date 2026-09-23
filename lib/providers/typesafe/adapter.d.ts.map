@@ -1,0 +1,1 @@
+{"version":3,"file":"adapter.d.ts","sourceRoot":"","sources":["../../../src/providers/typesafe/adapter.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAmB,eAAe,EAAE,MAAM,0BAA0B,CAAA;AAGhF,MAAM,WAAW,eAAe;IAC9B,MAAM,EAAE,MAAM,CAAA;IACd,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB,KAAK,CAAC,EAAE,OAAO,KAAK,CAAA;CACrB;AAsFD,wBAAgB,sBAAsB,CACpC,OAAO,EAAE,eAAe,GACvB,eAAe,CAgGjB"}

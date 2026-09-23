@@ -1,0 +1,7 @@
+allowBuilds:
+  simple-git-hooks: true
+minimumReleaseAgeExclude:
+  - '@tanstack/ai-event-client@0.12.1'
+  - '@tanstack/ai-typesafe@0.1.1'
+  - '@tanstack/ai-utils@0.4.1'
+  - '@tanstack/ai@0.58.0'

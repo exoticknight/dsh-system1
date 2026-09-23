@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+.research/
+.evolve/
+.test-build/
+.scratch/
+.package-check/
+artifacts/
+*.tgz
+.env
+.env.*
