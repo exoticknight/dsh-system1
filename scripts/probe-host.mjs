@@ -9,10 +9,13 @@ if (!process.argv[2])
 const host = pathToFileURL(process.argv[2])
 const require = createRequire(host)
 const manifest = JSON.parse(readFileSync(host, 'utf8'))
+const pluginManifest = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+)
 assert.equal(
-  manifest.version,
-  '0.1.5-rc.2',
-  'Host probe is pinned to the researched baseline.',
+  pluginManifest.dsh?.compatibility?.dshReleases?.[manifest.version],
+  'compatible',
+  `Host ${manifest.version} is not marked compatible in dsh.compatibility.dshReleases.`,
 )
 const load = async (name) => import(pathToFileURL(require.resolve(name)).href)
 const { Context } = await load('@deepseek-ai/cordis')
@@ -38,7 +41,7 @@ try {
   })
   assert.equal(result.answers.q.error.code, 'cancelled')
   console.log(
-    'Installed dsh 0.1.5-rc.2 loader composed and mounted both package entrypoints.',
+    `Installed dsh ${manifest.version} loader mounted the service and both independent provider components.`,
   )
   await ctx.loader.root.stop()
   assert.equal(ctx.get('system1'), undefined)

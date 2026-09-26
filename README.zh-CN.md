@@ -4,7 +4,7 @@
 
 **为 DeepSeek Harness 插件提供类型安全的 System One 判断服务。** 消费插件调用 `ctx.system1.decide()`，解释返回结果并自行决定后续动作。
 
-[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) ![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
+[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) ![DSH](https://img.shields.io/badge/DSH-0.1.7%20line-blue) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
 [![dsh.pub registry 状态](https://dsh.pub/api/badges/exoticknight/dsh-system1.svg)](https://dsh.pub/en/plugins/?q=exoticknight%2Fdsh-system1)
 
@@ -22,7 +22,7 @@
 
 ## 从 GitHub 安装
 
-要求 Node.js 22.19+（22.x）或 Node.js 24、Cordis `@deepseek-ai/cordis` 4.x，以及 dsh `0.1.5-rc.2` 或兼容版本。
+要求 Node.js 22.19+（22.x）或 Node.js 24、Cordis `@deepseek-ai/cordis` 4.x，以及 dsh `>=0.1.7-rc.1 <0.2.0`。Loader 已在 dsh `0.1.7-rc.1` 和 `0.1.7-rc.2` 上通过验证。
 
 将公开 GitHub 仓库添加到 dsh profile：
 

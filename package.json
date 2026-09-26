@@ -11,7 +11,8 @@
     "cordis",
     "typescript",
     "typesafe",
-    "jev"
+    "jev",
+    "laya"
   ],
   "type": "module",
   "packageManager": "pnpm@11.19.0",
@@ -32,6 +33,18 @@
     "./providers/typesafe": {
       "types": "./lib/providers/typesafe/index.d.ts",
       "import": "./lib/providers/typesafe/index.js"
+    },
+    "./providers": {
+      "types": "./lib/providers/index.d.ts",
+      "import": "./lib/providers/index.js"
+    },
+    "./providers/laya": {
+      "types": "./lib/providers/laya/index.d.ts",
+      "import": "./lib/providers/laya/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
     }
   },
   "files": [
@@ -49,11 +62,35 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dsh": ">=0.1.7-rc.1 <0.2.0",
+      "dshReleases": {
+        "0.1.7-rc.1": "compatible",
+        "0.1.7-rc.2": "compatible"
+      },
+      "profiles": [
+        "headless",
+        "web"
+      ]
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.client.json && node scripts/build-client.mjs",
     "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/*.test.js",
     "check:package": "node scripts/check-package.mjs",
     "probe:live": "node scripts/probe-live.mjs",
@@ -65,17 +102,27 @@
     "pre-commit": "node scripts/build-before-commit.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2"
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-credentials": ">=0.1.7-rc.1 <0.2.0"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "3.18.2",
-    "@tanstack/ai": "0.58.0",
-    "@tanstack/ai-typesafe": "0.1.1",
+    "@deepseek-ai/schemastery": "3.18.4",
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-api-remotes": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.7-rc.1",
+    "@deepseek-ai/dsh-credentials": ">=0.1.7-rc.1 <0.2.0",
     "@types/node": "^22.0.0",
+    "@types/react": "~18.3.1",
+    "esbuild": "^0.28.2",
+    "react": "^18.2.0",
     "simple-git-hooks": "2.14.0",
     "typescript": "7.0.2"
   },

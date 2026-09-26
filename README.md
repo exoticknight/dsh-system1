@@ -4,7 +4,7 @@
 
 **A typed System One decision service for DeepSeek Harness plugins.** Consumer plugins call `ctx.system1.decide()`, interpret the results, and choose their own actions.
 
-[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) ![DSH](https://img.shields.io/badge/DSH-0.1.5--rc.2-blue) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
+[![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) ![DSH](https://img.shields.io/badge/DSH-0.1.7%20line-blue) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
 [![dsh.pub registry status](https://dsh.pub/api/badges/exoticknight/dsh-system1.svg)](https://dsh.pub/en/plugins/?q=exoticknight%2Fdsh-system1)
 
@@ -22,7 +22,7 @@ The service provides request and response validation, per-question results, canc
 
 ## Install from GitHub
 
-Requirements: Node.js 22.19+ in the 22.x line or Node.js 24, Cordis `@deepseek-ai/cordis` 4.x, and dsh `0.1.5-rc.2` or compatible.
+Requirements: Node.js 22.19+ in the 22.x line or Node.js 24, Cordis `@deepseek-ai/cordis` 4.x, and dsh `>=0.1.7-rc.1 <0.2.0`. The Loader has been verified with dsh `0.1.7-rc.1` and `0.1.7-rc.2`.
 
 Add the public GitHub repository to a dsh profile:
 

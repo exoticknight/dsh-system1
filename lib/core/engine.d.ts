@@ -3,8 +3,9 @@ import type { Questions } from '../contracts/question.js';
 import type { System1Provider } from '../contracts/provider.js';
 export declare class System1Engine {
     private readonly registry;
-    private readonly options;
-    constructor(options?: System1Options);
+    private readonly resolveOptions;
+    constructor(options?: System1Options | (() => System1Options));
+    private validateOptions;
     registerProvider(id: string, provider: System1Provider): () => void;
     dispose(): void;
     decide<const Q extends Questions>(input: DecideRequest<Q>): Promise<DecideResponse<Q>>;

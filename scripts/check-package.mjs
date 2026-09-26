@@ -35,7 +35,7 @@ try {
       type: 'module',
       dependencies: {
         'dsh-system1': `file:./${tarball}`,
-        '@deepseek-ai/cordis': '4.0.2',
+        '@deepseek-ai/cordis': '4.0.4',
       },
     }),
   )

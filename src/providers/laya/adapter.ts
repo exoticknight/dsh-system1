@@ -1,36 +1,25 @@
 import type { System1Provider } from '../../contracts/index.js'
 import { createSystemOneHttpProvider } from '../systemone.js'
 
-export interface TypesafeOptions {
-  apiKey: string
+export interface LayaOptions {
+  apiKey?: string
   baseURL?: string
   resolveApiKey?: () => string | undefined | Promise<string | undefined>
   resolveBaseURL?: () => string | undefined
   fetch?: typeof fetch
 }
 
-const MODELS = new Set(['jev-latest', 'jev-preview', 'jev-1.13.0'])
+const MODELS = new Set(['auto', 'english', 'multilingual', 'typed-decisions'])
 
-export function createTypesafeProvider(
-  options: TypesafeOptions,
-): System1Provider {
+export function createLayaProvider(options: LayaOptions): System1Provider {
   return createSystemOneHttpProvider({
-    providerName: 'TypeSafe',
-    defaultBaseURL: options.baseURL ?? 'https://api.typesafe.ai',
+    providerName: 'Laya',
+    defaultBaseURL: options.baseURL ?? 'http://127.0.0.1:8000',
     resolveApiKey: options.resolveApiKey ?? (() => options.apiKey),
     ...(options.resolveBaseURL ? { resolveBaseURL: options.resolveBaseURL } : {}),
-    apiKeyRequired: true,
+    apiKeyRequired: false,
     isModelSupported: (model) => MODELS.has(model),
-    capabilities: {
-      primitives: ['noul', 'choice', 'score'],
-      maxChoiceOptions: 255,
-      maxScoreLevels: 10,
-      context: {
-        maxTokens: 64000,
-        includesQuestions: true,
-        maxStatePlusQuestionTokens: 32000,
-      },
-    },
+    requestModel: (model) => model === 'auto' ? undefined : model,
     ...(options.fetch ? { fetch: options.fetch } : {}),
   })
 }

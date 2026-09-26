@@ -5,13 +5,13 @@ import {
   isCredentialRefName,
 } from '@deepseek-ai/dsh-credentials'
 import type {} from '../../index.js'
-import { createTypesafeProvider } from './adapter.js'
-export { createTypesafeProvider, type TypesafeOptions } from './adapter.js'
+import { createLayaProvider } from './adapter.js'
+export { createLayaProvider, type LayaOptions } from './adapter.js'
 
 export interface Config {
   id: string
   apiKeyEnv: string
-  baseURL?: string | Volatile<string | undefined>
+  baseURL: string | Volatile<string>
 }
 interface ConfigInput {
   id?: string | null
@@ -21,20 +21,21 @@ interface ConfigInput {
 interface RuntimeConfig {
   id: string
   apiKeyEnv: string
-  baseURL: Volatile<string | undefined>
+  baseURL: Volatile<string>
 }
+
 export const inject = ['system1']
 export const Config: Schema<ConfigInput, RuntimeConfig> = Schema.object({
-  id: Schema.string().default('typesafe'),
+  id: Schema.string().default('laya'),
   apiKeyEnv: Schema.string()
     .role('credential-ref')
     .pattern(/^[A-Za-z_][A-Za-z0-9_]*$/u)
-    .default('TYPESAFE_API_KEY'),
-  baseURL: Schema.string().volatile(),
+    .default('LAYA_API_KEY'),
+  baseURL: Schema.string().default('http://127.0.0.1:8000').volatile(),
 })
+
 export function apply(ctx: Context, config: Config | RuntimeConfig) {
-  const provider = createTypesafeProvider({
-    apiKey: '',
+  const provider = createLayaProvider({
     resolveApiKey: async () => {
       const ref = config.apiKeyEnv
       if (!isCredentialRefName(ref)) return undefined

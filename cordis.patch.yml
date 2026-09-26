@@ -2,10 +2,17 @@
     - id: system1
       name: dsh-system1
       config:
-        defaultModel: { provider: typesafe, model: jev-1.13.0 }
+        defaultModel: { provider: typesafe, model: jev-latest }
         timeoutMs: 800
     - id: system1-typesafe
       name: dsh-system1/providers/typesafe
       config:
         id: typesafe
         apiKeyEnv: TYPESAFE_API_KEY
+        baseURL: https://api.typesafe.ai
+    - id: system1-laya
+      name: dsh-system1/providers/laya
+      config:
+        id: laya
+        apiKeyEnv: LAYA_API_KEY
+        baseURL: http://127.0.0.1:8000

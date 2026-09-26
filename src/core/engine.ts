@@ -27,8 +27,17 @@ import {
 
 export class System1Engine {
   private readonly registry = new ProviderRegistry()
-  private readonly options: System1Options
-  constructor(options: System1Options = {}) {
+  private readonly resolveOptions: () => System1Options
+  constructor(options: System1Options | (() => System1Options) = {}) {
+    if (typeof options === 'function') {
+      this.resolveOptions = options
+      return
+    }
+    this.validateOptions(options)
+    const snapshot = structuredClone(options)
+    this.resolveOptions = () => snapshot
+  }
+  private validateOptions(options: System1Options): void {
     if (
       options.defaultModel &&
       !modelSchema.safeParse(options.defaultModel).success
@@ -39,7 +48,6 @@ export class System1Engine {
       !timeoutSchema.safeParse(options.timeoutMs).success
     )
       throw new System1InputError('Invalid default timeout.')
-    this.options = structuredClone(options)
   }
   registerProvider(id: string, provider: System1Provider): () => void {
     return this.registry.register(id, provider)
@@ -53,7 +61,9 @@ export class System1Engine {
   ): Promise<DecideResponse<Q>> {
     const start = performance.now()
     const req = parseRequest(input)
-    const requested = req.model ?? this.options.defaultModel
+    const options = structuredClone(this.resolveOptions())
+    this.validateOptions(options)
+    const requested = req.model ?? options.defaultModel
     if (!requested)
       throw new System1InputError(
         'Select a model or configure a default model.',
@@ -90,7 +100,7 @@ export class System1Engine {
     try {
       const result = await execute(
         [entry.controller.signal, ...(req.signal ? [req.signal] : [])],
-        req.timeoutMs ?? this.options.timeoutMs ?? 800,
+        req.timeoutMs ?? options.timeoutMs ?? 800,
         async (signal) => {
           const described = capabilitiesSchema.safeParse(
             await entry.provider.describe(requested.model, signal),
