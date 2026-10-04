@@ -16,3 +16,10 @@
         id: laya
         apiKeyEnv: LAYA_API_KEY
         baseURL: http://127.0.0.1:8000
+    - id: system1-cloudflare
+      name: dsh-system1/providers/cloudflare
+      config:
+        id: cloudflare
+        apiKeyEnv: CLOUDFLARE_API_TOKEN
+        accountId: ''
+        baseURL: https://api.cloudflare.com/client/v4

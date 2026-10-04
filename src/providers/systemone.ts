@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import type { ProviderRequest, System1Provider } from '../contracts/index.js'
+import { isDeepStrictEqual } from 'node:util'
+import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js'
 import type { ModelCapabilities } from '../contracts/provider.js'
 import { System1ProviderError } from '../contracts/error.js'
 
@@ -123,31 +124,40 @@ export function createSystemOneHttpProvider(
           message: `${options.providerName} returned an invalid response.`,
         })
       }
-      const parsed = wireResponse.safeParse(raw)
-      if (!parsed.success)
-        throw new System1ProviderError({
-          code: 'invalid_response',
-          message: `${options.providerName} returned an invalid response.`,
-        })
-
-      const answeredModel = parsed.data.model ?? request.model
-      return {
-        model: answeredModel || request.model,
-        answers: normalizeAnswers(request, parsed.data.answers),
-        ...(parsed.data.usage
-          ? {
-              usage: {
-                ...(parsed.data.usage.input_tokens !== undefined
-                  ? { inputTokens: parsed.data.usage.input_tokens }
-                  : {}),
-                ...(parsed.data.usage.output_tokens !== undefined
-                  ? { outputTokens: parsed.data.usage.output_tokens }
-                  : {}),
-              },
-            }
-          : {}),
-      }
+      return normalizeSystemOneResponse(request, raw, options.providerName)
     },
+  }
+}
+
+/** Shared response normalization for providers that return the System One payload. */
+export function normalizeSystemOneResponse(
+  request: ProviderRequest,
+  raw: unknown,
+  providerName: string,
+): ProviderResponse {
+  const parsed = wireResponse.safeParse(raw)
+  if (!parsed.success)
+    throw new System1ProviderError({
+      code: 'invalid_response',
+      message: `${providerName} returned an invalid response.`,
+    })
+
+  const answeredModel = parsed.data.model ?? request.model
+  return {
+    model: answeredModel || request.model,
+    answers: normalizeAnswers(request, parsed.data.answers),
+    ...(parsed.data.usage
+      ? {
+          usage: {
+            ...(parsed.data.usage.input_tokens !== undefined
+              ? { inputTokens: parsed.data.usage.input_tokens }
+              : {}),
+            ...(parsed.data.usage.output_tokens !== undefined
+              ? { outputTokens: parsed.data.usage.output_tokens }
+              : {}),
+          },
+        }
+      : {}),
   }
 }
 
@@ -177,6 +187,16 @@ function normalizeAnswers(
         }]
 
       if (question.type !== 'score') return [id, invalidAnswer()]
+      if (
+        answer.legend !== undefined &&
+        !isDeepStrictEqual(
+          answer.legend,
+          Object.fromEntries(
+            question.criteria.map((value, index) => [String(index), value]),
+          ),
+        )
+      )
+        return [id, invalidAnswer()]
       const probabilities = question.criteria.map((_, index) => {
         const probability = answer.probabilities[String(index)]
         return probability

@@ -28,6 +28,7 @@ const en = {
   provider: 'Default service',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
+  providerCloudflare: 'Cloudflare Clef',
   providerUnknown: 'Unsupported service',
   model: 'Default model',
   timeout: 'Request timeout (ms)',
@@ -65,7 +66,13 @@ const en = {
   typesafeEndpointHint: 'The TypeSafe System One endpoint is appended automatically.',
   layaEndpoint: 'Laya server base URL',
   layaEndpointHint: 'Use the base URL of a Laya server exposing POST /v1/systemone.',
+  cloudflareSummary: 'Configure the Cloudflare API endpoint, account, and API token.',
+  cloudflareEndpoint: 'Cloudflare API base URL',
+  cloudflareEndpointHint: 'Use the Cloudflare API v4 base URL.',
+  cloudflareAccountId: 'Cloudflare account ID',
+  cloudflareAccountIdHint: 'Enter the 32-character account ID, or leave blank to use CLOUDFLARE_ACCOUNT_ID.',
   invalidEndpoint: 'Enter a full HTTP or HTTPS URL.',
+  invalidAccountId: 'Enter a 32-character Cloudflare account ID, or leave it blank to use the environment variable.',
   modelAuto: 'Auto route by language',
   modelEnglish: 'English checkpoint',
   modelMultilingual: 'Multilingual checkpoint',
@@ -77,6 +84,7 @@ const zh = {
   provider: '默认服务',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
+  providerCloudflare: 'Cloudflare Clef',
   providerUnknown: '暂不支持的服务',
   model: '默认模型',
   timeout: '请求超时（毫秒）',
@@ -114,7 +122,13 @@ const zh = {
   typesafeEndpointHint: '插件会自动在地址后拼接 TypeSafe System One 接口路径。',
   layaEndpoint: 'Laya 服务根地址',
   layaEndpointHint: '填写提供 POST /v1/systemone 接口的 Laya 服务根地址。',
+  cloudflareSummary: '配置 Cloudflare API 地址、账号和 API Token。',
+  cloudflareEndpoint: 'Cloudflare API 根地址',
+  cloudflareEndpointHint: '填写 Cloudflare API v4 根地址。',
+  cloudflareAccountId: 'Cloudflare 账号 ID',
+  cloudflareAccountIdHint: '填写 32 位账号 ID；留空时使用环境变量 CLOUDFLARE_ACCOUNT_ID。',
   invalidEndpoint: '请输入完整的 HTTP 或 HTTPS 地址。',
+  invalidAccountId: '请输入 32 位 Cloudflare 账号 ID，或留空以使用环境变量。',
   modelAuto: '按语言自动路由',
   modelEnglish: '英文模型',
   modelMultilingual: '多语言模型',
@@ -131,31 +145,76 @@ type Copy = Translate<keyof typeof en>
 type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
-type ProviderId = 'typesafe' | 'laya'
+type ProviderId = 'typesafe' | 'laya' | 'cloudflare'
 type ModelOption = { id: string; label?: keyof typeof en }
-
-const PROVIDERS: ReadonlyArray<{
+type ProviderSettings = {
   id: ProviderId
   rowId: string
+  label: keyof typeof en
+  summary: keyof typeof en
   keyRef: string
+  keyHint: keyof typeof en
+  endpointLabel: keyof typeof en
+  endpointHint: keyof typeof en
+  baseURL: string
   models: ReadonlyArray<ModelOption>
-}> = [
+  accountId?: {
+    path: 'accountId'
+    label: keyof typeof en
+    hint: keyof typeof en
+    defaultValue: string
+    normalize: (value: string) => string | undefined
+  }
+}
+
+const PROVIDERS: ReadonlyArray<ProviderSettings> = [
   {
     id: 'typesafe',
     rowId: 'system1-typesafe',
+    label: 'providerTypesafe',
+    summary: 'typesafeSummary',
     keyRef: 'TYPESAFE_API_KEY',
+    keyHint: 'keyHint',
+    endpointLabel: 'typesafeEndpoint',
+    endpointHint: 'typesafeEndpointHint',
+    baseURL: 'https://api.typesafe.ai',
     models: [{ id: 'jev-latest' }, { id: 'jev-preview' }, { id: 'jev-1.13.0' }],
   },
   {
     id: 'laya',
     rowId: 'system1-laya',
+    label: 'providerLaya',
+    summary: 'layaSummary',
     keyRef: 'LAYA_API_KEY',
+    keyHint: 'layaKeyHint',
+    endpointLabel: 'layaEndpoint',
+    endpointHint: 'layaEndpointHint',
+    baseURL: 'http://127.0.0.1:8000',
     models: [
       { id: 'auto', label: 'modelAuto' },
       { id: 'english', label: 'modelEnglish' },
       { id: 'multilingual', label: 'modelMultilingual' },
       { id: 'typed-decisions', label: 'modelTypedDecisions' },
     ],
+  },
+  {
+    id: 'cloudflare',
+    rowId: 'system1-cloudflare',
+    label: 'providerCloudflare',
+    summary: 'cloudflareSummary',
+    keyRef: 'CLOUDFLARE_API_TOKEN',
+    keyHint: 'keyHint',
+    endpointLabel: 'cloudflareEndpoint',
+    endpointHint: 'cloudflareEndpointHint',
+    baseURL: 'https://api.cloudflare.com/client/v4',
+    models: [{ id: 'clef' }, { id: 'clef-flash' }],
+    accountId: {
+      path: 'accountId',
+      label: 'cloudflareAccountId',
+      hint: 'cloudflareAccountIdHint',
+      defaultValue: '',
+      normalize: normalizeCloudflareAccountId,
+    },
   },
 ]
 
@@ -319,7 +378,7 @@ function BundleSettingsPage(props: BoundPageProps) {
     PROVIDERS.map((entry) => h('option', {
       key: entry.id,
       value: entry.id,
-    }, t(entry.id === 'typesafe' ? 'providerTypesafe' : 'providerLaya')))), t('defaultHint'), undefined, true),
+    }, t(entry.label)))), t('defaultHint'), undefined, true),
     field('dsh-system1-model', t('model'), h('select', {
       id: 'dsh-system1-model',
       name: 'model',
@@ -362,9 +421,8 @@ function ProviderSettingsPage(props: BoundPageProps & {
   const value = objectValue(state?.value)
   const base = objectValue(state?.base)
   const { provider, t } = props
-  const [baseURL, setBaseURL] = useState(provider.id === 'typesafe'
-    ? 'https://api.typesafe.ai'
-    : 'http://127.0.0.1:8000')
+  const [baseURL, setBaseURL] = useState(provider.baseURL)
+  const [accountId, setAccountId] = useState(provider.accountId?.defaultValue ?? '')
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -379,9 +437,11 @@ function ProviderSettingsPage(props: BoundPageProps & {
   const credentialGeneration = useRef(0)
 
   useEffect(() => {
-    setBaseURL(typeof value.baseURL === 'string' ? value.baseURL : provider.id === 'typesafe'
-      ? 'https://api.typesafe.ai'
-      : 'http://127.0.0.1:8000')
+    setBaseURL(typeof value.baseURL === 'string' ? value.baseURL : provider.baseURL)
+    const setting = provider.accountId
+    setAccountId(setting && typeof value[setting.path] === 'string'
+      ? value[setting.path] as string
+      : setting?.defaultValue ?? '')
   }, [provider.id, state?.revision, state?.status, state?.value])
 
   const refreshCredential = useCallback(async () => {
@@ -417,26 +477,52 @@ function ProviderSettingsPage(props: BoundPageProps & {
   }, [props.ctx, provider.keyRef, refreshCredential])
 
   const pageState = settingsState(t, state?.status)
-  if (props.view === 'summary') return h('p', null, t(provider.id === 'typesafe' ? 'typesafeSummary' : 'layaSummary'))
+  if (props.view === 'summary') return h('p', null, t(provider.summary))
   if (pageState) return pageState
   const canSave = Boolean(form && state?.writable && state.revision !== undefined)
   const defaultBaseURL = typeof base.baseURL === 'string' ? base.baseURL
-    : provider.id === 'typesafe' ? 'https://api.typesafe.ai' : 'http://127.0.0.1:8000'
+    : provider.baseURL
   const currentBaseURL = typeof value.baseURL === 'string' ? value.baseURL : defaultBaseURL
   const baseURLDirty = baseURL.trim() !== currentBaseURL
+  const accountSetting = provider.accountId
+  const defaultAccountId = accountSetting
+    ? typeof base[accountSetting.path] === 'string'
+      ? base[accountSetting.path] as string
+      : accountSetting.defaultValue
+    : ''
+  const currentAccountId = accountSetting && typeof value[accountSetting.path] === 'string'
+    ? value[accountSetting.path] as string
+    : defaultAccountId
+  const normalizedAccountId = accountSetting?.normalize(accountId)
+  const accountIdDirty = Boolean(accountSetting && accountId.trim() !== currentAccountId)
+  const settingsDirty = baseURLDirty || accountIdDirty
+  const normalizedBaseURL = normalizeEndpoint(baseURL)
+  const endpointInvalid = baseURLDirty && !normalizedBaseURL
+  const accountIdInvalid = Boolean(accountIdDirty && normalizedAccountId === undefined)
+  const endpointMessage = error || (endpointInvalid
+    ? t('invalidEndpoint')
+    : accountIdInvalid ? t('invalidAccountId') : '')
 
   const saveSettings = async () => {
     setNotice('')
     setError('')
-    const normalized = normalizeEndpoint(baseURL)
-    if (!normalized) {
+    if (!normalizedBaseURL) {
       setError(t('invalidEndpoint'))
       return
     }
-    if (!baseURLDirty || !form || state?.revision === undefined) return
+    if (accountIdDirty && normalizedAccountId === undefined) {
+      setError(t('invalidAccountId'))
+      return
+    }
+    const operations: SettingsPathOpView[] = []
+    if (baseURLDirty)
+      operations.push({ op: 'set', path: ['baseURL'], value: normalizedBaseURL })
+    if (accountIdDirty && accountSetting && normalizedAccountId !== undefined)
+      operations.push({ op: 'set', path: [accountSetting.path], value: normalizedAccountId })
+    if (!operations.length || !form || state?.revision === undefined) return
     setSaving(true)
     try {
-      if (await form.mutate([{ op: 'set', path: ['baseURL'], value: normalized }], state.revision))
+      if (await form.mutate(operations, state.revision))
         setNotice(t('saved'))
       else setError(t('saveFailed'))
     } catch {
@@ -488,17 +574,11 @@ function ProviderSettingsPage(props: BoundPageProps & {
     }
   }
 
-  const endpointLabel = provider.id === 'typesafe' ? 'typesafeEndpoint' : 'layaEndpoint'
-  const endpointHint = provider.id === 'typesafe' ? 'typesafeEndpointHint' : 'layaEndpointHint'
-  const keyHint = provider.id === 'typesafe' ? 'keyHint' : 'layaKeyHint'
-  const normalizedBaseURL = normalizeEndpoint(baseURL)
-  const endpointInvalid = baseURLDirty && !normalizedBaseURL
-  const endpointMessage = error || (endpointInvalid ? t('invalidEndpoint') : '')
   const endpointFormState: SettingsFormShell = {
     available: true,
     writable: canSave,
-    dirty: baseURLDirty,
-    invalid: endpointInvalid,
+    dirty: settingsDirty,
+    invalid: endpointInvalid || accountIdInvalid,
     saving,
     failed: false,
   }
@@ -511,7 +591,7 @@ function ProviderSettingsPage(props: BoundPageProps & {
       onDiscard: () => {},
       children: null,
     },
-    field(`dsh-system1-${provider.id}-endpoint`, t(endpointLabel), h('input', {
+    field(`dsh-system1-${provider.id}-endpoint`, t(provider.endpointLabel), h('input', {
       id: `dsh-system1-${provider.id}-endpoint`,
       name: 'baseURL',
       type: 'url',
@@ -523,7 +603,26 @@ function ProviderSettingsPage(props: BoundPageProps & {
         setError('')
         setBaseURL(event.currentTarget.value)
       },
-    }), t(endpointHint), resetAction(t, t(endpointLabel), () => setBaseURL(defaultBaseURL), !canSave || saving), true),
+    }), t(provider.endpointHint), resetAction(t, t(provider.endpointLabel), () => setBaseURL(defaultBaseURL), !canSave || saving), true),
+    accountSetting && field(
+      `dsh-system1-${provider.id}-${accountSetting.path}`,
+      t(accountSetting.label),
+      h('input', {
+        id: `dsh-system1-${provider.id}-${accountSetting.path}`,
+        name: accountSetting.path,
+        type: 'text',
+        value: accountId,
+        autoComplete: 'off',
+        disabled: !canSave || saving,
+        style: inputStyle,
+        onChange: (event: { currentTarget: { value: string } }) => {
+          setError('')
+          setAccountId(event.currentTarget.value)
+        },
+      }),
+      t(accountSetting.hint),
+      resetAction(t, t(accountSetting.label), () => setAccountId(defaultAccountId), !canSave || saving),
+    ),
     statusMessage(notice, endpointMessage)),
     h('section', { style: credentialSectionStyle },
       credentialLoading
@@ -531,7 +630,7 @@ function ProviderSettingsPage(props: BoundPageProps & {
         : h(SettingsSecretField, {
           id: `dsh-system1-${provider.id}-api-key`,
           label: t('key'),
-          hint: t(keyHint),
+          hint: t(provider.keyHint),
           text: secret,
           configured: credentialAvailable && credentialConfigured,
           stateLabel: !credentialAvailable
@@ -630,6 +729,13 @@ function normalizeEndpoint(value: string): string | undefined {
     return undefined
   }
   return undefined
+}
+
+function normalizeCloudflareAccountId(value: string): string | undefined {
+  const normalized = value.trim()
+  return normalized.length === 0 || normalized.length === 32
+    ? normalized
+    : undefined
 }
 
 const inputStyle = {

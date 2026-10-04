@@ -18,7 +18,7 @@
 | `choice` | 候选键和完整概率分布                |
 | `score`  | 从 0 开始的期望等级和概率分布       |
 
-服务提供请求与响应校验、逐题结果、取消、超时、provider 注册和执行元数据。内置 TypeSafe/Jev provider 使用 TanStack 的 TypeSafe adapter。其他后端可实现公开的 provider 契约。
+服务提供请求与响应校验、逐题结果、取消、超时、provider 注册和执行元数据。内置 TypeSafe/Jev、Laya 和 Cloudflare Clef provider，通过 System One HTTP 协议接入。其他后端可实现公开的 provider 契约。
 
 ## 从 GitHub 安装
 
@@ -32,7 +32,9 @@ dsh plugin --profile headless add github:exoticknight/dsh-system1
 
 仓库已包含插件所需的编译文件 `lib/`，安装时无需本地克隆，也无需手动拼接压缩包路径。pnpm 支持直接从 GitHub 仓库安装依赖，详见[pnpm 支持的包来源](https://pnpm.io/package-sources)。
 
-随包提供的 patch 会挂载服务和 TypeSafe provider。默认模型为 `jev-1.13.0`、provider id 为 `typesafe`、总超时为 800 ms。启动 dsh 前，在进程环境中设置 `TYPESAFE_API_KEY`。可根据后端延迟调整 `timeoutMs`。
+随包提供的 patch 会挂载服务及内置 provider。默认模型为 `jev-latest`、provider id 为 `typesafe`、总超时为 800 ms。可在插件设置页选择默认服务和模型，填写连接参数，并将密钥保存到 DSH 凭据存储；也可在启动前配置对应环境变量。根据后端延迟调整 `timeoutMs`，本地 CPU 推理通常需要更长预算。
+
+Cloudflare 使用 `cloudflare` provider 的 `clef` 或 `clef-flash`。配置步骤见[模型服务配置](docs/providers.md)。
 
 ## 消费插件调用
 
@@ -77,7 +79,7 @@ export async function apply(ctx: Context) {
 
 `noul` 返回 `probabilityTrue`；`choice` 返回候选键及完整分布；`score` 返回期望等级和按 `criteria` 排列的概率。它们都是模型输出，阈值和后续动作由消费插件决定。运行故障通过逐题 `status: 'error'` 返回；调用结构无效时抛出 `System1InputError`。
 
-完整契约见 [API 与 provider 开发](docs/api.md)，调用示例见[消费插件示例](examples/consumer.ts)。当前支持 TypeSafe 模型 `jev-1.13.0` 和 `jev-latest`。
+完整契约见 [API 与 provider 开发](docs/api.md)，调用示例见[消费插件示例](examples/consumer.ts)。TypeSafe 支持 `jev-latest`、`jev-preview` 和 `jev-1.13.0`；其他服务的模型与限制见[模型服务配置](docs/providers.md)。
 
 ## 开发
 

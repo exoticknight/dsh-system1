@@ -34,14 +34,29 @@ try {
   await ctx.loader.root.update(entries)
   await ctx.loader.await()
   assert.ok(ctx.system1)
-  const result = await ctx.system1.decide({
+  const cancelled = await ctx.system1.decide({
     state: 'fixture',
     questions: { q: { type: 'noul', instructions: 'yes?' } },
     signal: AbortSignal.abort(),
   })
-  assert.equal(result.answers.q.error.code, 'cancelled')
+  assert.equal(
+    cancelled.answers.q.status === 'error' ? cancelled.answers.q.error.code : undefined,
+    'cancelled',
+  )
+  for (const provider of ['typesafe', 'laya', 'cloudflare']) {
+    const result = await ctx.system1.decide({
+      state: 'fixture',
+      questions: { q: { type: 'noul', instructions: 'yes?' } },
+      model: { provider, model: '__host_probe_unsupported__' },
+    })
+    assert.equal(
+      result.answers.q.status === 'error' ? result.answers.q.error.code : undefined,
+      'unsupported',
+      `Provider ${provider} was not mounted or did not validate models without network access.`,
+    )
+  }
   console.log(
-    `Installed dsh ${manifest.version} loader mounted the service and both independent provider components.`,
+    `Installed dsh ${manifest.version} loader mounted the service and all three provider components.`,
   )
   await ctx.loader.root.stop()
   assert.equal(ctx.get('system1'), undefined)

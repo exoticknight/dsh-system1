@@ -49,6 +49,7 @@ try {
 import Service, { type System1Provider } from 'dsh-system1'
 import type { Questions } from 'dsh-system1/contracts'
 import * as typesafe from 'dsh-system1/providers/typesafe'
+import * as cloudflare from 'dsh-system1/providers/cloudflare'
 const ctx=new Context()
 const service=await ctx.plugin(Service,{defaultModel:{provider:'test',model:'fixture'}})
 const provider:System1Provider={async describe(){return {primitives:['choice']}},async evaluate(){return {model:'fixture',answers:{topic:{status:'ok',answer:{type:'choice',value:'a',probabilities:{a:1,b:0}}}}}}}
@@ -57,9 +58,17 @@ const questions={topic:{type:'choice',instructions:'?',criteria:{a:'A',b:'B'}}} 
 const result=await ctx.system1.decide({state:'fixture',questions})
 if(result.answers.topic.status!=='ok')throw new Error('Consumer failed')
 const value:'a'|'b'=result.answers.topic.answer.value
-if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid public entry')
+if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
 await service.dispose()
-console.log('Isolated package imports, consumer types and Cordis mount passed.')
+const cloudflareCtx=new Context()
+const cloudflareService=await cloudflareCtx.plugin(Service,{defaultModel:{provider:'cloudflare',model:'unsupported-probe'}})
+const cloudflarePlugin=await cloudflareCtx.plugin(cloudflare,{id:'cloudflare',apiKeyEnv:'CLOUDFLARE_API_TOKEN',accountId:'',baseURL:'https://api.cloudflare.com/client/v4'})
+if(typeof cloudflare.createCloudflareProvider!=='function')throw new Error('Missing Cloudflare provider export')
+const cloudflareResult=await cloudflareCtx.system1.decide({state:'fixture',questions:{q:{type:'noul',instructions:'?'}}})
+if(cloudflareResult.answers.q.status!=='error'||cloudflareResult.answers.q.error.code!=='unsupported')throw new Error('Cloudflare Cordis component did not register its provider')
+await cloudflarePlugin.dispose()
+await cloudflareService.dispose()
+console.log('Isolated package imports, consumer types and TypeSafe/Cloudflare Cordis mounts passed.')
 `
   writeFileSync(join(work, 'consumer.ts'), consumer)
   run(

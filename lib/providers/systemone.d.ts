@@ -1,4 +1,4 @@
-import type { System1Provider } from '../contracts/index.js';
+import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js';
 import type { ModelCapabilities } from '../contracts/provider.js';
 export interface SystemOneHttpProviderOptions {
     readonly providerName: string;
@@ -16,4 +16,6 @@ export interface SystemOneHttpProviderOptions {
  * contract. Provider identity, URL, key policy and model mapping stay separate.
  */
 export declare function createSystemOneHttpProvider(options: SystemOneHttpProviderOptions): System1Provider;
+/** Shared response normalization for providers that return the System One payload. */
+export declare function normalizeSystemOneResponse(request: ProviderRequest, raw: unknown, providerName: string): ProviderResponse;
 //# sourceMappingURL=systemone.d.ts.map

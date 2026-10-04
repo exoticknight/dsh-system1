@@ -3,7 +3,8 @@
     "paths": {
       "dsh-system1": ["./src/index.ts"],
       "dsh-system1/contracts": ["./src/contracts/index.ts"],
-      "dsh-system1/providers/typesafe": ["./src/providers/typesafe/index.ts"]
+      "dsh-system1/providers/typesafe": ["./src/providers/typesafe/index.ts"],
+      "dsh-system1/providers/cloudflare": ["./src/providers/cloudflare/index.ts"]
     },
     "target": "ES2022",
     "module": "NodeNext",

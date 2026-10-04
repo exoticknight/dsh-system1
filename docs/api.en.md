@@ -6,7 +6,7 @@
 
 `decide({ state, questions, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service uses its `defaultModel`. If neither is provided, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. The budget covers capability checks and the backend call.
 
-Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types only; `dsh-system1/providers/typesafe` exports the provider plugin and `createTypesafeProvider`.
+Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types only. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, and `dsh-system1/providers/cloudflare` entry points export their plugins and the `createTypesafeProvider`, `createLayaProvider`, and `createCloudflareProvider` factories respectively. See [provider setup](providers.en.md) for connection details and model selection.
 
 Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
 
@@ -57,6 +57,6 @@ Provider ids must be unique within a service. Registration returns an idempotent
 
 ## TypeSafe capabilities and limits
 
-Supported models are `jev-1.13.0` and `jev-latest`. `choice` supports up to 255 candidates; `score` supports 2–10 levels. The fixed model reports context information of 64k tokens per request and 32k tokens for state plus the longest individual question. The backend enforces exact token limits. HTTP 422 responses remain `provider_error` with `httpStatus`; without a stable error code, the service does not infer that the response means a length limit was exceeded.
+Supported models are `jev-1.13.0`, `jev-latest`, and `jev-preview`. `choice` supports up to 255 candidates; `score` supports 2–10 levels. The fixed model reports context information of 64k tokens per request and 32k tokens for state plus the longest individual question. The backend enforces exact token limits. HTTP 422 responses remain `provider_error` with `httpStatus`; without a stable error code, the service does not infer that the response means a length limit was exceeded.
 
 The provider plugin accepts `id`, `apiKeyEnv`, and optional `baseURL`; the first two default to `typesafe` and `TYPESAFE_API_KEY`. `createTypesafeProvider` accepts an explicit API key, optional base URL, and fetch implementation for embedding and local fixtures.

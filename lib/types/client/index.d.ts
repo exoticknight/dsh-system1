@@ -4,6 +4,7 @@ declare const en: {
     provider: string;
     providerTypesafe: string;
     providerLaya: string;
+    providerCloudflare: string;
     providerUnknown: string;
     model: string;
     timeout: string;
@@ -41,7 +42,13 @@ declare const en: {
     typesafeEndpointHint: string;
     layaEndpoint: string;
     layaEndpointHint: string;
+    cloudflareSummary: string;
+    cloudflareEndpoint: string;
+    cloudflareEndpointHint: string;
+    cloudflareAccountId: string;
+    cloudflareAccountIdHint: string;
     invalidEndpoint: string;
+    invalidAccountId: string;
     modelAuto: string;
     modelEnglish: string;
     modelMultilingual: string;

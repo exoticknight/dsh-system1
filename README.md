@@ -18,7 +18,7 @@ English | [简体中文](README.zh-CN.md)
 | `choice`  | Candidate key and the full probability distribution        |
 | `score`   | Expected zero-based level and the probability distribution |
 
-The service provides request and response validation, per-question results, cancellation, timeouts, provider registration, and execution metadata. The built-in TypeSafe/Jev provider uses TanStack's TypeSafe adapter. Other providers can implement the public provider contract.
+The service provides request and response validation, per-question results, cancellation, timeouts, provider registration, and execution metadata. Built-in providers connect to TypeSafe/Jev, Laya, and Cloudflare Clef through the System One HTTP protocol. Other backends can implement the public provider contract.
 
 ## Install from GitHub
 
@@ -32,7 +32,9 @@ dsh plugin --profile headless add github:exoticknight/dsh-system1
 
 The repository includes the compiled `lib/` files required by the plugin, so installation does not need a local checkout or a manually constructed archive path. pnpm supports GitHub repositories as direct package sources; see [supported package sources](https://pnpm.io/package-sources).
 
-The bundled patch mounts the service and TypeSafe provider. Defaults are model `jev-1.13.0`, provider id `typesafe`, and an 800 ms total timeout. Set `TYPESAFE_API_KEY` in the dsh process environment before startup. Adjust `timeoutMs` to fit the backend latency.
+The bundled patch mounts the service and built-in providers. Defaults are model `jev-latest`, provider id `typesafe`, and an 800 ms total timeout. Use the plugin settings to choose a default service and model, configure connections, and store keys in DSH credentials; environment variables are also supported. Adjust `timeoutMs` to fit backend latency, especially for local CPU inference.
+
+Cloudflare uses provider `cloudflare` with `clef` or `clef-flash`. See [provider setup](docs/providers.en.md) for configuration.
 
 ## Use from a consumer plugin
 
@@ -80,7 +82,7 @@ export async function apply(ctx: Context) {
 
 `noul` returns `probabilityTrue`; `choice` returns a candidate key and its full distribution; `score` returns an expected level and probabilities ordered by `criteria`. These are model outputs, so consumer plugins choose their own decision thresholds and actions. Runtime failures are reported per question with `status: 'error'`; malformed call structures throw `System1InputError`.
 
-See [API and provider development](docs/api.en.md) for the full contract and [the consumer example](examples/consumer.ts). Supported TypeSafe models are `jev-1.13.0` and `jev-latest`.
+See [API and provider development](docs/api.en.md) for the full contract and [the consumer example](examples/consumer.ts). TypeSafe supports `jev-latest`, `jev-preview`, and `jev-1.13.0`; see [provider setup](docs/providers.en.md) for other services and their limits.
 
 ## Development
 

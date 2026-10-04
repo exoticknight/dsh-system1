@@ -6,7 +6,7 @@
 
 `decide({ state, questions, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时使用服务的 `defaultModel`。两者都没有时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，默认 800，超时预算覆盖能力查询和后端调用。
 
-公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 只导出类型；`dsh-system1/providers/typesafe` 导出 provider 插件和 `createTypesafeProvider`。
+公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 只导出类型。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件及 `createTypesafeProvider`、`createLayaProvider`、`createCloudflareProvider` 工厂。连接参数与模型选择见[模型服务配置](providers.md)。
 
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 
@@ -54,6 +54,6 @@ ctx.effect(() => ctx.system1.registerProvider('custom', backend))
 
 ## TypeSafe 能力与限制
 
-支持模型 `jev-1.13.0` 和 `jev-latest`。`choice` 最多支持 255 个候选；`score` 支持 2–10 个等级。固定模型报告的 context 信息包括每个请求总计 64k tokens，以及 state 加最长单题共 32k tokens。精确 token 限制由后端执行。HTTP 422 保留为 `provider_error` 并附带 `httpStatus`；没有稳定错误码时，不推断它代表长度超限。
+支持模型 `jev-1.13.0`、`jev-latest` 和 `jev-preview`。`choice` 最多支持 255 个候选；`score` 支持 2–10 个等级。固定模型报告的 context 信息包括每个请求总计 64k tokens，以及 state 加最长单题共 32k tokens。精确 token 限制由后端执行。HTTP 422 保留为 `provider_error` 并附带 `httpStatus`；没有稳定错误码时，不推断它代表长度超限。
 
 provider 插件接受 `id`、`apiKeyEnv` 和可选的 `baseURL`；前两者默认值为 `typesafe` 和 `TYPESAFE_API_KEY`。`createTypesafeProvider` 接受显式 api key、可选 base URL 和 fetch 实现，便于嵌入调用与本地 fixture。
