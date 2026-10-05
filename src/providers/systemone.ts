@@ -39,6 +39,9 @@ export interface SystemOneHttpProviderOptions {
   readonly isModelSupported: (model: string) => boolean
   readonly requestModel?: (model: string) => string | undefined
   readonly capabilities?: ModelCapabilities
+  readonly selectResponseModel?: (
+    response: z.infer<typeof wireResponse>,
+  ) => string | undefined
   readonly fetch?: typeof fetch
 }
 
@@ -124,7 +127,12 @@ export function createSystemOneHttpProvider(
           message: `${options.providerName} returned an invalid response.`,
         })
       }
-      return normalizeSystemOneResponse(request, raw, options.providerName)
+      return normalizeSystemOneResponse(
+        request,
+        raw,
+        options.providerName,
+        options.selectResponseModel,
+      )
     },
   }
 }
@@ -134,6 +142,9 @@ export function normalizeSystemOneResponse(
   request: ProviderRequest,
   raw: unknown,
   providerName: string,
+  selectResponseModel?: (
+    response: z.infer<typeof wireResponse>,
+  ) => string | undefined,
 ): ProviderResponse {
   const parsed = wireResponse.safeParse(raw)
   if (!parsed.success)
@@ -142,7 +153,8 @@ export function normalizeSystemOneResponse(
       message: `${providerName} returned an invalid response.`,
     })
 
-  const answeredModel = parsed.data.model ?? request.model
+  const answeredModel =
+    selectResponseModel?.(parsed.data) ?? parsed.data.model ?? request.model
   return {
     model: answeredModel || request.model,
     answers: normalizeAnswers(request, parsed.data.answers),

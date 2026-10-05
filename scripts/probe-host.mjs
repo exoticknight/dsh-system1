@@ -1,12 +1,12 @@
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 if (!process.argv[2])
   throw new Error(
     'Pass the absolute path of installed @deepseek-ai/dsh/package.json.',
   )
-const host = pathToFileURL(process.argv[2])
+const host = pathToFileURL(realpathSync(process.argv[2]))
 const require = createRequire(host)
 const manifest = JSON.parse(readFileSync(host, 'utf8'))
 const pluginManifest = JSON.parse(

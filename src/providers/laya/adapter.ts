@@ -20,6 +20,12 @@ export function createLayaProvider(options: LayaOptions): System1Provider {
     apiKeyRequired: false,
     isModelSupported: (model) => MODELS.has(model),
     requestModel: (model) => model === 'auto' ? undefined : model,
+    selectResponseModel: (response) => {
+      const routing = response.routing
+      if (!routing || typeof routing !== 'object') return undefined
+      const model = (routing as { model?: unknown }).model
+      return typeof model === 'string' && model.trim() ? model : undefined
+    },
     ...(options.fetch ? { fetch: options.fetch } : {}),
   })
 }

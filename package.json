@@ -100,6 +100,8 @@
     "probe:live": "node scripts/probe-live.mjs",
     "probe:host": "node --expose-internals scripts/probe-host.mjs",
     "probe:cloudflare": "pnpm build && node scripts/probe-cloudflare.mjs",
+    "probe:clef-local": "node scripts/probe-clef-local.mjs",
+    "probe:laya": "node scripts/probe-laya.mjs",
     "hooks:install": "simple-git-hooks",
     "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm check:package"
   },

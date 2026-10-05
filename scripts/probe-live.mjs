@@ -40,8 +40,22 @@ if (!process.env.TYPESAFE_API_KEY?.trim()) {
       },
     })
     console.log(JSON.stringify(result, null, 2))
-    if (Object.values(result.answers).some((a) => a.status === 'error'))
+    const expectedAnswerTypes = {
+      refund: 'noul',
+      topic: 'choice',
+      urgency: 'score',
+    }
+    for (const [id, type] of Object.entries(expectedAnswerTypes)) {
+      const answer = result.answers[id]
+      if (answer?.status !== 'ok' || answer.answer.type !== type) {
+        console.error(`Live probe returned no valid ${type} answer for ${id}.`)
+        process.exitCode = 1
+      }
+    }
+    if (!result.meta.executed?.provider || !result.meta.executed?.model) {
+      console.error('Live probe did not report the executed provider and model.')
       process.exitCode = 1
+    }
   } finally {
     await provider.dispose()
     await service.dispose()

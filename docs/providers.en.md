@@ -12,6 +12,14 @@ Choose the default provider and model in DSH plugin settings, then save connecti
 
 Providers resolve keys through DSH credentials when available, otherwise through the process environment. Keys are never displayed. Independent provider plugins support custom registration and credential names through `id` and `apiKeyEnv`.
 
+## Local deployment scope
+
+See [local services and live validation](local-testing.en.md) for setup, probes, and validation boundaries.
+
+Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
+
+TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/quickstart) describe a hosted API. Its [model documentation](https://docs.typesafe.ai/models) does not provide a deployable local Jev release. This project validates TypeSafe through real hosted calls and does not count protocol fixtures as local Jev inference. Set `TYPESAFE_API_KEY` in `.env.local`, build the package, and run `pnpm probe:live` to reproduce the hosted call.
+
 ## Cloudflare Clef
 
 Create an API token with Workers AI access and obtain your Account ID from Cloudflare. Enter the Account ID in the Cloudflare component and save the token in its credential field. You can also set `CLOUDFLARE_ACCOUNT_ID` in the dsh process environment.
