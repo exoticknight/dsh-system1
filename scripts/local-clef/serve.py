@@ -11,6 +11,7 @@ import asyncio
 import importlib
 import os
 import re
+import subprocess
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -124,21 +125,62 @@ def canonical_device(device: str) -> str:
     return "cuda:0" if device == "cuda" else device
 
 
+def verify_model_checkout(model_path: Path) -> Path:
+    try:
+        resolved_path = model_path.expanduser().resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise ValueError("The local model path is unavailable.") from None
+    if not resolved_path.is_dir():
+        raise ValueError("The local model path must be a Git working directory.")
+
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=resolved_path,
+            check=False,
+            capture_output=True,
+            text=True,
+            shell=False,
+        )
+    except OSError:
+        raise ValueError("Git could not verify the local model checkout.") from None
+    if revision.returncode != 0 or revision.stdout.strip() != REVISION:
+        raise ValueError("The local model checkout does not match the pinned revision.")
+
+    try:
+        clean = subprocess.run(
+            ["git", "diff", "--quiet", "HEAD"],
+            cwd=resolved_path,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+        )
+    except OSError:
+        raise ValueError("Git could not verify the local model working tree.") from None
+    if clean.returncode != 0:
+        raise ValueError("The local model working tree is not clean.")
+
+    return resolved_path
+
+
 def validate_device(device: str) -> str:
     if device == "cpu" or device == "cuda" or re.fullmatch(r"cuda:\d+", device):
         return device
     raise ValueError("device must be cpu, cuda, or cuda:N")
 
 
-def create_app(device: str | None = None) -> FastAPI:
+def create_app(device: str | None = None, model_path: Path | None = None) -> FastAPI:
     selected_device = validate_device(device or os.environ.get("CLEF_DEVICE", "cuda:0"))
     runtime = ClefRuntime(selected_device)
+    selected_model_path = model_path
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        snapshot_path = snapshot_download(MODEL_ID, revision=REVISION, token=False)
-        snapshot = Path(snapshot_path)
-        sys.path.insert(0, str(snapshot))
+        resolved_model_path = selected_model_path or Path(
+            snapshot_download(MODEL_ID, revision=REVISION, token=False)
+        )
+        sys.path.insert(0, str(resolved_model_path))
         official = importlib.import_module("joint_schema_model")
         quantization = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -147,7 +189,7 @@ def create_app(device: str | None = None) -> FastAPI:
             bnb_4bit_compute_dtype=torch.bfloat16,
         )
         runtime.model, runtime.processor = official.load_release_model(
-            snapshot_path,
+            str(resolved_model_path),
             device=selected_device,
             dtype=torch.bfloat16,
             quantization_config=quantization,
@@ -171,8 +213,8 @@ def create_app(device: str | None = None) -> FastAPI:
         finally:
             runtime.model = None
             runtime.processor = None
-            if str(snapshot) in sys.path:
-                sys.path.remove(str(snapshot))
+            if str(resolved_model_path) in sys.path:
+                sys.path.remove(str(resolved_model_path))
 
     app = FastAPI(
         title="Local Clef-Flash compatibility service",
@@ -246,15 +288,24 @@ def main() -> None:
         type=int,
         default=int(os.environ.get("CLEF_PORT", str(DEFAULT_PORT))),
     )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        help="Use a clean Git checkout at the pinned model revision instead of the Hub cache.",
+    )
     args = parser.parse_args()
     device = validate_device(args.device)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
     if device.startswith("cuda") and not torch.cuda.is_available():
         parser.error("CUDA was selected but is not available; use --device cpu")
+    try:
+        model_path = verify_model_checkout(args.model_path) if args.model_path else None
+    except ValueError as error:
+        parser.error(str(error))
 
     uvicorn.run(
-        create_app(device),
+        create_app(device, model_path),
         host="127.0.0.1",
         port=args.port,
         access_log=False,

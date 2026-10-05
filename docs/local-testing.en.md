@@ -30,6 +30,8 @@ This probe checks the actual Loader, registration of all three providers, pre-ca
 
 On Windows with pnpm links, the probe resolves the host manifest's real path before loading dependencies from that host's tree. The Loader probe passed against `0.1.7-rc.2` on 2026-10-05. Full dependency installation reported skipped native build scripts; this result verifies the Loader, not a full DSH application launch.
 
+The same installed Loader also loaded `cordis.patch.yml` and called `ctx.system1.decide` with `laya/auto`. All three primitives passed, executing `multilingual` in approximately 488 ms. The Loader was then unloaded while the Laya service remained running. This verifies the host Loader → plugin → local model HTTP chain; sanitized evidence is stored at `.scratch/local-providers/host/live-laya-result.json`.
+
 ## TypeSafe
 
 The [official instructions](https://docs.typesafe.ai/introduction/quickstart) describe the hosted API; there is currently no local Jev release deployable from those public instructions. Set `TYPESAFE_API_KEY` in `.env.local`, build, then run:
@@ -85,6 +87,8 @@ The [official Clef-flash release](https://huggingface.co/Cloudflare/clef-flash) 
 
 The server pins `Cloudflare/clef-flash` revision `17f0b0ad64efb65d273590632833508766b2aae6`. Its first launch downloads approximately 19.1GB of original weights into the default Hugging Face cache. The backbone uses local NF4 double quantization with BF16 computation; the joint head stays BF16. This precision and implementation should not be assumed equivalent to the hosted deployment.
 
+The runtime pins PyTorch 2.11.0+cu128, torchvision 0.26.0+cu128, Transformers 5.18.0, tokenizers 0.23.1, and bitsandbytes 0.50.2; see requirements for all exact versions. Transformers 5.10.2 from the official example could not parse this snapshot's processor configuration in this environment. Updating the maintained dependency and installing torchvision allowed the official `Qwen3VLProcessor` to load successfully.
+
 Install and start from the repository root (CUDA 12.8 wheel, Windows/Python 3.13 setup):
 
 ```powershell
@@ -92,6 +96,30 @@ python -m venv .scratch/local-providers/cloudflare/venv
 & .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I -m pip install -r scripts/local-clef/requirements.txt
 & .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --device cuda:0 --port 8765
 ```
+
+Repeated Hub connection failures led to using Git LFS for network-error retries and HTTP Range resumption. To prepare a separate deployment artifact directory without relocating the Hub cache, first install Git and Git LFS, then run:
+
+```powershell
+$clefDir = '.scratch/local-providers/cloudflare/model'
+$clefRevision = '17f0b0ad64efb65d273590632833508766b2aae6'
+$previousSkipSmudge = $env:GIT_LFS_SKIP_SMUDGE
+try {
+  $env:GIT_LFS_SKIP_SMUDGE = '1'
+  git clone --no-checkout https://huggingface.co/Cloudflare/clef-flash $clefDir
+  git -C $clefDir fetch --depth=1 origin $clefRevision
+  git -C $clefDir checkout --detach $clefRevision
+} finally {
+  $env:GIT_LFS_SKIP_SMUDGE = $previousSkipSmudge
+}
+git -C $clefDir -c lfs.concurrenttransfers=4 -c lfs.transfer.maxretries=12 -c lfs.basictransfersonly=true lfs fetch origin $clefRevision
+git -C $clefDir lfs checkout
+git -C $clefDir lfs fsck
+& .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --model-path $clefDir --device cuda:0 --port 8765
+```
+
+Before startup, `--model-path` verifies the pinned Git commit and a clean tracked working tree, then loads official code and weights from that directory. Wait for LFS fetch, checkout, and integrity verification to succeed before launching inference.
+
+Let fetch run continuously and handle its own retries. Git LFS 3.7.1 saves a resumable `.part` when the download function returns an error normally. Forced Windows termination can leave only a randomly named temporary file that the next process will not automatically reuse. Monitor active writes through Git LFS progress or open-file-handle sizes; Windows directory metadata can lag behind.
 
 Use `--device cpu` for CPU placement in the same environment. After startup, run `pnpm build`, then `node scripts/probe-clef-local.mjs` in another terminal. It connects to `127.0.0.1:8765` by default; when changing the port, set both the server's `--port` and the probe's `CLEF_LOCAL_PORT`. The probe exercises the public service and Cloudflare adapter with all three primitives and probability distributions, using placeholder credentials without loading real Cloudflare tokens. Health is exposed at `/health`; inference uses `/client/v4/accounts/{account}/ai/run/@cf/cloudflare/clef-flash`.
 

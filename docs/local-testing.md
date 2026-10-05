@@ -30,6 +30,8 @@ pnpm probe:host <绝对路径到测试宿主/node_modules/@deepseek-ai/dsh/packa
 
 Windows pnpm 使用链接目录，探针会先解析宿主 manifest 的真实路径，以便从该宿主自己的依赖树加载 Loader。2026-10-05 对 `0.1.7-rc.2` 的 Loader 探针已通过。该环境的完整安装报告了被跳过的原生构建脚本；这里只验证 Loader，不代表完整 DSH 应用启动成功。
 
+同日还使用该安装版 Loader 加载 `cordis.patch.yml`，再由 `ctx.system1.decide` 请求 `laya/auto`：三原语均通过，实际执行 `multilingual`，约 488 ms；之后卸载 Loader，Laya 服务保持运行。此验收覆盖宿主 Loader → 插件 → 本地模型 HTTP 链路，脱敏记录位于 `.scratch/local-providers/host/live-laya-result.json`。
+
 ## TypeSafe
 
 [官方文档](https://docs.typesafe.ai/introduction/quickstart)提供托管 API 接入方法，当前没有可按公开说明部署的 Jev 本地发行版。在 `.env.local` 中配置 `TYPESAFE_API_KEY`，构建后执行：
@@ -85,6 +87,8 @@ Clef-flash 的[官方发行版](https://huggingface.co/Cloudflare/clef-flash)包
 
 服务固定 `Cloudflare/clef-flash` revision `17f0b0ad64efb65d273590632833508766b2aae6`，首次启动下载约 19.1GB 原始权重到默认 Hugging Face 缓存。Backbone 使用本地 NF4 double quant，计算精度 BF16；joint head 保留 BF16。此结果与官方云端部署的精度及实现不应直接等同。
 
+当前依赖固定为 PyTorch 2.11.0+cu128、torchvision 0.26.0+cu128、Transformers 5.18.0、tokenizers 0.23.1 和 bitsandbytes 0.50.2，其余精确版本见 requirements。官方示例提到的 Transformers 5.10.2 在本机无法解析该快照的 processor 配置；升级成熟依赖并补齐 torchvision 后，官方 `Qwen3VLProcessor` 已通过加载检查。
+
 从仓库根目录安装并启动（CUDA 12.8 wheel，Windows/Python 3.13 配置）：
 
 ```powershell
@@ -92,6 +96,30 @@ python -m venv .scratch/local-providers/cloudflare/venv
 & .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I -m pip install -r scripts/local-clef/requirements.txt
 & .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --device cuda:0 --port 8765
 ```
+
+本机 Hub 下载多次断连，因此改用支持网络错误重试及 Range 续传的 Git LFS。以下是独立部署产物目录的首次准备流程，不会搬迁 Hub 缓存；先安装 Git 与 Git LFS：
+
+```powershell
+$clefDir = '.scratch/local-providers/cloudflare/model'
+$clefRevision = '17f0b0ad64efb65d273590632833508766b2aae6'
+$previousSkipSmudge = $env:GIT_LFS_SKIP_SMUDGE
+try {
+  $env:GIT_LFS_SKIP_SMUDGE = '1'
+  git clone --no-checkout https://huggingface.co/Cloudflare/clef-flash $clefDir
+  git -C $clefDir fetch --depth=1 origin $clefRevision
+  git -C $clefDir checkout --detach $clefRevision
+} finally {
+  $env:GIT_LFS_SKIP_SMUDGE = $previousSkipSmudge
+}
+git -C $clefDir -c lfs.concurrenttransfers=4 -c lfs.transfer.maxretries=12 -c lfs.basictransfersonly=true lfs fetch origin $clefRevision
+git -C $clefDir lfs checkout
+git -C $clefDir lfs fsck
+& .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --model-path $clefDir --device cuda:0 --port 8765
+```
+
+`--model-path` 启动前检查固定 Git 提交及 tracked 工作树清洁状态，使用该目录的官方代码与权重。先等待 LFS fetch、checkout 和完整性检查成功，再启动模型服务。
+
+尽量让 fetch 连续运行并自行重试。Git LFS 3.7.1 在下载函数正常返回错误时保存可续传的 `.part`；Windows 强制中断可能只留下随机临时文件，不能保证下一进程自动复用。监控正在写入的文件时，以 Git LFS 进度或打开文件句柄获取的尺寸为准，Windows 目录列表可能滞后。
 
 `--device cpu` 可选择 CPU 路线，沿用同一个环境。等待启动完成后，在另一终端先执行 `pnpm build`，再运行 `node scripts/probe-clef-local.mjs`；默认连接 `127.0.0.1:8765`，更改端口时同时设置服务 `--port` 与探针 `CLEF_LOCAL_PORT`。探针通过公共 service 和 Cloudflare adapter 验证三原语及概率分布，使用占位凭据，不读取真实 Cloudflare token。服务健康接口为 `/health`，推理入口为 `/client/v4/accounts/{account}/ai/run/@cf/cloudflare/clef-flash`。
 
