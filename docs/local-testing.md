@@ -87,7 +87,7 @@ Clef-flash 的[官方发行版](https://huggingface.co/Cloudflare/clef-flash)包
 
 服务固定 `Cloudflare/clef-flash` revision `17f0b0ad64efb65d273590632833508766b2aae6`，首次启动下载约 19.1GB 原始权重到默认 Hugging Face 缓存。Backbone 使用本地 NF4 double quant，计算精度 BF16；joint head 保留 BF16。此结果与官方云端部署的精度及实现不应直接等同。
 
-当前依赖固定为 PyTorch 2.11.0+cu128、torchvision 0.26.0+cu128、Transformers 5.18.0、tokenizers 0.23.1 和 bitsandbytes 0.50.2，其余精确版本见 requirements。官方示例提到的 Transformers 5.10.2 在本机无法解析该快照的 processor 配置；升级成熟依赖并补齐 torchvision 后，官方 `Qwen3VLProcessor` 已通过加载检查。
+当前依赖固定为 PyTorch 2.11.0+cu128、torchvision 0.26.0+cu128、Transformers 5.18.0、tokenizers 0.23.1 和 bitsandbytes 0.50.2，其余精确版本见 requirements。最初包含 Transformers 5.10.2 的环境无法加载该快照的 processor；升级依赖并补齐 torchvision 后，官方 `Qwen3VLProcessor` 已通过加载检查。这是联合依赖调整的验证结果，尚未单独定位到某一个版本。
 
 从仓库根目录安装并启动（CUDA 12.8 wheel，Windows/Python 3.13 配置）：
 
@@ -106,6 +106,7 @@ $previousSkipSmudge = $env:GIT_LFS_SKIP_SMUDGE
 try {
   $env:GIT_LFS_SKIP_SMUDGE = '1'
   git clone --no-checkout https://huggingface.co/Cloudflare/clef-flash $clefDir
+  git -C $clefDir lfs install --local
   git -C $clefDir fetch --depth=1 origin $clefRevision
   git -C $clefDir checkout --detach $clefRevision
 } finally {
@@ -117,12 +118,20 @@ git -C $clefDir lfs fsck
 & .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --model-path $clefDir --device cuda:0 --port 8765
 ```
 
-`--model-path` 启动前检查固定 Git 提交及 tracked 工作树清洁状态，使用该目录的官方代码与权重。先等待 LFS fetch、checkout 和完整性检查成功，再启动模型服务。
+`--model-path` 启动前检查固定 Git 提交及代码、配置文件的 tracked 清洁状态，使用该目录的官方代码与权重。大权重的完整性由下载完成时的 LFS OID/SHA-256 校验负责；启动时排除 `.safetensors`，避免重复比较 19GB 文件占用推理所需内存。先等待 LFS fetch、checkout 和完整性检查成功，再启动模型服务。
 
 尽量让 fetch 连续运行并自行重试。Git LFS 3.7.1 在下载函数正常返回错误时保存可续传的 `.part`；Windows 强制中断可能只留下随机临时文件，不能保证下一进程自动复用。监控正在写入的文件时，以 Git LFS 进度或打开文件句柄获取的尺寸为准，Windows 目录列表可能滞后。
 
 `--device cpu` 可选择 CPU 路线，沿用同一个环境。等待启动完成后，在另一终端先执行 `pnpm build`，再运行 `node scripts/probe-clef-local.mjs`；默认连接 `127.0.0.1:8765`，更改端口时同时设置服务 `--port` 与探针 `CLEF_LOCAL_PORT`。探针通过公共 service 和 Cloudflare adapter 验证三原语及概率分布，使用占位凭据，不读取真实 Cloudflare token。服务健康接口为 `/health`，推理入口为 `/client/v4/accounts/{account}/ai/run/@cf/cloudflare/clef-flash`。
 
-当前上述内容记录运行配置；完整权重下载与模型端到端推理尚待完成，不能据此声称 Clef 本地联调已通过。
+2026-10-05，官方 Git LFS 下载完成，六个对象的 SHA-256 与尺寸均匹配固定提交的 pointer。下载证据位于 `.scratch/local-providers/cloudflare/model-download-evidence.json`。同日在 i5-13600KF、32GB RAM 上完成真实本地联调：CPU 加载 358 个 NF4 double-quant 线性层，backbone 计算与 joint head 均为 BF16；公共 service → Cloudflare adapter → 本地 HTTP → 官方模型的 `noul`、`choice`、`score` 及完整概率分布均通过，单次耗时 130632 ms。此耗时包含首次请求成本，不作为稳定性能基准。
 
 本地包装的输入长度上限为 4096 tokens，探针最长等待 300 秒；它没有模拟云端配额、认证或并发能力。前台服务使用 `Ctrl+C` 停止。真实 Workers AI 验证仍运行 `pnpm probe:cloudflare`，需要有效云端凭据。
+
+完整本地推理证据保存在 `.scratch/local-providers/cloudflare/evidence.json`。本机测试时可用显存约 5.5GB，因此实际采用 CPU。已下载的环境和权重可直接复用，按本次配置启动：
+
+```powershell
+& .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --model-path .scratch/local-providers/cloudflare/model --device cpu --port 8765
+```
+
+验收后为释放内存停止 Clef，保留环境和权重供按需启动；Laya 已恢复在 `127.0.0.1:8000` 运行，健康检查确认加载上述固定 revision 的 multilingual CPU 模型。

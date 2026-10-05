@@ -87,7 +87,7 @@ The [official Clef-flash release](https://huggingface.co/Cloudflare/clef-flash) 
 
 The server pins `Cloudflare/clef-flash` revision `17f0b0ad64efb65d273590632833508766b2aae6`. Its first launch downloads approximately 19.1GB of original weights into the default Hugging Face cache. The backbone uses local NF4 double quantization with BF16 computation; the joint head stays BF16. This precision and implementation should not be assumed equivalent to the hosted deployment.
 
-The runtime pins PyTorch 2.11.0+cu128, torchvision 0.26.0+cu128, Transformers 5.18.0, tokenizers 0.23.1, and bitsandbytes 0.50.2; see requirements for all exact versions. Transformers 5.10.2 from the official example could not parse this snapshot's processor configuration in this environment. Updating the maintained dependency and installing torchvision allowed the official `Qwen3VLProcessor` to load successfully.
+The runtime pins PyTorch 2.11.0+cu128, torchvision 0.26.0+cu128, Transformers 5.18.0, tokenizers 0.23.1, and bitsandbytes 0.50.2; see requirements for all exact versions. The initial environment containing Transformers 5.10.2 could not load this snapshot's processor. Updating dependencies and installing torchvision allowed the official `Qwen3VLProcessor` to load successfully. This verifies the combined dependency change; it does not isolate a single version as the cause.
 
 Install and start from the repository root (CUDA 12.8 wheel, Windows/Python 3.13 setup):
 
@@ -106,6 +106,7 @@ $previousSkipSmudge = $env:GIT_LFS_SKIP_SMUDGE
 try {
   $env:GIT_LFS_SKIP_SMUDGE = '1'
   git clone --no-checkout https://huggingface.co/Cloudflare/clef-flash $clefDir
+  git -C $clefDir lfs install --local
   git -C $clefDir fetch --depth=1 origin $clefRevision
   git -C $clefDir checkout --detach $clefRevision
 } finally {
@@ -117,12 +118,20 @@ git -C $clefDir lfs fsck
 & .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --model-path $clefDir --device cuda:0 --port 8765
 ```
 
-Before startup, `--model-path` verifies the pinned Git commit and a clean tracked working tree, then loads official code and weights from that directory. Wait for LFS fetch, checkout, and integrity verification to succeed before launching inference.
+Before startup, `--model-path` verifies the pinned Git commit and clean tracked code/configuration files, then loads official code and weights from that directory. Weight integrity is checked against LFS OIDs/SHA-256 after download. Startup excludes `.safetensors` from Git comparisons so another 19GB scan does not consume memory needed for inference. Wait for LFS fetch, checkout, and integrity verification to succeed before launching inference.
 
 Let fetch run continuously and handle its own retries. Git LFS 3.7.1 saves a resumable `.part` when the download function returns an error normally. Forced Windows termination can leave only a randomly named temporary file that the next process will not automatically reuse. Monitor active writes through Git LFS progress or open-file-handle sizes; Windows directory metadata can lag behind.
 
 Use `--device cpu` for CPU placement in the same environment. After startup, run `pnpm build`, then `node scripts/probe-clef-local.mjs` in another terminal. It connects to `127.0.0.1:8765` by default; when changing the port, set both the server's `--port` and the probe's `CLEF_LOCAL_PORT`. The probe exercises the public service and Cloudflare adapter with all three primitives and probability distributions, using placeholder credentials without loading real Cloudflare tokens. Health is exposed at `/health`; inference uses `/client/v4/accounts/{account}/ai/run/@cf/cloudflare/clef-flash`.
 
-These instructions currently record the runtime configuration. Full weight download and end-to-end model inference are still pending; local Clef integration is not yet verified.
+On 2026-10-05, the official Git LFS download completed and all six objects matched the pinned commit's pointer SHA-256 and byte sizes. Download evidence is stored at `.scratch/local-providers/cloudflare/model-download-evidence.json`. Real local integration also passed on an i5-13600KF with 32GB RAM: CPU placement, 358 NF4 double-quant linear layers, BF16 backbone computation and joint head. The public service → Cloudflare adapter → local HTTP → official model path returned valid `noul`, `choice`, and `score` answers with complete probability distributions in 130632 ms. This includes first-request costs and is not a steady-state performance benchmark.
 
 This wrapper caps input length at 4096 tokens, and the probe allows 300 seconds. It does not emulate cloud quotas, authentication, or concurrency capabilities. Stop a foreground server with `Ctrl+C`. Real Workers AI validation still uses `pnpm probe:cloudflare` with valid cloud credentials.
+
+Complete local inference evidence is stored at `.scratch/local-providers/cloudflare/evidence.json`. Only about 5.5GB of GPU memory was available during validation, so this run used CPU placement. Reuse the installed environment and downloaded weights with:
+
+```powershell
+& .scratch/local-providers/cloudflare/venv/Scripts/python.exe -I scripts/local-clef/serve.py --model-path .scratch/local-providers/cloudflare/model --device cpu --port 8765
+```
+
+After validation, Clef was stopped to release memory; its environment and weights remain available for on-demand startup. Laya was restored at `127.0.0.1:8000`, with health confirming the multilingual CPU model at the revision recorded above.

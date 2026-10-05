@@ -149,7 +149,15 @@ def verify_model_checkout(model_path: Path) -> Path:
 
     try:
         clean = subprocess.run(
-            ["git", "diff", "--quiet", "HEAD"],
+            [
+                "git",
+                "diff",
+                "--quiet",
+                "HEAD",
+                "--",
+                ".",
+                ":(exclude,glob)**/*.safetensors",
+            ],
             cwd=resolved_path,
             check=False,
             stdout=subprocess.DEVNULL,
@@ -159,7 +167,7 @@ def verify_model_checkout(model_path: Path) -> Path:
     except OSError:
         raise ValueError("Git could not verify the local model working tree.") from None
     if clean.returncode != 0:
-        raise ValueError("The local model working tree is not clean.")
+        raise ValueError("The local model code/config tree is not clean.")
 
     return resolved_path
 
