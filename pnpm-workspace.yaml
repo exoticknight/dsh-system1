@@ -1,5 +1,6 @@
 allowBuilds:
   simple-git-hooks: true
+  esbuild: true
 minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-api-remotes@0.1.7-rc.1'
   - '@deepseek-ai/dsh-brand@0.1.7-rc.1'
