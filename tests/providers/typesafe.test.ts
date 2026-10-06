@@ -3,8 +3,8 @@ import { test } from 'node:test'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { Context } from '@deepseek-ai/cordis'
-import System1Service from '../src/index.js'
-import * as typesafe from '../src/providers/typesafe/index.js'
+import System1Service from '../../src/index.js'
+import * as typesafe from '../../src/providers/typesafe/index.js'
 
 test('real HTTP transport and plugin mount preserve three primitives and structured JSON', async (t) => {
   const questions = {

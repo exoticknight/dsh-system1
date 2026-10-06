@@ -4,8 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import System1Service, {
   System1InputError,
   type System1Provider,
-} from '../src/index.js'
-import { createLayaProvider } from '../src/providers/laya/adapter.js'
+} from '../../src/index.js'
 
 const questions = { q: { type: 'noul', instructions: 'yes?' } } as const
 const ok = {
@@ -49,30 +48,6 @@ test('public service returns provider metadata and validates caller input', asyn
     () => ctx.system1.registerProvider('test', provider),
     System1InputError,
   )
-})
-
-test('Laya routing metadata identifies the selected checkpoint', async (t) => {
-  const { ctx } = await setup(t)
-  ctx.system1.registerProvider(
-    'laya',
-    createLayaProvider({
-      fetch: async () => Response.json({
-        model: 'laya-rl-agent',
-        routing: { model: 'multilingual' },
-        answers: { q: { type: 'noul', noul: 0.8 } },
-      }),
-    }),
-  )
-  const result = await ctx.system1.decide({
-    state: 'fixture',
-    questions,
-    model: { provider: 'laya', model: 'auto' },
-  })
-  assert.equal(result.answers.q.status, 'ok')
-  assert.deepEqual(result.meta.executed, {
-    provider: 'laya',
-    model: 'multilingual',
-  })
 })
 
 test('partial malformed answers do not discard valid siblings', async (t) => {

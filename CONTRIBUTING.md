@@ -21,10 +21,11 @@ Use the machine's existing toolchain and default cache locations. Submit changes
 | `src/index.ts`            | Cordis service, configuration, and Context declaration                            |
 | `src/contracts/`          | Public types shared by consumers and providers                                    |
 | `src/core/`               | Request validation, dispatch, result validation, timeouts, and provider lifecycle |
-| `src/providers/typesafe/` | TypeSafe plugin configuration, backend calls, and protocol mapping                |
+| `src/providers/`          | Provider plugins (`typesafe`, `laya`, `cloudflare`) and the shared System One HTTP transport |
 | `examples/`               | Consumer and third-party provider examples                                        |
-| `tests/`                  | Public contract, HTTP fixture, and lifecycle checks                               |
-| `scripts/`                | Package checks and explicit backend/host probes                                   |
+| `tests/plugin/`           | Service contract and lifecycle tests with fake providers                          |
+| `tests/providers/`        | Per-provider protocol, error, and mount tests with local HTTP fixtures; `clef-local/` holds the local Clef test service |
+| `scripts/`                | Build and package checks; `probe/` holds live model and host probes |
 | `docs/`                    | Chinese API and release guides; English versions use the `.en.md` suffix         |
 
 The generated `lib/` JavaScript, declarations, and source maps are committed so dsh can install this package directly from GitHub. The pre-commit hook runs `pnpm build` and stages the updated `lib/`. Stage build inputs before committing; the hook stops if it finds unstaged or untracked source changes that could make the generated output differ from the commit.
@@ -46,7 +47,7 @@ The hook uses the dev-only `simple-git-hooks` package. Its install script is app
 pnpm verify
 ```
 
-`verify` runs type checking, Node tests, a build, and an isolated tarball installation plus consumer compilation. Tests use local responses and do not need backend credentials. CI runs the same command on Windows and Linux with Node 22.19 and 24.
+`verify` runs type checking, plugin and provider tests, a build, and an isolated tarball installation plus consumer compilation. Tests use local responses and do not need backend credentials. CI runs the same command on Windows and Linux with Node 22.19 and 24.
 
 Host integration follows the dsh range `>=0.1.7-rc.1 <0.2.0`. Exact releases verified so far are listed as `compatible` in `dsh.compatibility.dshReleases`; run the Loader probe with one of those releases:
 
@@ -55,6 +56,6 @@ pnpm build
 pnpm probe:host <path-to-node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-For TypeSafe protocol changes, set up `.env.local` and explicitly run `pnpm probe:live`. It exits with code 2 when credentials are missing and code 1 when a question fails. A single response is an interface sample; latency and decision quality need evaluation in their actual use cases.
+When changing a provider's protocol, also run `pnpm test <provider>` and its live probe, `pnpm probe <target>`, as described in [testing and live model validation](docs/testing.en.md). A single response is an interface sample; latency and decision quality need evaluation in their actual use cases.
 
 Describe the problem, behavior change, and verification in a pull request. Generated output, credentials, and local research records are ignored by Git, except the committed `lib/` output required for GitHub installation. See the [release process](docs/releasing.en.md).

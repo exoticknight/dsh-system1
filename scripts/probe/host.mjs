@@ -10,7 +10,7 @@ const host = pathToFileURL(realpathSync(process.argv[2]))
 const require = createRequire(host)
 const manifest = JSON.parse(readFileSync(host, 'utf8'))
 const pluginManifest = JSON.parse(
-  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
 assert.equal(
   pluginManifest.dsh?.compatibility?.dshReleases?.[manifest.version],

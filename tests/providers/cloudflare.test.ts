@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
-import type { ProviderRequest } from '../src/contracts/index.js'
-import { System1ProviderError } from '../src/contracts/error.js'
-import System1Service from '../src/index.js'
-import { createCloudflareProvider } from '../src/providers/cloudflare/adapter.js'
-import * as cloudflare from '../src/providers/cloudflare/index.js'
+import type { ProviderRequest } from '../../src/contracts/index.js'
+import { System1ProviderError } from '../../src/contracts/error.js'
+import System1Service from '../../src/index.js'
+import { createCloudflareProvider } from '../../src/providers/cloudflare/adapter.js'
+import * as cloudflare from '../../src/providers/cloudflare/index.js'
 
 test('Cloudflare Clef sends the REST contract and normalizes the System One result', async () => {
   const request: ProviderRequest = {

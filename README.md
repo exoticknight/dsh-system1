@@ -93,7 +93,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-For an explicit live request, set `TYPESAFE_API_KEY` in `.env.local`, then run `pnpm probe:live`. The probe reads `.env.local`; the dsh plugin reads the process environment. Regular CI uses local fixtures.
+`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; see [testing and live model validation](docs/testing.en.md).
 
 See the [contribution guide](CONTRIBUTING.md) and [release process](docs/releasing.en.md).
 

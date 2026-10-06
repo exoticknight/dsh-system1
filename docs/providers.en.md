@@ -14,11 +14,11 @@ Providers resolve keys through DSH credentials when available, otherwise through
 
 ## Local deployment scope
 
-See [local services and live validation](local-testing.en.md) for setup, probes, and validation boundaries.
+See [local services and live validation](testing.en.md) for setup, probes, and validation boundaries.
 
-Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
+Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. The repository's local wrapper mirrors the Workers AI REST route, so the same `cloudflare` provider can use it by pointing `baseURL` at the local service. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
 
-TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/quickstart) describe a hosted API. Its [model documentation](https://docs.typesafe.ai/models) does not provide a deployable local Jev release. This project validates TypeSafe through real hosted calls and does not count protocol fixtures as local Jev inference. Set `TYPESAFE_API_KEY` in `.env.local`, build the package, and run `pnpm probe:live` to reproduce the hosted call.
+TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/quickstart) describe a hosted API. Its [model documentation](https://docs.typesafe.ai/models) does not provide a deployable local Jev release. This project validates TypeSafe through real hosted calls and does not count protocol fixtures as local Jev inference.
 
 ## Cloudflare Clef
 
@@ -49,4 +49,4 @@ const backend = createCloudflareProvider({
 ctx.effect(() => ctx.system1.registerProvider('cloudflare', backend))
 ```
 
-For development, set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env.local`, build the package, then run `pnpm probe:cloudflare` to check all three primitives. This sends a real cloud request. Missing configuration exits with code 2; answers failing the public contract exit with code 1.
+See [testing and live model validation](testing.en.md#cloudflare-credentials) for creating credentials, the free allocation, and the live probe.

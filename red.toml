@@ -4,6 +4,8 @@ version = 1
 paths = ["README.md", "README.zh-CN.md", "CONTRIBUTING.md", "CONTRIBUTING.zh-CN.md", "docs/**"]
 
 [research]
+# 新增 R 文档必须带来新的外部证据、DSH 接缝变化或当前决策影响；已有主题优先更新对应 R。
+# 已接受的范围和设计写入 E，不在 R 中重复展开。
 path = ".research"
 
 [evolve]

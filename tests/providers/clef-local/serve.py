@@ -22,7 +22,6 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from huggingface_hub import snapshot_download
 from pydantic import BaseModel, ConfigDict, Field
 from transformers import BitsAndBytesConfig
 
@@ -178,16 +177,13 @@ def validate_device(device: str) -> str:
     raise ValueError("device must be cpu, cuda, or cuda:N")
 
 
-def create_app(device: str | None = None, model_path: Path | None = None) -> FastAPI:
+def create_app(model_path: Path, device: str | None = None) -> FastAPI:
     selected_device = validate_device(device or os.environ.get("CLEF_DEVICE", "cuda:0"))
     runtime = ClefRuntime(selected_device)
-    selected_model_path = model_path
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        resolved_model_path = selected_model_path or Path(
-            snapshot_download(MODEL_ID, revision=REVISION, token=False)
-        )
+        resolved_model_path = model_path
         sys.path.insert(0, str(resolved_model_path))
         official = importlib.import_module("joint_schema_model")
         quantization = BitsAndBytesConfig(
@@ -299,7 +295,11 @@ def main() -> None:
     parser.add_argument(
         "--model-path",
         type=Path,
-        help="Use a clean Git checkout at the pinned model revision instead of the Hub cache.",
+        default=os.environ.get("CLEF_MODEL_PATH"),
+        help=(
+            "Clean Git checkout of Cloudflare/clef-flash at the pinned revision. "
+            "Download it yourself first; this service never downloads weights."
+        ),
     )
     args = parser.parse_args()
     device = validate_device(args.device)
@@ -308,12 +308,14 @@ def main() -> None:
     if device.startswith("cuda") and not torch.cuda.is_available():
         parser.error("CUDA was selected but is not available; use --device cpu")
     try:
-        model_path = verify_model_checkout(args.model_path) if args.model_path else None
+        if not args.model_path:
+            parser.error("--model-path (or CLEF_MODEL_PATH) is required; download the model first")
+        model_path = verify_model_checkout(Path(args.model_path))
     except ValueError as error:
         parser.error(str(error))
 
     uvicorn.run(
-        create_app(device, model_path),
+        create_app(model_path, device),
         host="127.0.0.1",
         port=args.port,
         access_log=False,

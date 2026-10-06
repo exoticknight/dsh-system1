@@ -95,13 +95,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit",
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.client.json && node scripts/build-client.mjs",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/*.test.js",
+    "test": "node scripts/test.mjs",
     "check:package": "node scripts/check-package.mjs",
-    "probe:live": "node scripts/probe-live.mjs",
-    "probe:host": "node --expose-internals scripts/probe-host.mjs",
-    "probe:cloudflare": "pnpm build && node scripts/probe-cloudflare.mjs",
-    "probe:clef-local": "node scripts/probe-clef-local.mjs",
-    "probe:laya": "node scripts/probe-laya.mjs",
+    "probe": "node scripts/probe/index.mjs",
+    "probe:host": "node --expose-internals scripts/probe/host.mjs",
     "hooks:install": "simple-git-hooks",
     "verify": "pnpm typecheck && pnpm test && pnpm build && pnpm check:package"
   },

@@ -90,7 +90,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-如需显式调用真实后端，在 `.env.local` 中设置 `TYPESAFE_API_KEY`，然后运行 `pnpm probe:live`。探针读取 `.env.local`；dsh 插件读取进程环境。常规 CI 使用本地 fixture。
+`pnpm test` 使用本地 fixture 运行插件和 provider 测试，与 CI 相同；`pnpm test <plugin|providers|provider 名>` 只运行其中一部分。真实模型探针 `pnpm probe <typesafe|cloudflare|laya|clef-local>` 读取 `.env.local` 中的凭据，本地 target 首次运行时自动准备服务，见[测试与真实模型验证](docs/testing.md)。
 
 更多内容见[贡献指南](CONTRIBUTING.zh-CN.md)和[发布流程](docs/releasing.md)。
 

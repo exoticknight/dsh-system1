@@ -14,11 +14,11 @@
 
 ## 本地部署范围
 
-启动、复测与验证边界见[本地服务与真实联调](local-testing.md)。
+启动、复测与验证边界见[测试与真实模型验证](testing.md)。
 
-Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
+Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
 
-TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstart)目前提供托管 API；[模型文档](https://docs.typesafe.ai/models)未提供可据此部署的 Jev 本地发行版。本项目通过真实托管调用验证 TypeSafe，不将本地协议模拟计作 Jev 本地推理。使用 `.env.local` 中的 `TYPESAFE_API_KEY`，构建后运行 `pnpm probe:live` 可复现托管调用。
+TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstart)目前提供托管 API；[模型文档](https://docs.typesafe.ai/models)未提供可据此部署的 Jev 本地发行版。本项目通过真实托管调用验证 TypeSafe，不将本地协议模拟计作 Jev 本地推理。
 
 ## Cloudflare Clef
 
@@ -49,4 +49,4 @@ const backend = createCloudflareProvider({
 ctx.effect(() => ctx.system1.registerProvider('cloudflare', backend))
 ```
 
-开发时可在 `.env.local` 中设置 `CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_API_TOKEN`，构建后运行 `pnpm probe:cloudflare`，验证三种判断原语。此探针会发起真实云端请求。缺少配置时退出码为 2；模型回答未通过公共契约校验时退出码为 1。
+凭据申请、免费额度和真实调用探针见[测试与真实模型验证](testing.md#cloudflare-凭据)。
