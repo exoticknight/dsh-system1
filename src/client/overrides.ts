@@ -30,15 +30,3 @@ export function overriddenAgainstDefault(
 ): boolean {
   return state.overridden && hasDefault(spec, base) && state.text !== spec.format(base)
 }
-
-/** Picking the package default again clears the user value instead of storing a copy of it. */
-export function defaultAware<S extends FieldSpec>(spec: S, readBase: () => unknown): S {
-  return {
-    ...spec,
-    parse: (text: string) => {
-      const base = readBase()
-      if (base !== undefined && base !== null && text === spec.format(base)) return { kind: 'clear' }
-      return spec.parse(text)
-    },
-  }
-}

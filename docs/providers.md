@@ -10,7 +10,7 @@
 | `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
 | `cloudflare` | `clef`、`clef-flash` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
-密钥优先通过 DSH credentials 服务解析；宿主没有该服务时读取进程环境。密钥不会回显。各独立 provider 插件可用 `id` 和 `apiKeyEnv` 自定义注册名及凭据引用。
+密钥优先通过 DSH credentials 服务解析；宿主没有该服务时读取进程环境。密钥不会回显。在服务组件的设置页填写 API Key 后，与连接参数一起点「保存设置」写入 DSH 凭据存储；留空保存会保留已有密钥。设置页仅在当前值与包默认值不同时显示「已覆盖」，「恢复默认值」会写回包默认值。各独立 provider 插件可用 `id` 和 `apiKeyEnv` 自定义注册名及凭据引用。
 
 ## 本地部署范围
 
@@ -22,7 +22,7 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 
 ## Cloudflare Clef
 
-在 Cloudflare 控制台创建有 Workers AI 调用权限的 API token，并取得 Account ID。在 Cloudflare 组件中填写 Account ID，将 token 保存到凭据字段。Account ID 也可通过启动进程的 `CLOUDFLARE_ACCOUNT_ID` 配置。
+在 Cloudflare 控制台创建有 Workers AI 调用权限的 API token，并取得 Account ID。在 Cloudflare 组件中填写 Account ID 和 API Key（即该 token），点「保存设置」。Account ID 也可通过启动进程的 `CLOUDFLARE_ACCOUNT_ID` 配置。
 
 保留默认 API 根地址即可直连 Cloudflare。插件会拼接 `/accounts/{accountId}/ai/run/@cf/cloudflare/{model}`，请求体使用短模型名。包内 adapter 同时接受 `@cf/cloudflare/clef` 和 `@cf/cloudflare/clef-flash`。
 

@@ -19,5 +19,3 @@ export interface FieldState {
  * when the package has a default and the shown value differs from it.
  */
 export declare function overriddenAgainstDefault(state: FieldState, spec: FieldSpec, base: unknown): boolean;
-/** Picking the package default again clears the user value instead of storing a copy of it. */
-export declare function defaultAware<S extends FieldSpec>(spec: S, readBase: () => unknown): S;
