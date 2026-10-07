@@ -36,6 +36,12 @@ dsh plugin --profile headless add github:exoticknight/dsh-system1
 
 Cloudflare 使用 `cloudflare` provider 的 `clef` 或 `clef-flash`。配置步骤见[模型服务配置](docs/providers.md)。
 
+## Agent 工具
+
+安装后 agent 可以直接使用 `system1_decide` 工具，无需编写消费插件。主模型可以把是否判断、分类和打分交给 System One，再根据返回的概率决定下一步。该工具使用上面配置的默认服务和模型。
+
+此功能由 bundle 中的 `system1-tool` 组件提供，默认开启。在插件页关闭该组件即可移除工具；headless profile 中可在对应条目上设置 `disabled: true`。参数和返回值见 [API 文档](docs/api.md#agent-工具)。
+
 ## 消费插件调用
 
 在消费插件项目中添加本包依赖：

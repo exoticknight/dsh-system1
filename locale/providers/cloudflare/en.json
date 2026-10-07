@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Cloudflare Clef",
+    "description": "Connects to Clef models on Cloudflare Workers AI."
+  }
+}

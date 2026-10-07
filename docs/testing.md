@@ -42,7 +42,7 @@ pnpm build
 pnpm probe:host <绝对路径到测试宿主/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-它通过实际 Loader 加载 `cordis.patch.yml`，验证三个 provider 注册、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
+它通过实际 Loader 加载 `cordis.patch.yml`，验证三个 provider 注册、`system1_decide` 工具在宿主真实工具注册表中注册和调用、各组件在插件页显示的中英文标题和描述、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null
@@ -50,7 +50,7 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.1.7-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.0-rc.2
 ```
 
 pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的原生构建脚本，应检查包是否已安装后单独运行探针。

@@ -42,6 +42,18 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 
 `meta.requested` 表示所选 provider id 和模型。仅在收到有效后端响应后才提供 `meta.executed`。元数据还包括 request id、耗时和可用用量。`approximate`、`degraded` 由 provider 提供；字段缺失表示未知。调用方可以逐次覆盖 `signal` 和 `timeoutMs`。总预算覆盖能力查询与后端执行。超时无法终止不合作的第三方代码，因此 provider 应取消底层 I/O。
 
+## Agent 工具
+
+`dsh-system1/tool` 组件注入 `system1` 和 DSH `tools`，注册模型可调用的 `system1_decide` 工具。组件只依赖宿主已有的工具注册表，不引入 `@deepseek-ai/dsh-tools` 运行时依赖。
+
+参数：
+
+- `state`：要判断的文本或 JSON 值。
+- `questions`：问题数组。每项包含 `id`（结果键，不可重复）、`type`（`noul`、`choice` 或 `score`）、字符串 `instructions`，以及与 `decide()` 相同的可选 `criteria`。`choice` 需要候选键到描述的对象，`score` 需要从低到高的等级数组。
+- `model`：可选的 `{ provider, model }`，省略时使用服务默认模型。
+
+返回 `{ answers, model }`。`answers` 按 `id` 给出 `{ status: 'ok', answer }` 或 `{ status: 'error', error: { code, message } }`，`model` 为实际执行的 provider 和模型。工具把调用取消信号传给 `decide()`，超时沿用服务配置。结构错误使整次工具调用失败，单题运行故障只体现在该题结果中。
+
 ## 实现 provider
 
 从 `dsh-system1/contracts` 导入类型，从包根入口导入 `System1ProviderError`。错误消息必须安全可展示。实现 `describe(model, signal)` 和 `evaluate(request, signal)`，并返回标准逐题答案。请求参数按只读处理。参见[provider 示例](../examples/provider.ts)。

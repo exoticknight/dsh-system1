@@ -42,7 +42,7 @@ pnpm build
 pnpm probe:host <absolute-path-to-test-host/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-It loads `cordis.patch.yml` through the real Loader and checks the three provider registrations, pre-cancellation, and unload without calling a model. When installing the test host inside the repository, use pnpm's `--ignore-workspace`:
+It loads `cordis.patch.yml` through the real Loader and checks the three provider registrations, registration and a call of `system1_decide` in the host's real tool registry, the English and Chinese titles and descriptions each component shows on the Plugins page, pre-cancellation, and unload without calling a model. When installing the test host inside the repository, use pnpm's `--ignore-workspace`:
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null
@@ -50,7 +50,7 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.1.7-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.0-rc.2
 ```
 
 pnpm may report `ERR_PNPM_IGNORED_BUILDS`. The Loader probe does not depend on the skipped native build scripts; confirm the packages are installed and run the probe separately.

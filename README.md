@@ -36,6 +36,12 @@ The bundled patch mounts the service and built-in providers. Defaults are model 
 
 Cloudflare uses provider `cloudflare` with `clef` or `clef-flash`. See [provider setup](docs/providers.en.md) for configuration.
 
+## Agent tool
+
+Once installed, the agent can call the `system1_decide` tool without a consumer plugin. The main model can hand yes/no checks, classification, and scoring to System One and decide the next step from the returned probabilities. The tool uses the default service and model configured above.
+
+The bundle's `system1-tool` component provides the tool and is enabled by default. Turn the component off on the Plugins page to remove the tool, or set `disabled: true` on its entry in a headless profile. See [the API reference](docs/api.en.md#agent-tool) for arguments and results.
+
 ## Use from a consumer plugin
 
 Install the package in your consumer plugin project:

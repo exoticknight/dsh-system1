@@ -45,6 +45,18 @@ Malformed call structures throw `System1InputError`. Runtime failures for a stru
 
 `meta.requested` records the selected provider id and model. `meta.executed` is present only after a valid backend response. Metadata also includes a request id, duration, and available usage. `approximate` and `degraded` are provider-supplied; an omitted field means unknown. Callers may override `signal` and `timeoutMs` per request. The total budget covers capability checks and backend execution. A timeout cannot stop non-cooperative third-party code, so providers should cancel their underlying I/O.
 
+## Agent tool
+
+The `dsh-system1/tool` component injects `system1` and the DSH `tools` registry and registers the model-facing `system1_decide` tool. It relies only on the host's tool registry and adds no runtime dependency on `@deepseek-ai/dsh-tools`.
+
+Arguments:
+
+- `state`: the text or JSON value to judge.
+- `questions`: an array of questions. Each has an `id` (the unique result key), a `type` (`noul`, `choice`, or `score`), string `instructions`, and the same optional `criteria` as `decide()`. `choice` requires an object mapping candidate keys to descriptions; `score` requires an array of levels from lowest to highest.
+- `model`: an optional `{ provider, model }`; the service default is used when omitted.
+
+The tool returns `{ answers, model }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`, and `model` is the provider and model that ran. The tool forwards the call's cancellation signal to `decide()` and uses the service timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
+
 ## Implementing a provider
 
 Import types from `dsh-system1/contracts` and `System1ProviderError` from the package root. Error messages must be safe to display. Implement `describe(model, signal)` and `evaluate(request, signal)` and return standard per-question answers. Treat request parameters as read-only. See the [provider example](../examples/provider.ts).

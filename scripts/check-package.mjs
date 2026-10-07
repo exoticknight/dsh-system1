@@ -50,6 +50,7 @@ import Service, { type System1Provider } from 'dsh-system1'
 import type { Questions } from 'dsh-system1/contracts'
 import * as typesafe from 'dsh-system1/providers/typesafe'
 import * as cloudflare from 'dsh-system1/providers/cloudflare'
+import * as tool from 'dsh-system1/tool'
 const ctx=new Context()
 const service=await ctx.plugin(Service,{defaultModel:{provider:'test',model:'fixture'}})
 const provider:System1Provider={async describe(){return {primitives:['choice']}},async evaluate(){return {model:'fixture',answers:{topic:{status:'ok',answer:{type:'choice',value:'a',probabilities:{a:1,b:0}}}}}}}
@@ -59,6 +60,7 @@ const result=await ctx.system1.decide({state:'fixture',questions})
 if(result.answers.topic.status!=='ok')throw new Error('Consumer failed')
 const value:'a'|'b'=result.answers.topic.answer.value
 if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
+if(typeof tool.apply!=='function'||tool.TOOL_NAME!=='system1_decide')throw new Error('Invalid agent tool public entry')
 await service.dispose()
 const cloudflareCtx=new Context()
 const cloudflareService=await cloudflareCtx.plugin(Service,{defaultModel:{provider:'cloudflare',model:'unsupported-probe'}})
