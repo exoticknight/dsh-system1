@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import { Button, SettingsForm, SettingsSecretField } from '@deepseek-ai/dsh-client-ui-primitives'
+import { SettingsForm, SettingsSecretField } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsFormLabels, SettingsFormShell } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
@@ -519,13 +519,8 @@ function BundleSettingsPage(props: BoundPageProps) {
         onRemove: deleteFallback,
       },
     )),
-    h(Button, {
-      type: 'button',
-      variant: 'outline',
-      style: formButtonStyle,
-      disabled: !canSave || saving,
-      onClick: addFallback,
-    }, t('fallbackAdd'))),
+    h('div', null,
+      actionButton(t('fallbackAdd'), addFallback, !canSave || saving, 'secondary'))),
     field('dsh-system1-timeout', t('timeout'), h('input', {
       id: 'dsh-system1-timeout',
       name: 'timeoutMs',
@@ -608,30 +603,12 @@ function fallbackModelRow(
           value: entry.id,
         }, entry.label ? t(entry.label) : entry.id))))),
     h('div', { style: fallbackActionsStyle },
-      h(Button, {
-        type: 'button',
-        variant: 'outline',
-        style: formButtonStyle,
-        disabled: disabled || index === 0,
-        'aria-label': `${t('fallbackUp')} ${index + 1}`,
-        onClick: () => actions.onMove(index, -1),
-      }, t('fallbackUp')),
-      h(Button, {
-        type: 'button',
-        variant: 'outline',
-        style: formButtonStyle,
-        disabled: disabled || index === rowCount - 1,
-        'aria-label': `${t('fallbackDown')} ${index + 1}`,
-        onClick: () => actions.onMove(index, 1),
-      }, t('fallbackDown')),
-      h(Button, {
-        type: 'button',
-        variant: 'ghost',
-        style: formButtonStyle,
-        disabled,
-        'aria-label': `${t('fallbackRemove')} ${index + 1}`,
-        onClick: () => actions.onRemove(index),
-      }, t('fallbackRemove'))),
+      actionButton(t('fallbackUp'), () => actions.onMove(index, -1),
+        disabled || index === 0, 'secondary', `${t('fallbackUp')} ${index + 1}`),
+      actionButton(t('fallbackDown'), () => actions.onMove(index, 1),
+        disabled || index === rowCount - 1, 'secondary', `${t('fallbackDown')} ${index + 1}`),
+      actionButton(t('fallbackRemove'), () => actions.onRemove(index),
+        disabled, 'secondary', `${t('fallbackRemove')} ${index + 1}`)),
   )
 }
 
@@ -870,16 +847,12 @@ function ProviderSettingsPage(props: BoundPageProps & {
       !credentialWritable && h('p', { role: 'note', style: settingsHintStyle }, t('keyReadOnly')),
       statusMessage(secretNotice, secretError),
       h('div', { style: settingsFooterStyle },
-        h(Button, {
-          type: 'button', variant: 'primary', style: formButtonStyle,
-          disabled: !credentialAvailable || !credentialWritable || credentialLoading || savingSecret || !secret.trim(),
-          onClick: saveSecret,
-        }, savingSecret ? t('keySaving') : t('keySave')),
-        h(Button, {
-          type: 'button', variant: 'outline', style: formButtonStyle,
-          disabled: !credentialAvailable || !credentialWritable || credentialLoading || savingSecret || !credentialConfigured,
-          onClick: clearSecret,
-        }, t('keyClear')),
+        actionButton(savingSecret ? t('keySaving') : t('keySave'), saveSecret,
+          !credentialAvailable || !credentialWritable || credentialLoading || savingSecret || !secret.trim(),
+          'primary'),
+        actionButton(t('keyClear'), clearSecret,
+          !credentialAvailable || !credentialWritable || credentialLoading || savingSecret || !credentialConfigured,
+          'secondary'),
       ),
     ),
   )
@@ -901,6 +874,31 @@ function field(
     control,
     h('p', { style: settingsHintStyle }, hint),
   )
+}
+
+/**
+ * Mirrors the SettingsForm save button (primitives' settings-form `.save` rule) so every action on
+ * these pages shares its font, border box, padding and radius. The shared Button primitive does not
+ * inherit the page font and uses different borders and fills, so overriding it inline cannot match.
+ */
+function actionButton(
+  label: string,
+  onClick: () => void,
+  disabled: boolean,
+  variant: 'primary' | 'secondary',
+  ariaLabel?: string,
+) {
+  return h('button', {
+    type: 'button',
+    disabled,
+    onClick,
+    ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+    style: {
+      ...actionButtonStyle,
+      ...(variant === 'primary' ? primaryActionStyle : secondaryActionStyle),
+      ...(disabled ? disabledActionStyle : {}),
+    },
+  }, label)
 }
 
 function resetAction(t: Copy, label: string, onClick: () => void, disabled: boolean) {
@@ -1045,14 +1043,26 @@ const credentialSectionStyle = {
   borderTop: '0.5px solid var(--dsw-alias-border-l2)',
   paddingTop: 12,
 }
-// Matches the SettingsForm save button above, so both sections' actions read alike.
-const formButtonStyle = {
-  height: 'auto',
+const actionButtonStyle = {
+  appearance: 'none',
+  border: '1px solid transparent',
+  borderRadius: 'var(--dsw-radius-md)',
   padding: '5px 14px',
+  font: 'inherit',
   fontSize: 13,
   lineHeight: 1.5,
-  borderRadius: 'var(--dsw-radius-md)',
+  cursor: 'pointer',
 }
+const primaryActionStyle = {
+  background: 'var(--dsw-alias-label-primary)',
+  color: 'var(--dsw-alias-bg-layer-3)',
+}
+const secondaryActionStyle = {
+  borderColor: 'var(--dsw-alias-border-l3)',
+  background: 'transparent',
+  color: 'var(--dsw-alias-label-primary)',
+}
+const disabledActionStyle = { opacity: 0.4, cursor: 'default' }
 const errorMessageStyle = {
   margin: 0,
   fontSize: 12,
