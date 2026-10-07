@@ -45,6 +45,7 @@ import {
   updateFallbackModel,
 } from './fallback-models.js'
 import type { FallbackModelDraft } from './fallback-models.js'
+import { defaultAware, overriddenAgainstDefault } from './overrides.js'
 
 const NS = 'dsh-system1'
 const PACKAGE = 'dsh-system1'
@@ -291,14 +292,32 @@ function useSettingsForm(
   specs: SettingsFieldSpec[],
   secrets: SettingsSecretSpec[] = [],
 ) {
-  const model = useMemo(() => new SettingsFormModel(scope, specs, secrets), [scope, specs, secrets])
+  const baseOf = useCallback(
+    (field: string) => objectValue(scope.getSnapshot().base)[field],
+    [scope],
+  )
+  const wrapped = useMemo(
+    () => specs.map((spec) => defaultAware(spec, () => baseOf(spec.field))),
+    [specs, baseOf],
+  )
+  const model = useMemo(
+    () => new SettingsFormModel(scope, wrapped, secrets),
+    [scope, wrapped, secrets],
+  )
   useEffect(() => () => model.dispose(), [model])
   const store = useMemo(() => model.bind((): FormView => ({
     shell: model.shell(),
-    fields: Object.fromEntries(
-      [...specs, ...secrets].map(({ field }) => [field, model.field(field)]),
-    ),
-  })) as unknown as FormStore, [model, specs, secrets])
+    fields: Object.fromEntries([
+      ...wrapped.map((spec) => {
+        const state = model.field(spec.field)
+        return [spec.field, {
+          ...state,
+          overridden: overriddenAgainstDefault(state, spec, baseOf(spec.field)),
+        }]
+      }),
+      ...secrets.map(({ field }) => [field, model.field(field)]),
+    ]),
+  })) as unknown as FormStore, [model, wrapped, secrets, baseOf])
   const subscribe = useCallback((listener: () => void) => store.subscribe(listener), [store])
   const getSnapshot = useCallback(() => store.getSnapshot(), [store])
   const view = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
