@@ -6,7 +6,7 @@
 
 | 层级 | 命令 | 覆盖范围 |
 | --- | --- | --- |
-| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、总预算、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
+| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、每次尝试的超时预算、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
 | Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载。使用本地 HTTP fixture 或替换的 `fetch` |
 | 真实模型探针 | `pnpm probe <target>` | 通过公共服务和 provider 插件入口调用真实模型 |
 
@@ -42,7 +42,7 @@ pnpm build
 pnpm probe:host <绝对路径到测试宿主/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-它通过实际 Loader 加载 `cordis.patch.yml`，验证三个 provider 注册、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
+它通过实际 Loader 加载 `cordis.patch.yml`，验证三个 provider 注册、`system1_decide` 工具在宿主真实工具注册表中注册和调用、各组件在插件页显示的中英文标题和描述、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null
@@ -50,7 +50,7 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.1.7-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.0-rc.2
 ```
 
 pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的原生构建脚本，应检查包是否已安装后单独运行探针。

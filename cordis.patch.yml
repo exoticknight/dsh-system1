@@ -23,3 +23,5 @@
         apiKeyEnv: CLOUDFLARE_API_TOKEN
         accountId: ''
         baseURL: https://api.cloudflare.com/client/v4
+    - id: system1-tool
+      name: dsh-system1/tool

@@ -9,5 +9,6 @@ export declare class System1Engine {
     registerProvider(id: string, provider: System1Provider): () => void;
     dispose(): void;
     decide<const Q extends Questions>(input: DecideRequest<Q>): Promise<DecideResponse<Q>>;
+    private attempt;
 }
 //# sourceMappingURL=engine.d.ts.map

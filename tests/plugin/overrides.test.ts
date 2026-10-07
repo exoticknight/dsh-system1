@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { overriddenAgainstDefault } from '../../src/client/overrides.js'
+
+const text = {
+  field: 'baseURL',
+  format: (value: unknown) => typeof value === 'string' ? value : '',
+  parse: (input: string) =>
+    input.trim() === '' ? { kind: 'clear' as const } : { kind: 'set' as const, value: input.trim() },
+}
+const list = {
+  field: 'fallbackModels',
+  format: (value: unknown) => JSON.stringify(Array.isArray(value) ? value : []),
+  parse: (input: string) => ({ kind: 'set' as const, value: JSON.parse(input) as unknown }),
+}
+
+test('a value equal to the package default is not an override', () => {
+  assert.equal(overriddenAgainstDefault(
+    { text: 'https://a', overridden: true, invalid: false }, text, 'https://a'), false)
+  assert.equal(overriddenAgainstDefault(
+    { text: 'https://b', overridden: true, invalid: false }, text, 'https://a'), true)
+})
+
+test('a field without a package default never shows an override', () => {
+  assert.equal(overriddenAgainstDefault(
+    { text: 'abc', overridden: true, invalid: false }, text, undefined), false)
+  assert.equal(overriddenAgainstDefault(
+    { text: 'abc', overridden: true, invalid: false }, text, ''), false)
+  assert.equal(overriddenAgainstDefault(
+    { text: '[{"provider":"laya","model":"auto"}]', overridden: true, invalid: false }, list, []), false)
+})
+
+test('an unset or cleared field is not an override', () => {
+  assert.equal(overriddenAgainstDefault(
+    { text: 'https://b', overridden: false, invalid: false }, text, 'https://a'), false)
+})

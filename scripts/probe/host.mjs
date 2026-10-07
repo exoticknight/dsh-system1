@@ -18,17 +18,61 @@ assert.equal(
   `Host ${manifest.version} is not marked compatible in dsh.compatibility.dshReleases.`,
 )
 const load = async (name) => import(pathToFileURL(require.resolve(name)).href)
-const { Context } = await load('@deepseek-ai/cordis')
+const { Context, Service } = await load('@deepseek-ai/cordis')
 const { Loader } = await load('@deepseek-ai/cordis-plugin-loader')
-const { composeEntries } = await load('@deepseek-ai/dsh-app-boot')
+const { composeEntries, readPluginMeta } = await load('@deepseek-ai/dsh-app-boot')
 const yaml = require('js-yaml')
 const patches = yaml.load(readFileSync('cordis.patch.yml', 'utf8'))
+const system1Entry = patches[0].insert.find(({ id }) => id === 'system1')
+assert.ok(system1Entry, 'System1 service entry is missing from the bundle patch.')
+system1Entry.config = {
+  ...system1Entry.config,
+  defaultModel: { provider: '__host_probe_primary__', model: 'primary' },
+  fallbackModels: [
+    { provider: '__host_probe_fallback__', model: 'backup' },
+  ],
+}
 const entries = composeEntries([patches], (message) => {
   throw new Error(message)
 })
+// Plugin page titles and descriptions, read the way DSH reads them.
+const baseUrl = pathToFileURL(process.cwd() + '/package.json').href
+for (const { name } of patches[0].insert) {
+  const meta = readPluginMeta(name, baseUrl)
+  assert.equal(meta?.error, undefined, meta?.error)
+  for (const field of ['title', 'description'])
+    for (const locale of ['en', 'zh'])
+      assert.ok(meta?.[field]?.[locale], `${name} lacks ${locale} ${field}`)
+}
+// The host's real tool registry, so the bundle's agent tool entry can mount.
+// dsh-tools is not a direct dependency of @deepseek-ai/dsh; resolve it through dsh-app-boot.
+const tools = await import(
+  pathToFileURL(
+    createRequire(require.resolve('@deepseek-ai/dsh-app-boot')).resolve(
+      '@deepseek-ai/dsh-tools',
+    ),
+  ).href
+)
+// ToolRuntime only hooks its schemas into the system prompt; nothing else is needed here.
+class SystemPromptStub extends Service {
+  constructor(ctx) {
+    super(ctx, 'systemPrompt')
+  }
+  tools() {
+    return () => {}
+  }
+  section() {
+    return () => {}
+  }
+  getSectionOrder() {
+    return []
+  }
+}
 const ctx = new Context()
+await ctx.plugin(SystemPromptStub)
+await ctx.plugin(tools.default)
 const fiber = await ctx.plugin(Loader, {
-  baseUrl: pathToFileURL(process.cwd() + '/package.json').href,
+  baseUrl,
 })
 try {
   await ctx.loader.root.update(entries)
@@ -55,11 +99,58 @@ try {
       `Provider ${provider} was not mounted or did not validate models without network access.`,
     )
   }
+  assert.deepEqual(
+    ctx.tools.schemas().map((schema) => schema.name),
+    ['system1_decide'],
+    'The agent tool component did not register system1_decide.',
+  )
+  const call = await ctx.tools.execute({
+    callId: 'host-probe',
+    name: 'system1_decide',
+    arguments: {
+      state: 'fixture',
+      questions: [{ id: 'q', type: 'noul', instructions: 'yes?' }],
+      model: { provider: 'typesafe', model: '__host_probe_unsupported__' },
+    },
+    signal: new AbortController().signal,
+  })
+  assert.equal(call.isError, false, JSON.stringify(call))
+  assert.equal(call.value.answers.q.error?.code, 'unsupported')
+  const fallbackCall = await ctx.tools.execute({
+    callId: 'host-probe-fallback-output',
+    name: 'system1_decide',
+    arguments: {
+      state: 'fixture',
+      questions: [{ id: 'q', type: 'noul', instructions: 'yes?' }],
+    },
+    signal: new AbortController().signal,
+  })
+  assert.equal(fallbackCall.isError, false, JSON.stringify(fallbackCall))
+  assert.equal('model' in fallbackCall.value, false)
+  assert.deepEqual(fallbackCall.value.fallbacks, [
+    {
+      provider: '__host_probe_primary__',
+      model: 'primary',
+      error: {
+        code: 'unavailable',
+        message: 'Requested provider is not registered.',
+      },
+    },
+    {
+      provider: '__host_probe_fallback__',
+      model: 'backup',
+      error: {
+        code: 'unavailable',
+        message: 'Requested provider is not registered.',
+      },
+    },
+  ])
   console.log(
-    `Installed dsh ${manifest.version} loader mounted the service and all three provider components.`,
+    `Installed dsh ${manifest.version} loader mounted the service, all providers and the agent tool; the real tool registry accepted fallback output.`,
   )
   await ctx.loader.root.stop()
   assert.equal(ctx.get('system1'), undefined)
+  assert.deepEqual(ctx.tools.schemas(), [])
 } finally {
   await fiber.dispose()
 }

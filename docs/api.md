@@ -4,7 +4,7 @@
 
 ## 请求与结果
 
-`decide({ state, questions, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时使用服务的 `defaultModel`。两者都没有时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，默认 800，超时预算覆盖能力查询和后端调用。
+`decide({ state, questions, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，默认 800；每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
 
 公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 只导出类型。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件及 `createTypesafeProvider`、`createLayaProvider`、`createCloudflareProvider` 工厂。连接参数与模型选择见[模型服务配置](providers.md)。
 
@@ -40,7 +40,29 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 
 无效调用结构抛出 `System1InputError`。结构合法的请求发生运行故障时，通过逐题 `status: 'error'` 返回。错误代码包括 `unavailable`、`unsupported`、`limit_exceeded`、`timeout`、`cancelled`、`provider_error` 和 `invalid_response`。某题缺失或答案无效不会影响其他合法答案；额外题号会记入 `meta.warnings`。
 
-`meta.requested` 表示所选 provider id 和模型。仅在收到有效后端响应后才提供 `meta.executed`。元数据还包括 request id、耗时和可用用量。`approximate`、`degraded` 由 provider 提供；字段缺失表示未知。调用方可以逐次覆盖 `signal` 和 `timeoutMs`。总预算覆盖能力查询与后端执行。超时无法终止不合作的第三方代码，因此 provider 应取消底层 I/O。
+`meta.requested` 表示所选 provider id 和模型。仅在收到有效后端响应后才提供 `meta.executed`。元数据还包括 request id、耗时和可用用量。`approximate`、`degraded` 由 provider 提供；字段缺失表示未知。调用方可以逐次覆盖 `signal` 和 `timeoutMs`。每次尝试使用完整超时预算，因此兜底链的最坏总时长为链中模型数乘以预算。超时无法终止不合作的第三方代码，因此 provider 应取消底层 I/O。
+
+## 备用模型
+
+在插件设置中按顺序添加备用模型。服务会依次尝试 `[defaultModel, ...fallbackModels]`，完全相同的 provider 与模型组合只执行一次。调用方显式传入 `model` 时只执行该模型，不读取备用链。每个备用项须包含字符串 `provider` 和 `model`；格式错误的插件配置会在加载时被拒绝，使用备用链时还会校验非空值。显式 `model` 的调用不受未使用的备用项影响。
+
+整次模型尝试失败时，服务继续尝试下一项。未注册 provider、超时、能力不支持、`provider_error` 或无效响应信封会触发兜底。有效信封中的单题答案无效时，服务按题返回错误，不会重试其他模型。调用方取消、provider 报告 `cancelled`、provider 在调用中注销或服务卸载都会结束整条链；取消的那次尝试不计入 `meta.attempts`。
+
+`meta.requested` 是链首模型，`meta.executed` 是成功执行的 provider 和实际模型，`meta.attempts` 按顺序列出已完成但失败的尝试及错误码和消息；没有记录项时省略。全部模型尝试失败时，每题返回最后一次尝试的错误；如果执行被取消，则返回 `cancelled`。不同模型的概率未相互校准；需要稳定阈值的消费插件应检查 `meta.executed`。
+
+## Agent 工具
+
+`dsh-system1/tool` 组件注入 `system1` 和 DSH `tools`，注册模型可调用的 `system1_decide` 工具。组件只依赖宿主已有的工具注册表，不引入 `@deepseek-ai/dsh-tools` 运行时依赖。
+
+参数：
+
+- `state`：要判断的文本或 JSON 值。
+- `questions`：问题数组。每项包含 `id`（结果键，不可重复）、`type`（`noul`、`choice` 或 `score`）、字符串 `instructions`，以及与 `decide()` 相同的可选 `criteria`。`choice` 需要候选键到描述的对象，`score` 需要从低到高的等级数组。
+- `model`：可选的 `{ provider, model }`，省略时使用服务默认模型。
+
+返回 `{ answers, model?, fallbacks? }`。`answers` 按 `id` 给出 `{ status: 'ok', answer }` 或 `{ status: 'error', error: { code, message } }`。有 provider 成功时，`model` 是实际执行的 provider 和模型；没有 provider 成功时省略。发生非取消的失败尝试时，`fallbacks` 按顺序列出 `{ provider, model, error: { code, message } }`。工具把调用取消信号传给 `decide()`，超时沿用服务配置。结构错误使整次工具调用失败，单题运行故障只体现在该题结果中。
+
+工具描述的数值含义是：概率在 0–1；`score.value` 是从 0 开始、对应 criteria 位置的期望等级下标；`confidence` 由后端定义，不能当作概率或跨后端比较。不同模型返回的概率也未相互校准。
 
 ## 实现 provider
 

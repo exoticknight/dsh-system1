@@ -2,7 +2,7 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-Choose the default provider and model in DSH plugin settings, then save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. The timeout covers capability checks and HTTP requests; allow more time for local CPU inference and cold starts.
+Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full `timeoutMs` budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
 
 | Provider | Models | Default base URL | Credential reference |
 | --- | --- | --- | --- |
@@ -10,7 +10,7 @@ Choose the default provider and model in DSH plugin settings, then save connecti
 | `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
 | `cloudflare` | `clef`, `clef-flash` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
-Providers resolve keys through DSH credentials when available, otherwise through the process environment. Keys are never displayed. Independent provider plugins support custom registration and credential names through `id` and `apiKeyEnv`.
+Providers resolve keys through DSH credentials when available, otherwise through the process environment. Keys are never displayed. On a provider component's settings page, enter the API key and press Save with the connection details to store it in DSH credentials; saving with the field blank keeps the existing key. The page marks a setting as overridden only when it differs from the package default, and Reset writes the package default back. Independent provider plugins support custom registration and credential names through `id` and `apiKeyEnv`.
 
 ## Local deployment scope
 
@@ -22,7 +22,7 @@ TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/qui
 
 ## Cloudflare Clef
 
-Create an API token with Workers AI access and obtain your Account ID from Cloudflare. Enter the Account ID in the Cloudflare component and save the token in its credential field. You can also set `CLOUDFLARE_ACCOUNT_ID` in the dsh process environment.
+Create an API token with Workers AI access and obtain your Account ID from Cloudflare. In the Cloudflare component, enter the Account ID and the token as the API key, then press Save. You can also set `CLOUDFLARE_ACCOUNT_ID` in the dsh process environment.
 
 Keep the default API root for direct Cloudflare access. The plugin appends `/accounts/{accountId}/ai/run/@cf/cloudflare/{model}` and sends the short model name in the request body. The adapter also accepts the full identifiers `@cf/cloudflare/clef` and `@cf/cloudflare/clef-flash`.
 
