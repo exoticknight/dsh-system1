@@ -12,12 +12,24 @@ export const TOOL_NAME = 'system1_decide'
 export const inject = ['system1', 'tools']
 
 const PRIMITIVES = ['noul', 'choice', 'score'] as const
+const ERROR_CODES = [
+  'unavailable',
+  'unsupported',
+  'limit_exceeded',
+  'timeout',
+  'cancelled',
+  'provider_error',
+  'invalid_response',
+] as const
 
 const DESCRIPTION =
-  'Ask System One, a fast classifier model, for calibrated judgments about a piece of text. ' +
+  'Ask System One, a fast classifier model, for probabilistic judgments about a piece of text. ' +
   'Use it for quick yes/no checks (noul), picking one category (choice) or rating on an ordered scale (score); ' +
   'several questions about the same text can go in one call. ' +
   'Results are probabilities, not decisions: weigh them and decide the next step yourself. ' +
+  'Probabilities are in the range 0-1; score.value is the zero-based expected level index matching a criteria position. ' +
+  'Confidence is backend-defined, is not a probability, and is not comparable across backends. ' +
+  'Probabilities from different models are not calibrated against each other. The model field identifies the provider and model that answered. ' +
   'A question that fails returns status "error" without affecting the others.'
 
 /** Raw JSON Schema accepted by the DSH tool registry (the enforced subset). */
@@ -61,7 +73,8 @@ const PARAMETERS = {
       type: 'object',
       additionalProperties: false,
       required: ['provider', 'model'],
-      description: 'Optional backend override; omit to use the configured default.',
+      description:
+        'Optional backend override; omit to use the configured default and its fallback models.',
       properties: {
         provider: { type: 'string' },
         model: { type: 'string' },
@@ -83,6 +96,28 @@ const OUTPUT_SCHEMA = {
       properties: {
         provider: { type: 'string' },
         model: { type: 'string' },
+      },
+    },
+    fallbacks: {
+      type: 'array',
+      description: 'Failed provider and model attempts, in order.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['provider', 'model', 'error'],
+        properties: {
+          provider: { type: 'string' },
+          model: { type: 'string' },
+          error: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['code', 'message'],
+            properties: {
+              code: { type: 'string', enum: [...ERROR_CODES] },
+              message: { type: 'string' },
+            },
+          },
+        },
       },
     },
   },
@@ -156,5 +191,17 @@ function toOutput(response: DecideResponse) {
           }
   }
   const { provider, model } = response.meta.executed ?? response.meta.requested
-  return { answers, model: { provider, model } }
+  return {
+    answers,
+    model: { provider, model },
+    ...(response.meta.attempts?.length
+      ? {
+          fallbacks: response.meta.attempts.map(({ provider, model, error }) => ({
+            provider,
+            model,
+            error: { code: error.code, message: error.message },
+          })),
+        }
+      : {}),
+  }
 }

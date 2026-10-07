@@ -23,6 +23,15 @@ const { Loader } = await load('@deepseek-ai/cordis-plugin-loader')
 const { composeEntries, readPluginMeta } = await load('@deepseek-ai/dsh-app-boot')
 const yaml = require('js-yaml')
 const patches = yaml.load(readFileSync('cordis.patch.yml', 'utf8'))
+const system1Entry = patches[0].insert.find(({ id }) => id === 'system1')
+assert.ok(system1Entry, 'System1 service entry is missing from the bundle patch.')
+system1Entry.config = {
+  ...system1Entry.config,
+  defaultModel: { provider: '__host_probe_primary__', model: 'primary' },
+  fallbackModels: [
+    { provider: '__host_probe_fallback__', model: 'backup' },
+  ],
+}
 const entries = composeEntries([patches], (message) => {
   throw new Error(message)
 })
@@ -107,8 +116,40 @@ try {
   })
   assert.equal(call.isError, false, JSON.stringify(call))
   assert.equal(call.value.answers.q.error?.code, 'unsupported')
+  const fallbackCall = await ctx.tools.execute({
+    callId: 'host-probe-fallback-output',
+    name: 'system1_decide',
+    arguments: {
+      state: 'fixture',
+      questions: [{ id: 'q', type: 'noul', instructions: 'yes?' }],
+    },
+    signal: new AbortController().signal,
+  })
+  assert.equal(fallbackCall.isError, false, JSON.stringify(fallbackCall))
+  assert.deepEqual(fallbackCall.value.model, {
+    provider: '__host_probe_primary__',
+    model: 'primary',
+  })
+  assert.deepEqual(fallbackCall.value.fallbacks, [
+    {
+      provider: '__host_probe_primary__',
+      model: 'primary',
+      error: {
+        code: 'unavailable',
+        message: 'Requested provider is not registered.',
+      },
+    },
+    {
+      provider: '__host_probe_fallback__',
+      model: 'backup',
+      error: {
+        code: 'unavailable',
+        message: 'Requested provider is not registered.',
+      },
+    },
+  ])
   console.log(
-    `Installed dsh ${manifest.version} loader mounted the service, all three provider components, and the agent tool.`,
+    `Installed dsh ${manifest.version} loader mounted the service, all providers and the agent tool; the real tool registry accepted fallback output.`,
   )
   await ctx.loader.root.stop()
   assert.equal(ctx.get('system1'), undefined)

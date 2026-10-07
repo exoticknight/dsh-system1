@@ -2,14 +2,20 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { Context, Service } from '@deepseek-ai/cordis'
-import System1Service, { type System1Provider } from '../../src/index.js'
+import System1Service, {
+  type System1Options,
+  type System1Provider,
+} from '../../src/index.js'
 import * as tool from '../../src/tool/index.js'
 
 interface Registered {
   name: string
   description: string
   parameters: Record<string, unknown>
-  output: { render(args: unknown, value: unknown): { type: string; text: string }[] }
+  output: {
+    schema: Record<string, unknown>
+    render(args: unknown, value: unknown): { type: string; text: string }[]
+  }
   execute(args: unknown, exec: { signal: AbortSignal }): Promise<unknown>
 }
 
@@ -53,15 +59,20 @@ const provider: System1Provider = {
   },
 }
 
-async function setup(t: { after(fn: () => Promise<void>): void }) {
+async function setup(
+  t: { after(fn: () => Promise<void>): void },
+  options: Partial<System1Options> = {},
+  preferred: System1Provider = provider,
+) {
   const ctx = new Context()
   const fibers = [
     await ctx.plugin(System1Service, {
       defaultModel: { provider: 'test', model: 'requested' },
+      ...options,
     }),
     await ctx.plugin(FakeTools),
   ]
-  ctx.system1.registerProvider('test', provider)
+  ctx.system1.registerProvider('test', preferred)
   fibers.push(await ctx.plugin(tool))
   t.after(async () => {
     for (const fiber of fibers.reverse()) await fiber.dispose()
@@ -94,6 +105,16 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   const definition = tools.registered.get(tool.TOOL_NAME)
   assert.ok(definition)
   assert.equal(definition.parameters.type, 'object')
+  assert.match(definition.description, /probabilities.*0.?1/i)
+  assert.match(definition.description, /zero-based.*criteria/i)
+  assert.match(definition.description, /confidence.*backend/i)
+  assert.match(definition.description, /not.*calibrated/i)
+  const outputProperties = definition.output.schema.properties as Record<
+    string,
+    { type?: string; items?: { properties?: Record<string, unknown> } }
+  >
+  assert.equal(outputProperties.fallbacks?.type, 'array')
+  assert.ok(outputProperties.fallbacks?.items?.properties?.error)
   await fiber.dispose()
   assert.equal(tools.registered.has(tool.TOOL_NAME), false)
 })
@@ -128,8 +149,44 @@ test('agent tool forwards questions to decide and returns per-question results',
     error: { code: 'unsupported', message: 'no score' },
   })
   assert.deepEqual(value.model, { provider: 'test', model: 'actual' })
+  assert.equal('fallbacks' in value, false)
   const text = definition.output.render(args, value)[0]!.text
   assert.match(text, /"probabilityTrue":0\.9/)
+})
+
+test('agent tool returns the executed model and failed fallbacks', async (t) => {
+  const { ctx, tools } = await setup(
+    t,
+    { fallbackModels: [{ provider: 'backup', model: 'backup-model' }] },
+    {
+      ...provider,
+      async evaluate() {
+        throw new Error('do not expose provider exception details')
+      },
+    },
+  )
+  ctx.system1.registerProvider('backup', provider)
+  const definition = tools.registered.get(tool.TOOL_NAME)!
+
+  const value = (await definition.execute(args, {
+    signal: new AbortController().signal,
+  })) as {
+    model: { provider: string; model: string }
+    fallbacks?: {
+      provider: string
+      model: string
+      error: { code: string; message: string }
+    }[]
+  }
+
+  assert.deepEqual(value.model, { provider: 'backup', model: 'actual' })
+  assert.deepEqual(value.fallbacks, [
+    {
+      provider: 'test',
+      model: 'requested',
+      error: { code: 'provider_error', message: 'Provider evaluation failed.' },
+    },
+  ])
 })
 
 test('agent tool rejects malformed questions before calling a provider', async (t) => {
