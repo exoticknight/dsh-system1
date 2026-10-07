@@ -32,7 +32,7 @@ dsh plugin --profile headless add github:exoticknight/dsh-system1
 
 The repository includes the compiled `lib/` files required by the plugin, so installation does not need a local checkout or a manually constructed archive path. pnpm supports GitHub repositories as direct package sources; see [supported package sources](https://pnpm.io/package-sources).
 
-The bundled patch mounts the service and built-in providers. Defaults are model `jev-latest`, provider id `typesafe`, and an 800 ms total timeout. Use the plugin settings to choose a default service and model, configure connections, and store keys in DSH credentials; environment variables are also supported. Adjust `timeoutMs` to fit backend latency, especially for local CPU inference.
+The bundled patch mounts the service and built-in providers. Defaults are model `jev-latest`, provider id `typesafe`, and an 800 ms timeout per model attempt. Use the plugin settings to choose a default service and model, add fallback models in the order they should be tried, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust `timeoutMs` to fit backend latency, especially for local CPU inference.
 
 Cloudflare uses provider `cloudflare` with `clef` or `clef-flash`. See [provider setup](docs/providers.en.md) for configuration.
 

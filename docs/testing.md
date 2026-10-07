@@ -6,7 +6,7 @@
 
 | 层级 | 命令 | 覆盖范围 |
 | --- | --- | --- |
-| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、总预算、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
+| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、每次尝试的超时预算、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
 | Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载。使用本地 HTTP fixture 或替换的 `fetch` |
 | 真实模型探针 | `pnpm probe <target>` | 通过公共服务和 provider 插件入口调用真实模型 |
 

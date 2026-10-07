@@ -2,7 +2,7 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-Choose the default provider and model in DSH plugin settings, then save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. The timeout covers capability checks and HTTP requests; allow more time for local CPU inference and cold starts.
+Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full `timeoutMs` budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
 
 | Provider | Models | Default base URL | Credential reference |
 | --- | --- | --- | --- |

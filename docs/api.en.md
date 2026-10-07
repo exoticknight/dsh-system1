@@ -4,7 +4,7 @@
 
 ## Requests and results
 
-`decide({ state, questions, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service uses its `defaultModel`. If neither is provided, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. The budget covers capability checks and the backend call.
+`decide({ state, questions, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. Each model attempt gets the full budget, including capability checks and the backend call.
 
 Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types only. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, and `dsh-system1/providers/cloudflare` entry points export their plugins and the `createTypesafeProvider`, `createLayaProvider`, and `createCloudflareProvider` factories respectively. See [provider setup](providers.en.md) for connection details and model selection.
 
@@ -43,7 +43,15 @@ Public inputs support JSON. The current TypeSafe state supports strings, objects
 
 Malformed call structures throw `System1InputError`. Runtime failures for a structurally valid request are returned per question with `status: 'error'`. Error codes include `unavailable`, `unsupported`, `limit_exceeded`, `timeout`, `cancelled`, `provider_error`, and `invalid_response`. A missing or invalid answer for one question does not discard other valid answers; unexpected question ids appear in `meta.warnings`.
 
-`meta.requested` records the selected provider id and model. `meta.executed` is present only after a valid backend response. Metadata also includes a request id, duration, and available usage. `approximate` and `degraded` are provider-supplied; an omitted field means unknown. Callers may override `signal` and `timeoutMs` per request. The total budget covers capability checks and backend execution. A timeout cannot stop non-cooperative third-party code, so providers should cancel their underlying I/O.
+`meta.requested` records the selected provider id and model. `meta.executed` is present only after a valid backend response. Metadata also includes a request id, duration, and available usage. `approximate` and `degraded` are provider-supplied; an omitted field means unknown. Callers may override `signal` and `timeoutMs` per request. Each attempt receives the full timeout budget, so a fallback chain can take up to its number of models multiplied by that budget. A timeout cannot stop non-cooperative third-party code, so providers should cancel their underlying I/O.
+
+## Fallback models
+
+Add fallback models in order in the plugin settings. The service tries `[defaultModel, ...fallbackModels]` and deduplicates identical provider/model pairs. A per-call `model` override runs by itself and does not read the fallback list. Each fallback entry must contain string `provider` and `model` fields; malformed plugin configuration is rejected during load, and non-empty values are checked when the fallback chain is used. An explicit `model` call is unaffected by unused fallback entries.
+
+The service moves to the next model when a whole attempt fails because the provider is unavailable, times out, lacks a required capability, returns `provider_error`, or returns an invalid response envelope. Invalid answers inside an otherwise valid envelope are returned per question without retrying another model. Caller cancellation, a provider-reported `cancelled` error, unregistering a provider during a call, or service unload ends the chain. The cancelled attempt is omitted from `meta.attempts`.
+
+`meta.requested` is the first model in the chain; `meta.executed` is the provider and actual model that succeeded; `meta.attempts` lists completed failed attempts and their error codes and messages in order, and is omitted when there are no recorded failures. If every model attempt fails, each question returns the last attempt's error; cancellation returns `cancelled`. Probabilities from different models are not calibrated against each other. Consumers that need stable thresholds should inspect `meta.executed`.
 
 ## Agent tool
 
@@ -55,7 +63,9 @@ Arguments:
 - `questions`: an array of questions. Each has an `id` (the unique result key), a `type` (`noul`, `choice`, or `score`), string `instructions`, and the same optional `criteria` as `decide()`. `choice` requires an object mapping candidate keys to descriptions; `score` requires an array of levels from lowest to highest.
 - `model`: an optional `{ provider, model }`; the service default is used when omitted.
 
-The tool returns `{ answers, model }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`, and `model` is the provider and model that ran. The tool forwards the call's cancellation signal to `decide()` and uses the service timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
+The tool returns `{ answers, model?, fallbacks? }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`. When a provider succeeds, `model` identifies the provider and actual model that ran; it is omitted when none succeeds. `fallbacks`, when present, lists non-cancelled failed attempts as `{ provider, model, error: { code, message } }` in order. The tool forwards the call's cancellation signal to `decide()` and uses the service timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
+
+The tool description tells models that probabilities range from 0 to 1, `score.value` is a zero-based expected criteria index, confidence is backend-defined and not comparable across backends, and probabilities from different models are not calibrated against each other.
 
 ## Implementing a provider
 

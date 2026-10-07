@@ -6,7 +6,7 @@ Checks come in three layers. The first two need no credentials or model services
 
 | Layer | Command | Coverage |
 | --- | --- | --- |
-| Plugin tests | `pnpm test plugin` | Service contract, input and result validation, total budget, cancellation, provider registration and unload. Uses fake providers and no backend protocol |
+| Plugin tests | `pnpm test plugin` | Service contract, input and result validation, per-attempt timeout budgets, cancellation, provider registration and unload. Uses fake providers and no backend protocol |
 | Provider tests | `pnpm test providers` | Each adapter's request shape, response normalization, error sanitization, missing credentials, and plugin mount/unmount. Uses local HTTP fixtures or an injected `fetch` |
 | Live model probes | `pnpm probe <target>` | Calls a real model through the public service and the provider plugin entry |
 
