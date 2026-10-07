@@ -522,7 +522,7 @@ function BundleSettingsPage(props: BoundPageProps) {
     h(Button, {
       type: 'button',
       variant: 'outline',
-      size: 'sm',
+      style: formButtonStyle,
       disabled: !canSave || saving,
       onClick: addFallback,
     }, t('fallbackAdd'))),
@@ -611,7 +611,7 @@ function fallbackModelRow(
       h(Button, {
         type: 'button',
         variant: 'outline',
-        size: 'sm',
+        style: formButtonStyle,
         disabled: disabled || index === 0,
         'aria-label': `${t('fallbackUp')} ${index + 1}`,
         onClick: () => actions.onMove(index, -1),
@@ -619,7 +619,7 @@ function fallbackModelRow(
       h(Button, {
         type: 'button',
         variant: 'outline',
-        size: 'sm',
+        style: formButtonStyle,
         disabled: disabled || index === rowCount - 1,
         'aria-label': `${t('fallbackDown')} ${index + 1}`,
         onClick: () => actions.onMove(index, 1),
@@ -627,7 +627,7 @@ function fallbackModelRow(
       h(Button, {
         type: 'button',
         variant: 'ghost',
-        size: 'sm',
+        style: formButtonStyle,
         disabled,
         'aria-label': `${t('fallbackRemove')} ${index + 1}`,
         onClick: () => actions.onRemove(index),

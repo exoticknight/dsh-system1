@@ -418,13 +418,13 @@ test('caller timeout budget is available independently to each model attempt', a
       })
     },
   })
-  ctx.system1.registerProvider('test', delayedProvider(100))
+  ctx.system1.registerProvider('test', delayedProvider(400))
   ctx.system1.registerProvider('backup', delayedProvider(15))
 
   const result = await ctx.system1.decide({
     state: null,
     questions,
-    timeoutMs: 40,
+    timeoutMs: 150,
   })
 
   assert.equal(result.answers.q.status, 'ok')
