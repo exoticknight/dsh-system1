@@ -126,10 +126,7 @@ try {
     signal: new AbortController().signal,
   })
   assert.equal(fallbackCall.isError, false, JSON.stringify(fallbackCall))
-  assert.deepEqual(fallbackCall.value.model, {
-    provider: '__host_probe_primary__',
-    model: 'primary',
-  })
+  assert.equal('model' in fallbackCall.value, false)
   assert.deepEqual(fallbackCall.value.fallbacks, [
     {
       provider: '__host_probe_primary__',

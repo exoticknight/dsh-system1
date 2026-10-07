@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   addFallbackModel,
   fallbackModelsEqual,
+  fallbackModelsInvalidForSave,
   fallbackModelsValid,
   moveFallbackModel,
   readFallbackModels,
@@ -36,6 +37,14 @@ test('fallback settings require a service and model but allow an empty or duplic
   )
   assert.equal(fallbackModelsValid([{ provider: ' ', model: 'jev-latest' }]), false)
   assert.equal(fallbackModelsValid([{ provider: 'laya', model: '' }]), false)
+})
+
+test('malformed stored fallback rows do not block unrelated settings saves', () => {
+  const malformed = readFallbackModels([null])
+
+  assert.equal(fallbackModelsInvalidForSave(malformed, false, false), false)
+  assert.equal(fallbackModelsInvalidForSave(malformed, true, false), true)
+  assert.equal(fallbackModelsInvalidForSave(malformed, true, true), false)
 })
 
 test('fallback dirty comparison treats order as part of the saved value', () => {

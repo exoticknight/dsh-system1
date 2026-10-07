@@ -29,7 +29,7 @@ const DESCRIPTION =
   'Results are probabilities, not decisions: weigh them and decide the next step yourself. ' +
   'Probabilities are in the range 0-1; score.value is the zero-based expected level index matching a criteria position. ' +
   'Confidence is backend-defined, is not a probability, and is not comparable across backends. ' +
-  'Probabilities from different models are not calibrated against each other. The model field identifies the provider and model that answered. ' +
+  'Probabilities from different models are not calibrated against each other. When a provider succeeds, the model field identifies who answered; if every provider fails, model is omitted. ' +
   'A question that fails returns status "error" without affecting the others.'
 
 /** Raw JSON Schema accepted by the DSH tool registry (the enforced subset). */
@@ -86,7 +86,7 @@ const PARAMETERS = {
 const OUTPUT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['answers', 'model'],
+  required: ['answers'],
   properties: {
     answers: { type: 'object' },
     model: {
@@ -190,10 +190,16 @@ function toOutput(response: DecideResponse) {
             error: { code: result.error.code, message: result.error.message },
           }
   }
-  const { provider, model } = response.meta.executed ?? response.meta.requested
   return {
     answers,
-    model: { provider, model },
+    ...(response.meta.executed
+      ? {
+          model: {
+            provider: response.meta.executed.provider,
+            model: response.meta.executed.model,
+          },
+        }
+      : {}),
     ...(response.meta.attempts?.length
       ? {
           fallbacks: response.meta.attempts.map(({ provider, model, error }) => ({

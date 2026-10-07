@@ -22,7 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import {
   addFallbackModel,
   fallbackModelsEqual,
-  fallbackModelsValid,
+  fallbackModelsInvalidForSave,
   moveFallbackModel,
   readFallbackModels,
   removeFallbackModel,
@@ -326,7 +326,11 @@ function BundleSettingsPage(props: BoundPageProps) {
   const modelIsListed = models.some((candidate) => candidate.id === model)
   const parsedTimeout = Number(timeout)
   const selectionInvalid = !provider.trim() || !model.trim()
-  const fallbackInvalid = !resetFallbacks && !fallbackModelsValid(fallbackModels)
+  const fallbackInvalid = fallbackModelsInvalidForSave(
+    fallbackModels,
+    fallbackDirty,
+    resetFallbacks,
+  )
   const timeoutInvalid = !resetTimeout &&
     (!Number.isInteger(parsedTimeout) || parsedTimeout < 1 || parsedTimeout > 2147483647)
   const validationError = error || (selectionInvalid
@@ -341,7 +345,11 @@ function BundleSettingsPage(props: BoundPageProps) {
       setError(t('required'))
       return
     }
-    if (!resetFallbacks && !fallbackModelsValid(fallbackModels)) {
+    if (fallbackModelsInvalidForSave(
+      fallbackModels,
+      fallbackDirty,
+      resetFallbacks,
+    )) {
       setError(t('fallbackRequired'))
       return
     }

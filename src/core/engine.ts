@@ -39,7 +39,10 @@ export class System1Engine {
     const snapshot = structuredClone(options)
     this.resolveOptions = () => snapshot
   }
-  private validateOptions(options: System1Options): void {
+  private validateOptions(
+    options: System1Options,
+    validateFallbackModels = true,
+  ): void {
     if (
       options.defaultModel &&
       !modelSchema.safeParse(options.defaultModel).success
@@ -51,6 +54,7 @@ export class System1Engine {
     )
       throw new System1InputError('Invalid default timeout.')
     if (
+      validateFallbackModels &&
       options.fallbackModels !== undefined &&
       (!Array.isArray(options.fallbackModels) ||
         options.fallbackModels.some(
@@ -72,7 +76,7 @@ export class System1Engine {
     const start = performance.now()
     const req = parseRequest(input)
     const options = structuredClone(this.resolveOptions())
-    this.validateOptions(options)
+    this.validateOptions(options, req.model === undefined)
     const chain = modelChain(req.model, options)
     if (chain.length === 0)
       throw new System1InputError(
@@ -124,15 +128,15 @@ export class System1Engine {
       )
       if ('error' in outcome) {
         lastError = outcome.error
-        attempts.push({
-          ...model,
-          error: { code: outcome.error.code, message: outcome.error.message },
-        })
         if (outcome.error.code === 'cancelled')
           return failure(
             outcome.error,
             attempts.length ? { attempts } : {},
           )
+        attempts.push({
+          ...model,
+          error: { code: outcome.error.code, message: outcome.error.message },
+        })
         continue
       }
       const { result } = outcome

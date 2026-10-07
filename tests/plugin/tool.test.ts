@@ -109,10 +109,12 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   assert.match(definition.description, /zero-based.*criteria/i)
   assert.match(definition.description, /confidence.*backend/i)
   assert.match(definition.description, /not.*calibrated/i)
+  assert.match(definition.description, /every provider fails.*model is omitted/i)
   const outputProperties = definition.output.schema.properties as Record<
     string,
     { type?: string; items?: { properties?: Record<string, unknown> } }
   >
+  assert.deepEqual(definition.output.schema.required, ['answers'])
   assert.equal(outputProperties.fallbacks?.type, 'array')
   assert.ok(outputProperties.fallbacks?.items?.properties?.error)
   await fiber.dispose()
@@ -185,6 +187,41 @@ test('agent tool returns the executed model and failed fallbacks', async (t) => 
       provider: 'test',
       model: 'requested',
       error: { code: 'provider_error', message: 'Provider evaluation failed.' },
+    },
+  ])
+})
+
+test('agent tool omits model when every configured provider fails', async (t) => {
+  const { tools } = await setup(
+    t,
+    { fallbackModels: [{ provider: 'missing', model: 'backup-model' }] },
+    {
+      ...provider,
+      async evaluate() {
+        throw new Error('provider failed')
+      },
+    },
+  )
+  const definition = tools.registered.get(tool.TOOL_NAME)!
+
+  const value = (await definition.execute(args, {
+    signal: new AbortController().signal,
+  })) as Record<string, unknown>
+
+  assert.equal('model' in value, false)
+  assert.deepEqual(value.fallbacks, [
+    {
+      provider: 'test',
+      model: 'requested',
+      error: { code: 'provider_error', message: 'Provider evaluation failed.' },
+    },
+    {
+      provider: 'missing',
+      model: 'backup-model',
+      error: {
+        code: 'unavailable',
+        message: 'Requested provider is not registered.',
+      },
     },
   ])
 })

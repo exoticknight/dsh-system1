@@ -216,6 +216,7 @@ test('unregister cancels in-flight work; stale disposer cannot remove new regist
     'cancelled',
   )
   assert.equal(fallbackCalls, 0)
+  assert.equal('attempts' in result.meta, false)
   assert.equal(
     (await ctx.system1.decide({ state: null, questions })).answers.q.status,
     'ok',
@@ -249,6 +250,7 @@ test('service unload cancels calls and removes ctx service', async (t) => {
     'cancelled',
   )
   assert.equal(fallbackCalls, 0)
+  assert.equal('attempts' in result.meta, false)
   assert.equal(ctx.get('system1'), undefined)
 })
 
@@ -502,6 +504,38 @@ test('final provider failure retains retry and HTTP status metadata', async (t) 
   ])
 })
 
+test('provider-reported cancellation ends the chain without recording an attempt', async (t) => {
+  const { ctx } = await setup(t, {
+    fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
+  })
+  let fallbackCalls = 0
+  ctx.system1.registerProvider('test', {
+    ...provider,
+    async evaluate() {
+      throw new System1ProviderError({
+        code: 'cancelled',
+        message: 'Provider cancelled the request.',
+      })
+    },
+  })
+  ctx.system1.registerProvider('backup', {
+    ...provider,
+    async evaluate() {
+      fallbackCalls++
+      return ok
+    },
+  })
+
+  const result = await ctx.system1.decide({ state: null, questions })
+
+  assert.equal(
+    result.answers.q.status === 'error' && result.answers.q.error.code,
+    'cancelled',
+  )
+  assert.equal(fallbackCalls, 0)
+  assert.equal('attempts' in result.meta, false)
+})
+
 test('model chain deduplicates identical provider and model pairs', async (t) => {
   const { ctx } = await setup(t, {
     fallbackModels: [
@@ -656,6 +690,60 @@ test('caller cancellation aborts provider I/O after evaluation starts', async (t
   )
   assert.equal(aborted, true)
   assert.equal(fallbackCalls, 0)
+  assert.equal('attempts' in result.meta, false)
+})
+
+test('explicit model failure does not try configured fallback models', async (t) => {
+  const { ctx } = await setup(t, {
+    fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
+  })
+  let fallbackCalls = 0
+  ctx.system1.registerProvider('test', {
+    ...provider,
+    async evaluate() {
+      throw new Error('explicit model failed')
+    },
+  })
+  ctx.system1.registerProvider('backup', {
+    ...provider,
+    async evaluate() {
+      fallbackCalls++
+      return ok
+    },
+  })
+
+  const result = await ctx.system1.decide({
+    state: null,
+    questions,
+    model: { provider: 'test', model: 'explicit' },
+  })
+
+  assert.equal(
+    result.answers.q.status === 'error' && result.answers.q.error.code,
+    'provider_error',
+  )
+  assert.equal(fallbackCalls, 0)
+  assert.deepEqual(result.meta.attempts?.map(({ provider, model }) => ({
+    provider,
+    model,
+  })), [{ provider: 'test', model: 'explicit' }])
+})
+
+test('explicit per-call model ignores malformed unused fallback options', async (t) => {
+  const { ctx } = await setup(t, {
+    fallbackModels: [{ provider: '', model: '' }],
+  })
+  ctx.system1.registerProvider('test', provider)
+
+  const result = await ctx.system1.decide({
+    state: null,
+    questions,
+    model: { provider: 'test', model: 'explicit' },
+  })
+
+  assert.equal(result.answers.q.status, 'ok')
+  assert.equal(result.meta.executed?.provider, 'test')
+  assert.equal('attempts' in result.meta, false)
 })
 
 test('service without a default model accepts an explicit per-call model', async (t) => {
@@ -706,5 +794,14 @@ test('service with no default or fallback model rejects an unconfigured call', a
   await assert.rejects(
     ctx.system1.decide({ state: null, questions }),
     System1InputError,
+  )
+})
+
+test('fallback config schema rejects malformed model references at load time', () => {
+  assert.throws(
+    () => System1Service.Config({
+      fallbackModels: [{ provider: 'test', model: 3 }],
+    } as never),
+    TypeError,
   )
 })

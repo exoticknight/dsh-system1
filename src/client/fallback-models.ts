@@ -23,6 +23,14 @@ export function fallbackModelsValid(rows: readonly FallbackModelDraft[]): boolea
   )
 }
 
+export function fallbackModelsInvalidForSave(
+  rows: readonly FallbackModelDraft[],
+  dirty: boolean,
+  resetting: boolean,
+): boolean {
+  return dirty && !resetting && !fallbackModelsValid(rows)
+}
+
 export function fallbackModelsEqual(
   left: readonly FallbackModelDraft[],
   right: readonly FallbackModelDraft[],
