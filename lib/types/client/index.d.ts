@@ -7,6 +7,17 @@ declare const en: {
     providerCloudflare: string;
     providerUnknown: string;
     model: string;
+    fallbackModels: string;
+    fallbackHint: string;
+    fallbackRequired: string;
+    fallbackProvider: string;
+    fallbackModel: string;
+    fallbackChooseService: string;
+    fallbackChooseModel: string;
+    fallbackAdd: string;
+    fallbackUp: string;
+    fallbackDown: string;
+    fallbackRemove: string;
     timeout: string;
     defaultHint: string;
     timeoutHint: string;

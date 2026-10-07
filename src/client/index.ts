@@ -19,18 +19,39 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import {
+  addFallbackModel,
+  fallbackModelsEqual,
+  fallbackModelsValid,
+  moveFallbackModel,
+  readFallbackModels,
+  removeFallbackModel,
+  updateFallbackModel,
+} from './fallback-models.js'
+import type { FallbackModelDraft } from './fallback-models.js'
 
 const NS = 'dsh-system1'
 const PACKAGE = 'dsh-system1'
 
 const en = {
-  coreSummary: 'Choose the default service and model, then set the shared request timeout.',
+  coreSummary: 'Choose a default model and ordered fallbacks, then set the shared request timeout.',
   provider: 'Default service',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: 'Unsupported service',
   model: 'Default model',
+  fallbackModels: 'Fallback models',
+  fallbackHint: 'Tried in order when the default model fails.',
+  fallbackRequired: 'Choose a service and model for each fallback.',
+  fallbackProvider: 'Fallback service',
+  fallbackModel: 'Fallback model',
+  fallbackChooseService: 'Choose a service',
+  fallbackChooseModel: 'Choose a model',
+  fallbackAdd: 'Add fallback model',
+  fallbackUp: 'Move up',
+  fallbackDown: 'Move down',
+  fallbackRemove: 'Remove',
   timeout: 'Request timeout (ms)',
   defaultHint: 'Used when a decision request does not specify a model.',
   timeoutHint: 'Applies when a decision request does not provide its own timeout.',
@@ -80,13 +101,24 @@ const en = {
 }
 
 const zh = {
-  coreSummary: '选择默认服务和模型，并设置通用请求超时。',
+  coreSummary: '选择默认模型和按顺序尝试的备用模型，并设置通用请求超时。',
   provider: '默认服务',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: '暂不支持的服务',
   model: '默认模型',
+  fallbackModels: '备用模型',
+  fallbackHint: '默认模型失败时按顺序依次尝试。',
+  fallbackRequired: '请为每个备用项选择服务和模型。',
+  fallbackProvider: '备用服务',
+  fallbackModel: '备用模型',
+  fallbackChooseService: '选择服务',
+  fallbackChooseModel: '选择模型',
+  fallbackAdd: '添加备用模型',
+  fallbackUp: '上移',
+  fallbackDown: '下移',
+  fallbackRemove: '删除',
   timeout: '请求超时（毫秒）',
   defaultHint: '决策请求未指定模型时使用。',
   timeoutHint: '决策请求没有单独指定超时时使用。',
@@ -252,11 +284,14 @@ function BundleSettingsPage(props: BoundPageProps) {
   const getSnapshot = useCallback(() => form.getSnapshot(), [form])
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   const value = objectValue(state.value)
+  const base = objectValue(state.base)
   const t = props.t
   const [provider, setProvider] = useState('typesafe')
   const [model, setModel] = useState('jev-latest')
+  const [fallbackModels, setFallbackModels] = useState<FallbackModelDraft[]>([])
   const [timeout, setTimeout] = useState('800')
   const [resetModel, setResetModel] = useState(false)
+  const [resetFallbacks, setResetFallbacks] = useState(false)
   const [resetTimeout, setResetTimeout] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
@@ -266,8 +301,10 @@ function BundleSettingsPage(props: BoundPageProps) {
     const currentModel = objectValue(value.defaultModel)
     setProvider(typeof currentModel.provider === 'string' ? currentModel.provider : 'typesafe')
     setModel(typeof currentModel.model === 'string' ? currentModel.model : 'jev-latest')
+    setFallbackModels(readFallbackModels(value.fallbackModels))
     setTimeout(typeof value.timeoutMs === 'number' ? String(value.timeoutMs) : '800')
     setResetModel(false)
+    setResetFallbacks(false)
     setResetTimeout(false)
   }, [state.revision, state.status, state.value])
 
@@ -279,6 +316,9 @@ function BundleSettingsPage(props: BoundPageProps) {
   const modelDirty = resetModel ||
     provider !== (typeof currentModel.provider === 'string' ? currentModel.provider : '') ||
     model !== (typeof currentModel.model === 'string' ? currentModel.model : '')
+  const currentFallbackModels = readFallbackModels(value.fallbackModels)
+  const fallbackDirty = resetFallbacks ||
+    !fallbackModelsEqual(fallbackModels, currentFallbackModels)
   const timeoutDirty = resetTimeout ||
     timeout !== String(typeof value.timeoutMs === 'number' ? value.timeoutMs : 800)
   const providerInfo = PROVIDERS.find((candidate) => candidate.id === provider)
@@ -286,10 +326,12 @@ function BundleSettingsPage(props: BoundPageProps) {
   const modelIsListed = models.some((candidate) => candidate.id === model)
   const parsedTimeout = Number(timeout)
   const selectionInvalid = !provider.trim() || !model.trim()
+  const fallbackInvalid = !resetFallbacks && !fallbackModelsValid(fallbackModels)
   const timeoutInvalid = !resetTimeout &&
     (!Number.isInteger(parsedTimeout) || parsedTimeout < 1 || parsedTimeout > 2147483647)
   const validationError = error || (selectionInvalid
     ? t('required')
+    : fallbackInvalid ? t('fallbackRequired')
     : timeoutInvalid ? t('invalidTimeout') : '')
 
   const saveSettings = async () => {
@@ -297,6 +339,10 @@ function BundleSettingsPage(props: BoundPageProps) {
     setError('')
     if (!provider.trim() || !model.trim()) {
       setError(t('required'))
+      return
+    }
+    if (!resetFallbacks && !fallbackModelsValid(fallbackModels)) {
+      setError(t('fallbackRequired'))
       return
     }
     if (!resetTimeout &&
@@ -311,6 +357,17 @@ function BundleSettingsPage(props: BoundPageProps) {
         op: 'set',
         path: ['defaultModel'],
         value: { provider: provider.trim(), model: model.trim() },
+      })
+    }
+    if (fallbackDirty) {
+      if (resetFallbacks) operations.push({ op: 'unset', path: ['fallbackModels'] })
+      else operations.push({
+        op: 'set',
+        path: ['fallbackModels'],
+        value: fallbackModels.map(({ provider, model }) => ({
+          provider: provider.trim(),
+          model: model.trim(),
+        })),
       })
     }
     if (timeoutDirty) {
@@ -335,7 +392,6 @@ function BundleSettingsPage(props: BoundPageProps) {
     setModel(nextInfo?.models[0]?.id ?? '')
     setResetModel(false)
   }
-  const base = objectValue(state.base)
   const baseModel = objectValue(base.defaultModel)
   const resetToModel = () => {
     setProvider(typeof baseModel.provider === 'string' ? baseModel.provider : 'typesafe')
@@ -346,11 +402,48 @@ function BundleSettingsPage(props: BoundPageProps) {
     setTimeout(typeof base.timeoutMs === 'number' ? String(base.timeoutMs) : '800')
     setResetTimeout(true)
   }
+  const resetToFallbackModels = () => {
+    setFallbackModels(readFallbackModels(base.fallbackModels))
+    setResetFallbacks(true)
+  }
+  const addFallback = () => {
+    const firstProvider = PROVIDERS[0]!
+    setFallbackModels(addFallbackModel(fallbackModels, {
+      provider: firstProvider.id,
+      model: firstProvider.models[0]?.id ?? '',
+    }))
+    setResetFallbacks(false)
+    setError('')
+  }
+  const changeFallbackProvider = (index: number, nextProvider: string) => {
+    const nextInfo = PROVIDERS.find((candidate) => candidate.id === nextProvider)
+    setFallbackModels(updateFallbackModel(fallbackModels, index, {
+      provider: nextProvider,
+      model: nextInfo?.models[0]?.id ?? '',
+    }))
+    setResetFallbacks(false)
+    setError('')
+  }
+  const changeFallbackModel = (index: number, nextModel: string) => {
+    setFallbackModels(updateFallbackModel(fallbackModels, index, { model: nextModel }))
+    setResetFallbacks(false)
+    setError('')
+  }
+  const moveFallback = (index: number, offset: -1 | 1) => {
+    setFallbackModels(moveFallbackModel(fallbackModels, index, offset))
+    setResetFallbacks(false)
+    setError('')
+  }
+  const deleteFallback = (index: number) => {
+    setFallbackModels(removeFallbackModel(fallbackModels, index))
+    setResetFallbacks(false)
+    setError('')
+  }
   const formState: SettingsFormShell = {
     available: true,
     writable: canSave,
-    dirty: modelDirty || timeoutDirty,
-    invalid: selectionInvalid || timeoutInvalid,
+    dirty: modelDirty || fallbackDirty || timeoutDirty,
+    invalid: selectionInvalid || fallbackInvalid || timeoutInvalid,
     saving,
     failed: false,
   }
@@ -393,6 +486,38 @@ function BundleSettingsPage(props: BoundPageProps) {
     !modelIsListed && model && h('option', { value: model }, model),
     models.map((entry) => h('option', { key: entry.id, value: entry.id },
       entry.label ? t(entry.label) : entry.id))), t('defaultHint'), resetAction(t, t('model'), resetToModel, !canSave || saving)),
+    h('section', {
+      style: fallbackSectionStyle,
+      role: 'group',
+      'aria-labelledby': 'dsh-system1-fallbacks-label',
+    },
+    h('div', { style: settingsFieldHeadStyle },
+      h('span', {
+        id: 'dsh-system1-fallbacks-label',
+        style: settingsLabelStyle,
+      }, t('fallbackModels')),
+      resetAction(t, t('fallbackModels'), resetToFallbackModels, !canSave || saving)),
+    h('p', { style: settingsHintStyle }, t('fallbackHint')),
+    fallbackModels.map((fallback, index) => fallbackModelRow(
+      t,
+      fallback,
+      index,
+      fallbackModels.length,
+      !canSave || saving,
+      {
+        onProviderChange: changeFallbackProvider,
+        onModelChange: changeFallbackModel,
+        onMove: moveFallback,
+        onRemove: deleteFallback,
+      },
+    )),
+    h(Button, {
+      type: 'button',
+      variant: 'outline',
+      size: 'sm',
+      disabled: !canSave || saving,
+      onClick: addFallback,
+    }, t('fallbackAdd'))),
     field('dsh-system1-timeout', t('timeout'), h('input', {
       id: 'dsh-system1-timeout',
       name: 'timeoutMs',
@@ -410,6 +535,95 @@ function BundleSettingsPage(props: BoundPageProps) {
     }), t('timeoutHint'), resetAction(t, t('timeout'), resetToTimeout, !canSave || saving)),
     h('p', { role: 'note', style: settingsNoteStyle }, t('providerEnabledHint')),
     statusMessage(notice, validationError)),
+  )
+}
+
+interface FallbackModelRowActions {
+  onProviderChange(index: number, provider: string): void
+  onModelChange(index: number, model: string): void
+  onMove(index: number, offset: -1 | 1): void
+  onRemove(index: number): void
+}
+
+function fallbackModelRow(
+  t: Copy,
+  fallback: FallbackModelDraft,
+  index: number,
+  rowCount: number,
+  disabled: boolean,
+  actions: FallbackModelRowActions,
+) {
+  const providerInfo = PROVIDERS.find((candidate) => candidate.id === fallback.provider)
+  const models = providerInfo?.models ?? []
+  const modelIsListed = models.some((candidate) => candidate.id === fallback.model)
+  const serviceId = `dsh-system1-fallback-service-${index}`
+  const modelId = `dsh-system1-fallback-model-${index}`
+  return h('div', { key: index, style: fallbackRowStyle },
+    h('div', { style: fallbackSelectorsStyle },
+      h('div', null,
+        h('label', {
+          htmlFor: serviceId,
+          style: settingsHintStyle,
+        }, `${t('fallbackProvider')} ${index + 1}`),
+        h('select', {
+          id: serviceId,
+          value: fallback.provider,
+          disabled,
+          style: selectStyle,
+          onChange: (event: { currentTarget: { value: string } }) =>
+            actions.onProviderChange(index, event.currentTarget.value),
+        },
+        h('option', { value: '', disabled: true }, t('fallbackChooseService')),
+        !providerInfo && fallback.provider && h('option', { value: fallback.provider },
+          `${t('providerUnknown')}: ${fallback.provider}`),
+        PROVIDERS.map((entry) => h('option', {
+          key: entry.id,
+          value: entry.id,
+        }, t(entry.label))))),
+      h('div', null,
+        h('label', {
+          htmlFor: modelId,
+          style: settingsHintStyle,
+        }, `${t('fallbackModel')} ${index + 1}`),
+        h('select', {
+          id: modelId,
+          value: fallback.model,
+          disabled: disabled || !providerInfo,
+          style: selectStyle,
+          onChange: (event: { currentTarget: { value: string } }) =>
+            actions.onModelChange(index, event.currentTarget.value),
+        },
+        h('option', { value: '', disabled: true }, t('fallbackChooseModel')),
+        !modelIsListed && fallback.model && h('option', { value: fallback.model }, fallback.model),
+        models.map((entry) => h('option', {
+          key: entry.id,
+          value: entry.id,
+        }, entry.label ? t(entry.label) : entry.id))))),
+    h('div', { style: fallbackActionsStyle },
+      h(Button, {
+        type: 'button',
+        variant: 'outline',
+        size: 'sm',
+        disabled: disabled || index === 0,
+        'aria-label': `${t('fallbackUp')} ${index + 1}`,
+        onClick: () => actions.onMove(index, -1),
+      }, t('fallbackUp')),
+      h(Button, {
+        type: 'button',
+        variant: 'outline',
+        size: 'sm',
+        disabled: disabled || index === rowCount - 1,
+        'aria-label': `${t('fallbackDown')} ${index + 1}`,
+        onClick: () => actions.onMove(index, 1),
+      }, t('fallbackDown')),
+      h(Button, {
+        type: 'button',
+        variant: 'ghost',
+        size: 'sm',
+        disabled,
+        'aria-label': `${t('fallbackRemove')} ${index + 1}`,
+        onClick: () => actions.onRemove(index),
+      }, t('fallbackRemove'))),
   )
 }
 
@@ -764,6 +978,27 @@ const settingsFieldStyle = {
   gap: 6,
   padding: '12px 0',
   borderTop: '0.5px solid var(--dsw-alias-border-l2)',
+}
+const fallbackSectionStyle = {
+  ...settingsFieldStyle,
+  marginTop: 0,
+}
+const fallbackRowStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  padding: '12px 0',
+  borderTop: '0.5px solid var(--dsw-alias-border-l2)',
+}
+const fallbackSelectorsStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
+}
+const fallbackActionsStyle = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 8,
 }
 const settingsFieldHeadStyle = { display: 'flex', alignItems: 'center', gap: 8 }
 const settingsLabelStyle = {
