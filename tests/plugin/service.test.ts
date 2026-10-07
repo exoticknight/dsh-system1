@@ -4,6 +4,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { System1Engine } from '../../src/core/engine.js'
 import System1Service, {
   System1InputError,
+  System1ProviderError,
   type System1Provider,
   type System1Options,
 } from '../../src/index.js'
@@ -464,6 +465,40 @@ test('all failed attempts return the last error and preserve their order', async
   })), [
     { provider: 'test', code: 'provider_error' },
     { provider: 'backup', code: 'invalid_response' },
+  ])
+})
+
+test('final provider failure retains retry and HTTP status metadata', async (t) => {
+  const { ctx } = await setup(t)
+  ctx.system1.registerProvider('test', {
+    ...provider,
+    async evaluate() {
+      throw new System1ProviderError({
+        code: 'provider_error',
+        message: 'Provider request failed.',
+        retryable: true,
+        httpStatus: 503,
+      })
+    },
+  })
+
+  const result = await ctx.system1.decide({ state: null, questions })
+
+  assert.deepEqual(result.answers.q, {
+    status: 'error',
+    error: {
+      code: 'provider_error',
+      message: 'Provider request failed.',
+      retryable: true,
+      httpStatus: 503,
+    },
+  })
+  assert.deepEqual(result.meta.attempts, [
+    {
+      provider: 'test',
+      model: 'requested',
+      error: { code: 'provider_error', message: 'Provider request failed.' },
+    },
   ])
 })
 

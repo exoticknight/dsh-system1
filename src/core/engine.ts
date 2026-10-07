@@ -227,10 +227,7 @@ export class System1Engine {
     } catch (error) {
       if (error instanceof System1ProviderError) {
         const detail = errorSchema.safeParse(error.detail)
-        if (detail.success)
-          return {
-            error: { code: detail.data.code, message: detail.data.message },
-          }
+        if (detail.success) return { error: detail.data }
       }
       return {
         error: {
