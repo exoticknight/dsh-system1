@@ -14,6 +14,7 @@ import {
   IconChevronUpOutlineRegular,
   IconPlusOutlineRegular,
   IconTrashOutlineRegular,
+  Menu,
   SettingsForm,
   SettingsFormModel,
   SettingsSecretField,
@@ -394,8 +395,9 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
         disabled,
         t,
         onReset: () => actions.resetField('defaultModel'),
-      }, modelSelectors(t, 'dsh-system1-default', defaultRow, disabled, defaultField.invalid,
-        (row) => actions.edit('defaultModel', JSON.stringify(row)))),
+      }, h('div', { style: modelPairStyle },
+        modelSelectors(t, 'dsh-system1-default', defaultRow, disabled, defaultField.invalid,
+          (row) => actions.edit('defaultModel', JSON.stringify(row))))),
       h(SelectField, {
         key: 'fallbacks',
         id: 'dsh-system1-fallback-models',
@@ -409,8 +411,9 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
         onReset: () => actions.resetField('fallbackModels'),
       },
       fallbacks.map((row, index) => h('div', { key: index, style: fallbackRowStyle },
-        modelSelectors(t, `dsh-system1-fallback-${index}`, row, disabled, fallbackField.invalid,
-          (next) => editFallbacks(updateFallbackModel(fallbacks, index, next))),
+        h('div', { style: modelPairStyle },
+          modelSelectors(t, `dsh-system1-fallback-${index}`, row, disabled, fallbackField.invalid,
+            (next) => editFallbacks(updateFallbackModel(fallbacks, index, next)))),
         h(Button, {
           variant: 'ghost', size: 'sm', icon: h(IconChevronUpOutlineRegular, { size: 13 }),
           disabled: disabled || index === 0,
@@ -466,42 +469,92 @@ function modelSelectors(
 ) {
   const info = PROVIDERS.find((candidate) => candidate.id === row.provider)
   const models = info?.models ?? []
-  const listed = models.some((candidate) => candidate.id === row.model)
-  const invalidProps = invalid ? { 'aria-invalid': true } : {}
+  const providerOptions = [
+    ...(!info && row.provider
+      ? [{ id: row.provider, label: `${t('providerUnknown')}: ${row.provider}` }]
+      : []),
+    ...PROVIDERS.map((entry) => ({ id: entry.id, label: t(entry.label) })),
+  ]
+  const modelOptions = [
+    ...(row.model && !models.some((candidate) => candidate.id === row.model)
+      ? [{ id: row.model, label: row.model }]
+      : []),
+    ...models.map((entry) => ({ id: entry.id, label: entry.label ? t(entry.label) : entry.id })),
+  ]
   return [
-    h('select', {
+    h(Dropdown, {
       key: 'provider',
       id: `${idPrefix}-provider`,
-      'aria-label': t('provider'),
+      label: t('provider'),
       value: row.provider,
+      placeholder: t('fallbackChooseService'),
+      options: providerOptions,
       disabled,
-      style: selectStyle,
-      ...invalidProps,
-      onChange: (event: { currentTarget: { value: string } }) => {
-        const provider = event.currentTarget.value
+      invalid,
+      onChange: (provider: string) => {
         const next = PROVIDERS.find((candidate) => candidate.id === provider)
         onChange({ provider, model: next?.models[0]?.id ?? '' })
       },
-    },
-    h('option', { value: '', disabled: true }, t('fallbackChooseService')),
-    !info && row.provider && h('option', { value: row.provider }, `${t('providerUnknown')}: ${row.provider}`),
-    PROVIDERS.map((entry) => h('option', { key: entry.id, value: entry.id }, t(entry.label)))),
-    h('select', {
+    }),
+    h(Dropdown, {
       key: 'model',
       id: `${idPrefix}-model`,
-      'aria-label': t('fallbackModel'),
+      label: t('fallbackModel'),
       value: row.model,
+      placeholder: t('fallbackChooseModel'),
+      options: modelOptions,
       disabled: disabled || !info,
-      style: selectStyle,
-      ...invalidProps,
-      onChange: (event: { currentTarget: { value: string } }) =>
-        onChange({ ...row, model: event.currentTarget.value }),
-    },
-    h('option', { value: '', disabled: true }, t('fallbackChooseModel')),
-    !listed && row.model && h('option', { value: row.model }, row.model),
-    models.map((entry) => h('option', { key: entry.id, value: entry.id },
-      entry.label ? t(entry.label) : entry.id))),
+      invalid,
+      onChange: (model: string) => onChange({ ...row, model }),
+    }),
   ]
+}
+
+/**
+ * DSH's settings dropdown: a trigger button opening the primitives Menu with the current choice
+ * selected, as the plugin inventory's preset switcher does. Trigger styles copy that switcher.
+ */
+function Dropdown(props: {
+  id: string
+  label: string
+  value: string
+  placeholder: string
+  options: ReadonlyArray<{ id: string; label: string }>
+  disabled: boolean
+  invalid: boolean
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const current = props.options.find((option) => option.id === props.value)
+  return h(Menu, {
+    open,
+    onClose: () => setOpen(false),
+    items: props.options,
+    ...(current ? { selectedId: current.id } : {}),
+    onSelect: (id: string) => {
+      setOpen(false)
+      if (id !== props.value) props.onChange(id)
+    },
+    align: 'start',
+    portal: true,
+    anchor: h('button', {
+      id: props.id,
+      type: 'button',
+      'aria-label': props.label,
+      'aria-haspopup': 'menu',
+      'aria-expanded': open,
+      ...(props.invalid ? { 'aria-invalid': true } : {}),
+      disabled: props.disabled,
+      style: {
+        ...dropdownTriggerStyle,
+        ...(props.invalid ? dropdownInvalidStyle : {}),
+        ...(props.disabled ? dropdownDisabledStyle : {}),
+      },
+      onClick: () => setOpen((value) => !value),
+    },
+    h('span', { style: dropdownLabelStyle }, current?.label ?? props.placeholder),
+    h(IconChevronDownOutlineRegular, { size: 12 })),
+  })
 }
 
 /**
@@ -746,19 +799,35 @@ const fieldInvalidStyle = {
   lineHeight: 1.5,
   color: 'var(--dsw-alias-state-error-primary)',
 }
-const selectStyle = {
-  boxSizing: 'border-box',
+// The plugin inventory's preset switcher trigger, stretched to fill its grid cell.
+const dropdownTriggerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  width: '100%',
+  minWidth: 0,
+  height: 36,
+  padding: '0 14px',
+  border: 'none',
+  borderRadius: 'var(--dsw-radius-md)',
+  background: 'var(--dsw-alias-bg-module-platform)',
+  color: 'var(--dsw-alias-label-primary)',
+  font: 'inherit',
+  fontSize: 14,
+  lineHeight: '22px',
+  whiteSpace: 'nowrap',
+  cursor: 'pointer',
+}
+const dropdownLabelStyle = { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }
+const dropdownInvalidStyle = { boxShadow: 'inset 0 0 0 1px var(--dsw-alias-state-error-primary)' }
+const dropdownDisabledStyle = { color: 'var(--dsw-alias-label-tertiary)', cursor: 'default' }
+const modelPairStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
   flex: 1,
   minWidth: 0,
-  height: 34,
-  padding: '0 12px',
-  border: '0.5px solid var(--dsw-alias-border-l4)',
-  borderRadius: 'var(--dsw-radius-md)',
-  background: 'var(--dsw-alias-bg-layer-3)',
-  font: 'inherit',
-  fontSize: 13,
-  lineHeight: 1.5,
-  color: 'var(--dsw-alias-label-primary)',
 }
 const selectStackStyle = { display: 'flex', flexDirection: 'column', gap: 8 }
 const fallbackRowStyle = { display: 'flex', alignItems: 'center', gap: 8 }
