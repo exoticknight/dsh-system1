@@ -218,7 +218,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
   },
 ]
 
-export const inject = ['slots', 'locale', 'remote', 'configForms']
+export const inject = ['slots', 'locale', 'remote', 'remote.credentials', 'configForms']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-system1 client copy')
@@ -649,12 +649,12 @@ function ProviderSettingsPage(props: BoundPageProps & {
       statusMessage(secretNotice, secretError),
       h('div', { style: settingsFooterStyle },
         h(Button, {
-          type: 'button', size: 'sm', variant: 'primary',
+          type: 'button', variant: 'primary', style: formButtonStyle,
           disabled: !credentialAvailable || !credentialWritable || credentialLoading || savingSecret || !secret.trim(),
           onClick: saveSecret,
         }, savingSecret ? t('keySaving') : t('keySave')),
         h(Button, {
-          type: 'button', size: 'sm', variant: 'outline',
+          type: 'button', variant: 'outline', style: formButtonStyle,
           disabled: !credentialAvailable || !credentialWritable || credentialLoading || savingSecret || !credentialConfigured,
           onClick: clearSecret,
         }, t('keyClear')),
@@ -798,8 +798,17 @@ const resetButtonStyle = {
 }
 const settingsFooterStyle = { display: 'flex', alignItems: 'center', gap: 8, paddingTop: 16 }
 const credentialSectionStyle = {
+  marginTop: 16,
   borderTop: '0.5px solid var(--dsw-alias-border-l2)',
   paddingTop: 12,
+}
+// Matches the SettingsForm save button above, so both sections' actions read alike.
+const formButtonStyle = {
+  height: 'auto',
+  padding: '5px 14px',
+  fontSize: 13,
+  lineHeight: 1.5,
+  borderRadius: 'var(--dsw-radius-md)',
 }
 const errorMessageStyle = {
   margin: 0,
