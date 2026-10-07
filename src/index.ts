@@ -19,7 +19,8 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export default class System1Service extends Service {
-  static Config: Schema<System1Options, System1Config> = Schema.object({
+  // Keep the public contract despite Schemastery's invariant object-schema types.
+  static Config = Schema.object({
     defaultModel: Schema.union([
       Schema.const(undefined),
       Schema.object({
@@ -27,21 +28,36 @@ export default class System1Service extends Service {
         model: Schema.string().required(),
       }),
     ]).volatile(),
+    fallbackModels: Schema.array(Schema.any()).default([]).volatile(),
     timeoutMs: Schema.number()
       .min(1)
       .max(2147483647)
       .step(1)
       .default(800)
       .volatile(),
-  })
+  }) as unknown as Schema<System1Options, System1Config>
   private readonly engine: System1Engine
   constructor(ctx: Context, config: System1Config | System1Options = {}) {
     super(ctx, 'system1')
     this.engine = new System1Engine(() => {
-      const defaultModel = readConfigValue(config.defaultModel)
-      const timeoutMs = readConfigValue(config.timeoutMs)
+      const defaultModel = readConfigValue<ModelRef | undefined>(
+        config.defaultModel as
+          | ModelRef
+          | undefined
+          | Volatile<ModelRef | undefined>,
+      )
+      const fallbackModels = readConfigValue<readonly ModelRef[]>(
+        config.fallbackModels as
+          | readonly ModelRef[]
+          | Volatile<readonly ModelRef[]>
+          | undefined,
+      )
+      const timeoutMs = readConfigValue<number>(
+        config.timeoutMs as number | Volatile<number> | undefined,
+      )
       return {
         ...(defaultModel !== undefined ? { defaultModel } : {}),
+        ...(fallbackModels !== undefined ? { fallbackModels } : {}),
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       }
     })
@@ -57,6 +73,7 @@ export default class System1Service extends Service {
 
 interface System1Config {
   defaultModel: Volatile<ModelRef | undefined>
+  fallbackModels: Volatile<readonly ModelRef[]>
   timeoutMs: Volatile<number>
 }
 

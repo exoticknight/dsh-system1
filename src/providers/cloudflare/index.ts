@@ -50,8 +50,8 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
         return (await credentials.resolve(credentialRef(ref)))?.value
       return process.env[ref]
     },
-    resolveAccountId: () => readConfigValue(config.accountId)?.trim() || process.env.CLOUDFLARE_ACCOUNT_ID,
-    resolveBaseURL: () => readConfigValue(config.baseURL),
+    resolveAccountId: () => readConfigValue<string>(config.accountId)?.trim() || process.env.CLOUDFLARE_ACCOUNT_ID,
+    resolveBaseURL: () => readConfigValue<string>(config.baseURL),
   })
   ctx.effect(() => ctx.system1.registerProvider(config.id, provider))
 }

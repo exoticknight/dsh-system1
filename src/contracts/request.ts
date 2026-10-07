@@ -1,5 +1,6 @@
 import type { JsonValue, Questions } from './question.js'
 import type { QuestionResult } from './answer.js'
+import type { DecisionError } from './error.js'
 export interface ModelRef {
   readonly provider: string
   readonly model: string
@@ -13,6 +14,9 @@ export interface ExecutionModel {
   readonly model: string
   readonly revision?: string
 }
+export interface FallbackAttempt extends ModelRef {
+  readonly error: Pick<DecisionError, 'code' | 'message'>
+}
 export interface DecisionMeta {
   readonly requestId: string
   readonly requested: ModelRef
@@ -22,6 +26,7 @@ export interface DecisionMeta {
   readonly approximate?: boolean | undefined
   readonly degraded?: boolean | undefined
   readonly warnings?: readonly string[] | undefined
+  readonly attempts?: readonly FallbackAttempt[] | undefined
 }
 export interface DecideRequest<Q extends Questions = Questions> {
   readonly state: JsonValue
@@ -36,5 +41,6 @@ export interface DecideResponse<Q extends Questions = Questions> {
 }
 export interface System1Options {
   readonly defaultModel?: ModelRef | undefined
+  readonly fallbackModels?: readonly ModelRef[]
   readonly timeoutMs?: number
 }
