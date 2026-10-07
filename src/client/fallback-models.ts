@@ -23,23 +23,6 @@ export function fallbackModelsValid(rows: readonly FallbackModelDraft[]): boolea
   )
 }
 
-export function fallbackModelsInvalidForSave(
-  rows: readonly FallbackModelDraft[],
-  dirty: boolean,
-  resetting: boolean,
-): boolean {
-  return dirty && !resetting && !fallbackModelsValid(rows)
-}
-
-export function fallbackModelsEqual(
-  left: readonly FallbackModelDraft[],
-  right: readonly FallbackModelDraft[],
-): boolean {
-  return left.length === right.length && left.every((row, index) =>
-    row.provider === right[index]?.provider && row.model === right[index]?.model,
-  )
-}
-
 export function addFallbackModel(
   rows: readonly FallbackModelDraft[],
   model: FallbackModelDraft,

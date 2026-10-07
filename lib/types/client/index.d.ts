@@ -10,7 +10,6 @@ declare const en: {
     fallbackModels: string;
     fallbackHint: string;
     fallbackRequired: string;
-    fallbackProvider: string;
     fallbackModel: string;
     fallbackChooseService: string;
     fallbackChooseModel: string;
@@ -23,9 +22,9 @@ declare const en: {
     timeoutHint: string;
     providerEnabledHint: string;
     reset: string;
+    overridden: string;
     save: string;
     saving: string;
-    saved: string;
     saveFailed: string;
     loading: string;
     unavailable: string;
@@ -40,13 +39,6 @@ declare const en: {
     keyStatusUnavailable: string;
     keyReadOnly: string;
     keyUnavailable: string;
-    keySave: string;
-    keyClear: string;
-    keySaving: string;
-    keySaved: string;
-    keyCleared: string;
-    keySaveFailed: string;
-    keyRequired: string;
     typesafeSummary: string;
     layaSummary: string;
     typesafeEndpoint: string;

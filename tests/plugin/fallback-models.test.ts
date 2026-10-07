@@ -2,8 +2,6 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   addFallbackModel,
-  fallbackModelsEqual,
-  fallbackModelsInvalidForSave,
   fallbackModelsValid,
   moveFallbackModel,
   readFallbackModels,
@@ -37,23 +35,6 @@ test('fallback settings require a service and model but allow an empty or duplic
   )
   assert.equal(fallbackModelsValid([{ provider: ' ', model: 'jev-latest' }]), false)
   assert.equal(fallbackModelsValid([{ provider: 'laya', model: '' }]), false)
-})
-
-test('malformed stored fallback rows do not block unrelated settings saves', () => {
-  const malformed = readFallbackModels([null])
-
-  assert.equal(fallbackModelsInvalidForSave(malformed, false, false), false)
-  assert.equal(fallbackModelsInvalidForSave(malformed, true, false), true)
-  assert.equal(fallbackModelsInvalidForSave(malformed, true, true), false)
-})
-
-test('fallback dirty comparison treats order as part of the saved value', () => {
-  const first = [
-    { provider: 'typesafe', model: 'jev-latest' },
-    { provider: 'laya', model: 'auto' },
-  ]
-  assert.equal(fallbackModelsEqual(first, [...first]), true)
-  assert.equal(fallbackModelsEqual(first, [...first].reverse()), false)
 })
 
 test('fallback rows can be added, changed, reordered, and removed immutably', () => {
