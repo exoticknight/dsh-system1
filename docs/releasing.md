@@ -6,7 +6,7 @@
 
 ## npm 发布身份
 
-在 npm 包设置中添加 GitHub Actions Trusted Publisher：账号 `exoticknight`、仓库 `dsh-system1`、工作流文件 `release.yml`，允许 `npm publish`，环境名留空。工作流通过 OIDC 发布，不使用 npm token。新建信任关系后两天内须成功发布一次来完成验证，建议临近下一个版本发布时配置。详见 [npm Trusted Publisher 文档](https://docs.npmjs.com/trusted-publishers/)。
+本包已配置 GitHub Actions Trusted Publisher：账号 `exoticknight`、仓库 `dsh-system1`、工作流文件 `release.yml`，允许 `npm publish`，环境名留空。`v0.2.1` 的 OIDC 发布已将该信任关系验证为 `Valid`。工作流通过 OIDC 发布，不使用 npm token。新增信任关系须在两天内成功发布一次来完成验证。详见 [npm Trusted Publisher 文档](https://docs.npmjs.com/trusted-publishers/)。
 
 首次创建 npm 包前无法配置 Trusted Publisher。`v0.2.0` 由维护者从对应的干净提交交互式执行 `npm publish --access public --tag latest` 并完成 2FA；该 tag 沿用旧工作流创建 GitHub Release。后续 tag 使用本页所述的 OIDC 工作流。
 

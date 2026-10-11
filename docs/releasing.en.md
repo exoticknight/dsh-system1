@@ -6,7 +6,7 @@ Pushing a `v*` tag starts the Release workflow. It checks that the tag matches `
 
 ## npm publishing identity
 
-Add a GitHub Actions Trusted Publisher in the npm package settings: owner `exoticknight`, repository `dsh-system1`, workflow filename `release.yml`, allow `npm publish`, and leave the environment name blank. The workflow publishes through OIDC without an npm token. A new trust relationship must complete its first successful publication within two days, so configure it shortly before the next version release. See the [npm Trusted Publisher documentation](https://docs.npmjs.com/trusted-publishers/).
+This package has a GitHub Actions Trusted Publisher: owner `exoticknight`, repository `dsh-system1`, workflow filename `release.yml`, `npm publish` allowed, and no environment name. The OIDC publication of `v0.2.1` validated this connection as `Valid`. The workflow publishes through OIDC without an npm token. A new trust relationship must complete its first successful publication within two days. See the [npm Trusted Publisher documentation](https://docs.npmjs.com/trusted-publishers/).
 
 A Trusted Publisher cannot be configured before the npm package exists. The maintainer publishes `v0.2.0` interactively from its clean commit using `npm publish --access public --tag latest` and completes 2FA; that tag uses the previous workflow to create its GitHub Release. Subsequent tags use the OIDC workflow described here.
 
