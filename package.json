@@ -1,6 +1,6 @@
 {
   "name": "dsh-system1",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Typed System One decision service for DeepSeek Harness plugins",
   "license": "Apache-2.0",
   "keywords": [
@@ -144,7 +144,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/exoticknight/dsh-system1.git"
+    "url": "git+https://github.com/exoticknight/dsh-system1.git"
   },
   "homepage": "https://github.com/exoticknight/dsh-system1#readme",
   "publishConfig": {
