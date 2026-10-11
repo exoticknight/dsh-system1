@@ -34,7 +34,7 @@ The repository includes the compiled `lib/` files required by the plugin, so ins
 
 The bundled patch mounts the service and built-in providers. Defaults are model `jev-latest`, provider id `typesafe`, and an 800 ms timeout per model attempt. Use the plugin settings to choose a default service and model, add fallback models in the order they should be tried, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust `timeoutMs` to fit backend latency, especially for local CPU inference.
 
-Cloudflare uses provider `cloudflare` with `clef` or `clef-flash`. See [provider setup](docs/providers.en.md) for configuration.
+Cloudflare uses provider `cloudflare` with `clef`, `clef-flash`, or `clef-omni`. See [provider setup](docs/providers.en.md) for configuration.
 
 ## Agent tool
 

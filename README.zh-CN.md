@@ -34,7 +34,7 @@ dsh plugin --profile headless add github:exoticknight/dsh-system1
 
 随包提供的 patch 会挂载服务及内置 provider。默认模型为 `jev-latest`、provider id 为 `typesafe`，每次模型尝试的默认超时为 800 ms。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整 `timeoutMs`，本地 CPU 推理通常需要更长预算。
 
-Cloudflare 使用 `cloudflare` provider 的 `clef` 或 `clef-flash`。配置步骤见[模型服务配置](docs/providers.md)。
+Cloudflare 使用 `cloudflare` provider 的 `clef`、`clef-flash` 或 `clef-omni`。配置步骤见[模型服务配置](docs/providers.md)。
 
 ## Agent 工具
 

@@ -14,16 +14,17 @@ export interface CloudflareOptions {
 }
 
 const MODELS = new Map([
-  ['clef', { path: '@cf/cloudflare/clef', requestModel: 'clef' }],
-  ['@cf/cloudflare/clef', { path: '@cf/cloudflare/clef', requestModel: 'clef' }],
-  ['clef-flash', { path: '@cf/cloudflare/clef-flash', requestModel: 'clef-flash' }],
-  ['@cf/cloudflare/clef-flash', { path: '@cf/cloudflare/clef-flash', requestModel: 'clef-flash' }],
+  ['clef', { path: '@cf/cloudflare/clef', requestModel: 'clef', maxTokens: 65_536 }],
+  ['@cf/cloudflare/clef', { path: '@cf/cloudflare/clef', requestModel: 'clef', maxTokens: 65_536 }],
+  ['clef-flash', { path: '@cf/cloudflare/clef-flash', requestModel: 'clef-flash', maxTokens: 24_576 }],
+  ['@cf/cloudflare/clef-flash', { path: '@cf/cloudflare/clef-flash', requestModel: 'clef-flash', maxTokens: 24_576 }],
+  ['clef-omni', { path: '@cf/cloudflare/clef-omni', requestModel: 'clef-omni', maxTokens: 64_000 }],
+  ['@cf/cloudflare/clef-omni', { path: '@cf/cloudflare/clef-omni', requestModel: 'clef-omni', maxTokens: 64_000 }],
 ])
 
-const CAPABILITIES: ModelCapabilities = {
+const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
   primitives: ['noul', 'choice', 'score'],
   maxQuestions: 64,
-  context: { maxTokens: 65_536, includesQuestions: true },
 }
 
 /** Cloudflare REST transport for the native System One Clef models. */
@@ -33,12 +34,16 @@ export function createCloudflareProvider(
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
     async describe(model) {
-      if (!MODELS.has(model))
+      const selectedModel = MODELS.get(model)
+      if (!selectedModel)
         throw new System1ProviderError({
           code: 'unsupported',
           message: 'Cloudflare model is not supported.',
         })
-      return CAPABILITIES
+      return {
+        ...CAPABILITIES,
+        context: { maxTokens: selectedModel.maxTokens, includesQuestions: true },
+      }
     },
     async evaluate(request, signal) {
       const selectedModel = MODELS.get(request.model)

@@ -8,7 +8,7 @@ Choose the default provider and model in DSH plugin settings, and add fallback m
 | --- | --- | --- | --- |
 | `typesafe` | `jev-latest`, `jev-preview`, `jev-1.13.0` | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
-| `cloudflare` | `clef`, `clef-flash` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare` | `clef`, `clef-flash`, `clef-omni` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 Providers resolve keys through DSH credentials when available, otherwise through the process environment. Keys are never displayed. On a provider component's settings page, enter the API key and press Save with the connection details to store it in DSH credentials; saving with the field blank keeps the existing key. The page marks a setting as overridden only when it differs from the package default, and Reset writes the package default back. Independent provider plugins support custom registration and credential names through `id` and `apiKeyEnv`.
 
@@ -24,7 +24,7 @@ TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/qui
 
 Create an API token with Workers AI access and obtain your Account ID from Cloudflare. In the Cloudflare component, enter the Account ID and the token as the API key, then press Save. You can also set `CLOUDFLARE_ACCOUNT_ID` in the dsh process environment.
 
-Keep the default API root for direct Cloudflare access. The plugin appends `/accounts/{accountId}/ai/run/@cf/cloudflare/{model}` and sends the short model name in the request body. The adapter also accepts the full identifiers `@cf/cloudflare/clef` and `@cf/cloudflare/clef-flash`.
+Keep the default API root for direct Cloudflare access. The plugin appends `/accounts/{accountId}/ai/run/@cf/cloudflare/{model}` and sends the short model name in the request body. The adapter also accepts the full identifiers `@cf/cloudflare/clef`, `@cf/cloudflare/clef-flash`, and `@cf/cloudflare/clef-omni`.
 
 ```ts
 const result = await ctx.system1.decide({
@@ -35,7 +35,7 @@ const result = await ctx.system1.decide({
 })
 ```
 
-Cloudflare accepts up to 64 questions per request. Question IDs are at most 100 characters and use letters, digits, underscores, dots, or hyphens. Its context window is 65,536 tokens; the backend may truncate long inputs, so control input size in your application. This plugin exposes string, object, or array state and the three decision primitives. See the [Clef API](https://developers.cloudflare.com/workers-ai/models/clef/) and [Workers AI REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
+Cloudflare accepts up to 64 questions per request. Question IDs are at most 100 characters and use letters, digits, underscores, dots, or hyphens. The context limit is 65,536 tokens for `clef`, 24,576 for `clef-flash`, and 64,000 for `clef-omni`; the backend may truncate long inputs, so control input size in your application. This plugin exposes string, object, or array state and the three decision primitives. See the [Clef API](https://developers.cloudflare.com/workers-ai/models/clef/), [Clef-omni API](https://developers.cloudflare.com/workers-ai/models/clef-omni/), and [Workers AI REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
 
 For embedding, create the provider directly. An optional `fetch` implementation supports custom transport or local protocol fixtures:
 

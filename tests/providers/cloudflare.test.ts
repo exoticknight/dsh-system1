@@ -105,6 +105,51 @@ test('Cloudflare Clef sends the REST contract and normalizes the System One resu
   assert.deepEqual(result.usage, { inputTokens: 12, outputTokens: 5 })
 })
 
+test('Cloudflare Clef family routes model IDs and reports model-specific context', async () => {
+  const models = [
+    { name: 'clef', maxTokens: 65_536 },
+    { name: 'clef-flash', maxTokens: 24_576 },
+    { name: 'clef-omni', maxTokens: 64_000 },
+  ] as const
+  for (const { name, maxTokens } of models) {
+    for (const model of [name, `@cf/cloudflare/${name}`]) {
+      const provider = createCloudflareProvider({
+        apiKey: 'fixture-token',
+        accountId: 'fixture-account',
+        fetch: async (input, init) => {
+          assert.equal(
+            String(input),
+            `https://api.cloudflare.com/client/v4/accounts/fixture-account/ai/run/@cf/cloudflare/${name}`,
+          )
+          assert.deepEqual(JSON.parse(String(init?.body)), {
+            model: name,
+            state: 'sample',
+            questions: { q: { type: 'noul', instructions: 'yes?' } },
+          })
+          return Response.json({ success: true, result: {
+            model: name,
+            answers: { q: { type: 'noul', noul: 0.8 } },
+          } })
+        },
+      })
+      assert.deepEqual(await provider.describe(model, new AbortController().signal), {
+        primitives: ['noul', 'choice', 'score'],
+        maxQuestions: 64,
+        context: { maxTokens, includesQuestions: true },
+      })
+      const result = await provider.evaluate({
+        requestId: 'fixture',
+        model,
+        state: 'sample',
+        questions: { q: { type: 'noul', instructions: 'yes?' } },
+      }, new AbortController().signal)
+      assert.deepEqual(result.answers.q, {
+        status: 'ok', answer: { type: 'noul', probabilityTrue: 0.8 },
+      })
+    }
+  }
+})
+
 test('Cloudflare rejects incomplete credentials and unsuccessful REST envelopes safely', async () => {
   let calls = 0
   const request: ProviderRequest = {

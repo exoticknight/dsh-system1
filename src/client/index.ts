@@ -240,7 +240,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointLabel: 'cloudflareEndpoint',
     endpointHint: 'cloudflareEndpointHint',
     baseURL: 'https://api.cloudflare.com/client/v4',
-    models: [{ id: 'clef' }, { id: 'clef-flash' }],
+    models: [{ id: 'clef' }, { id: 'clef-flash' }, { id: 'clef-omni' }],
     accountId: {
       path: 'accountId',
       label: 'cloudflareAccountId',

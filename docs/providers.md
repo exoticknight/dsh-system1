@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | `typesafe` | `jev-latest`、`jev-preview`、`jev-1.13.0` | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
-| `cloudflare` | `clef`、`clef-flash` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
+| `cloudflare` | `clef`、`clef-flash`、`clef-omni` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 密钥优先通过 DSH credentials 服务解析；宿主没有该服务时读取进程环境。密钥不会回显。在服务组件的设置页填写 API Key 后，与连接参数一起点「保存设置」写入 DSH 凭据存储；留空保存会保留已有密钥。设置页仅在当前值与包默认值不同时显示「已覆盖」，「恢复默认值」会写回包默认值。各独立 provider 插件可用 `id` 和 `apiKeyEnv` 自定义注册名及凭据引用。
 
@@ -24,7 +24,7 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 
 在 Cloudflare 控制台创建有 Workers AI 调用权限的 API token，并取得 Account ID。在 Cloudflare 组件中填写 Account ID 和 API Key（即该 token），点「保存设置」。Account ID 也可通过启动进程的 `CLOUDFLARE_ACCOUNT_ID` 配置。
 
-保留默认 API 根地址即可直连 Cloudflare。插件会拼接 `/accounts/{accountId}/ai/run/@cf/cloudflare/{model}`，请求体使用短模型名。包内 adapter 同时接受 `@cf/cloudflare/clef` 和 `@cf/cloudflare/clef-flash`。
+保留默认 API 根地址即可直连 Cloudflare。插件会拼接 `/accounts/{accountId}/ai/run/@cf/cloudflare/{model}`，请求体使用短模型名。包内 adapter 同时接受 `@cf/cloudflare/clef`、`@cf/cloudflare/clef-flash` 和 `@cf/cloudflare/clef-omni`。
 
 ```ts
 const result = await ctx.system1.decide({
@@ -35,7 +35,7 @@ const result = await ctx.system1.decide({
 })
 ```
 
-Cloudflare 对每次请求最多接受 64 道题，题号最长 100 个字符，可使用字母、数字、下划线、点和连字符。上下文信息为 65,536 tokens；长输入可能由后端截断，应在业务侧控制输入长度。插件当前接入字符串、对象或数组形式的 state 与三种判断原语。参见 [Clef 官方接口](https://developers.cloudflare.com/workers-ai/models/clef/)和 [Workers AI REST 入门](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)。
+Cloudflare 对每次请求最多接受 64 道题，题号最长 100 个字符，可使用字母、数字、下划线、点和连字符。上下文上限按模型分别为 `clef` 65,536、`clef-flash` 24,576、`clef-omni` 64,000 tokens；长输入可能由后端截断，应在业务侧控制输入长度。插件当前接入字符串、对象或数组形式的 state 与三种判断原语。参见 [Clef 官方接口](https://developers.cloudflare.com/workers-ai/models/clef/)、[Clef-omni 官方接口](https://developers.cloudflare.com/workers-ai/models/clef-omni/)和 [Workers AI REST 入门](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)。
 
 嵌入使用时可直接创建 provider；`fetch` 可选，用于替换传输或本地协议 fixture：
 
