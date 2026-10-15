@@ -10,6 +10,15 @@ const description = z.union([
   z.record(z.string(), json),
   z.array(json),
 ])
+const imageData = z
+  .string()
+  .min(4)
+  .max(22_369_624)
+  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u)
+const imageInput = z.strictObject({
+  mediaType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+  data: imageData,
+})
 const id = z
   .string()
   .min(1)
@@ -40,6 +49,10 @@ const question = z.discriminatedUnion('type', [
     instructions: description,
     criteria: z.array(description).min(2),
   }),
+  z.strictObject({
+    type: z.literal('box'),
+    instructions: description,
+  }),
 ])
 export const modelSchema = z.strictObject({
   provider: id,
@@ -49,9 +62,21 @@ export const timeoutSchema = z.number().int().positive().max(2_147_483_647)
 const requestSchema = z.strictObject({
   state: json,
   questions: z.record(id, question).refine((v) => Object.keys(v).length > 0),
+  images: z.array(imageInput).max(4).optional(),
+  longContext: z.boolean().optional(),
   model: modelSchema.optional(),
   timeoutMs: timeoutSchema.optional(),
   signal: z.instanceof(AbortSignal).optional(),
+}).superRefine((request, context) => {
+  if (
+    Object.values(request.questions).some((q) => q.type === 'box') &&
+    !request.images?.length
+  )
+    context.addIssue({
+      code: 'custom',
+      path: ['images'],
+      message: 'Box questions require at least one image.',
+    })
 })
 export function parseRequest(input: unknown) {
   try {
@@ -88,6 +113,16 @@ const answerSchema = z.discriminatedUnion('type', [
     probabilities: distribution,
     confidence: probability.optional(),
   }),
+  z.strictObject({
+    type: z.literal('box'),
+    box: z.strictObject({
+      top: probability,
+      bottom: probability,
+      left: probability,
+      right: probability,
+    }).refine((box) => box.top < box.bottom && box.left < box.right),
+    confidence: probability.optional(),
+  }),
 ])
 export const errorSchema = z.strictObject({
   code: z.enum([
@@ -121,10 +156,17 @@ export const responseSchema = z.strictObject({
   degraded: z.boolean().optional(),
 })
 export const capabilitiesSchema = z.strictObject({
-  primitives: z.array(z.enum(['noul', 'choice', 'score'])).min(1),
+  primitives: z.array(z.enum(['noul', 'choice', 'score', 'box'])).min(1),
   maxQuestions: z.number().int().positive().optional(),
   maxChoiceOptions: z.number().int().positive().optional(),
   maxScoreLevels: z.number().int().min(2).optional(),
+  images: z.strictObject({
+    formats: z.array(z.enum(['image/png', 'image/jpeg', 'image/webp'])).min(1),
+    maxCount: z.number().int().positive().optional(),
+    maxBytesPerImage: z.number().int().positive().optional(),
+    maxTotalBytes: z.number().int().positive().optional(),
+  }).optional(),
+  longContext: z.strictObject({ maxTokens: z.number().int().positive() }).optional(),
   context: z
     .strictObject({
       maxTokens: z.number().int().positive(),

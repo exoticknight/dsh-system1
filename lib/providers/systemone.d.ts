@@ -17,7 +17,11 @@ export interface SystemOneHttpProviderOptions {
     readonly apiKeyRequired?: boolean;
     readonly isModelSupported: (model: string) => boolean;
     readonly requestModel?: (model: string) => string | undefined;
-    readonly capabilities?: ModelCapabilities;
+    readonly capabilities?: ModelCapabilities | ((model: string) => ModelCapabilities);
+    readonly serializeRequest?: (request: ProviderRequest) => {
+        readonly body: Readonly<Record<string, unknown>>;
+        readonly headers?: Readonly<Record<string, string>>;
+    };
     readonly selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined;
     readonly fetch?: typeof fetch;
 }

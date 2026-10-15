@@ -1,10 +1,19 @@
 import type { JsonValue, Primitive, Questions } from './question.js'
-import type { Usage } from './request.js'
+import type { ImageInput, ImageMediaType, Usage } from './request.js'
 export interface ModelCapabilities {
   readonly primitives: readonly Primitive[]
   readonly maxQuestions?: number | undefined
   readonly maxChoiceOptions?: number | undefined
   readonly maxScoreLevels?: number | undefined
+  readonly images?:
+    | {
+        readonly formats: readonly ImageMediaType[]
+        readonly maxCount?: number | undefined
+        readonly maxBytesPerImage?: number | undefined
+        readonly maxTotalBytes?: number | undefined
+      }
+    | undefined
+  readonly longContext?: { readonly maxTokens: number } | undefined
   /** Informational: the provider must enforce its own tokenizer budget. */
   readonly context?:
     | {
@@ -18,6 +27,8 @@ export interface ProviderRequest {
   readonly model: string
   readonly state: JsonValue
   readonly questions: Questions
+  readonly images?: readonly ImageInput[] | undefined
+  readonly longContext?: boolean | undefined
   readonly requestId: string
 }
 export interface ProviderResponse {

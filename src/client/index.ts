@@ -211,7 +211,12 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointLabel: 'typesafeEndpoint',
     endpointHint: 'typesafeEndpointHint',
     baseURL: 'https://api.typesafe.ai',
-    models: [{ id: 'jev-latest' }, { id: 'jev-preview' }, { id: 'jev-1.13.0' }],
+    models: [
+      { id: 'jev-latest' },
+      { id: 'jev-preview' },
+      { id: 'jev-1.14.0' },
+      { id: 'jev-1.13.0' },
+    ],
   },
   {
     id: 'laya',

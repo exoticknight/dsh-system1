@@ -3,7 +3,7 @@ export interface JsonObject {
     readonly [key: string]: JsonValue;
 }
 export type Description = string | JsonObject | readonly JsonValue[];
-export type Primitive = 'noul' | 'choice' | 'score';
+export type Primitive = 'noul' | 'choice' | 'score' | 'box';
 export interface NoulQuestion {
     readonly type: 'noul';
     readonly instructions: Description;
@@ -22,6 +22,10 @@ export interface ScoreQuestion {
     readonly instructions: Description;
     readonly criteria: readonly Description[];
 }
-export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion;
+export interface BoxQuestion {
+    readonly type: 'box';
+    readonly instructions: Description;
+}
+export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion | BoxQuestion;
 export type Questions = Readonly<Record<string, Question>>;
 //# sourceMappingURL=question.d.ts.map

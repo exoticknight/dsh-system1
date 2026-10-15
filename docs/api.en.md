@@ -4,7 +4,7 @@
 
 ## Requests and results
 
-`decide({ state, questions, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. Each model attempt gets the full budget, including capability checks and the backend call.
+`decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. Each model attempt gets the full budget, including capability checks and the backend call.
 
 Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types only. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, and `dsh-system1/providers/cloudflare` entry points export their plugins and the `createTypesafeProvider`, `createLayaProvider`, and `createCloudflareProvider` factories respectively. See [provider setup](providers.en.md) for connection details and model selection.
 
@@ -35,11 +35,24 @@ if (result.answers.topic.status === 'ok') {
 }
 ```
 
-`noul` returns `probabilityTrue`; `choice` returns the candidate key and full `probabilities`; `score` returns an expected zero-based level and a distribution ordered by `criteria`. Probabilities are model outputs, so consumers choose their own action thresholds.
+`noul` returns `probabilityTrue`; `choice` returns the candidate key and full `probabilities`; `score` returns an expected zero-based level and a distribution ordered by `criteria`. A `box` question returns `{ type: 'box', box: { top, bottom, left, right }, confidence? }`, with edges as fractions from 0 to 1. Probabilities and coordinates are model outputs, so consumers choose their own action thresholds.
+
+`images` is an optional request-wide list of up to four attachments. Each item is `{ mediaType, data }`; `mediaType` can be `image/png`, `image/jpeg`, or `image/webp`, and `data` is standard padded Base64 without a data-URL prefix. Every question can use these images; a `box` question requires at least one image. Providers check format, count, and size against model capabilities, and fallback chains skip models that cannot accept the requested image input. Set `longContext: true` to request extended context. TypeSafe Jev currently supports up to 262k tokens; requests without this option use standard context limits.
+
+```ts
+const result = await ctx.system1.decide({
+  state: 'Items on the kitchen counter.',
+  images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
+  questions: {
+    mug: { type: 'box', instructions: 'Locate the coffee mug in the image.' },
+  },
+  model: { provider: 'typesafe', model: 'jev-1.14.0' },
+})
+```
 
 The TypeSafe confidence value is preserved as received. Its provider and actual model are identified through `meta.executed`. TypeSafe computes confidence as a deterministic value from 0 to 1 based on its distribution, but the protocol does not fix the formula; see [TypeSafe Confidence](https://docs.typesafe.ai/confidence). Other providers must document their confidence semantics before consumers use thresholds from another provider.
 
-Public inputs support JSON. The current TypeSafe state supports strings, objects, and arrays; other JSON scalar values return `unsupported`. Question instructions and criteria descriptions support strings, objects, or arrays; a choice description may also be `null`. Question and option identifiers must not be empty or equal to `__proto__`, `prototype`, or `constructor`.
+`state` supports JSON. The current TypeSafe state supports strings, objects, and arrays; other JSON scalar values return `unsupported`. Question instructions and criteria descriptions support strings, objects, or arrays; a choice description may also be `null`. Images use the top-level `images` field. Question and option identifiers must not be empty or equal to `__proto__`, `prototype`, or `constructor`.
 
 Malformed call structures throw `System1InputError`. Runtime failures for a structurally valid request are returned per question with `status: 'error'`. Error codes include `unavailable`, `unsupported`, `limit_exceeded`, `timeout`, `cancelled`, `provider_error`, and `invalid_response`. A missing or invalid answer for one question does not discard other valid answers; unexpected question ids appear in `meta.warnings`.
 
@@ -60,12 +73,14 @@ The `dsh-system1/tool` component injects `system1` and the DSH `tools` registry 
 Arguments:
 
 - `state`: the text or JSON value to judge.
-- `questions`: an array of questions. Each has an `id` (the unique result key), a `type` (`noul`, `choice`, or `score`), string `instructions`, and the same optional `criteria` as `decide()`. `choice` requires an object mapping candidate keys to descriptions; `score` requires an array of levels from lowest to highest.
+- `questions`: an array of questions. Each has an `id` (the unique result key), a `type` (`noul`, `choice`, `score`, or `box`), string `instructions`, and the same optional `criteria` as `decide()`. `choice` requires an object mapping candidate keys to descriptions; `score` requires an array of levels from lowest to highest; `box` requires an image attachment.
+- `images`: an optional list of image attachments in the same format as `decide()`.
+- `longContext`: an optional boolean; when `true`, it requests extended context from TypeSafe Jev.
 - `model`: an optional `{ provider, model }`; the service default is used when omitted.
 
 The tool returns `{ answers, model?, fallbacks? }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`. When a provider succeeds, `model` identifies the provider and actual model that ran; it is omitted when none succeeds. `fallbacks`, when present, lists non-cancelled failed attempts as `{ provider, model, error: { code, message } }` in order. The tool forwards the call's cancellation signal to `decide()` and uses the service timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
 
-The tool description tells models that probabilities range from 0 to 1, `score.value` is a zero-based expected criteria index, confidence is backend-defined and not comparable across backends, and probabilities from different models are not calibrated against each other.
+The tool description tells models that probabilities range from 0 to 1, `score.value` is a zero-based expected criteria index, `box` edges are normalized image coordinates, confidence is backend-defined and not comparable across backends, and probabilities from different models are not calibrated against each other.
 
 ## Implementing a provider
 
@@ -75,10 +90,10 @@ Import types from `dsh-system1/contracts` and `System1ProviderError` from the pa
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))
 ```
 
-Provider ids must be unique within a service. Registration returns an idempotent disposer. Unregistering cancels in-flight calls for that instance, and service disposal removes all registrations. Declare known capability limits per model and omit unknown limits. Context token counts are informational; the backend enforces its actual token budget.
+Provider ids must be unique within a service. Registration returns an idempotent disposer. Unregistering cancels in-flight calls for that instance, and service disposal removes all registrations. Declare known capability limits per model and omit unknown limits; image formats, count, and byte limits use the `images` capability, while `longContext.maxTokens` declares extended context. Context token counts are informational; the backend enforces its actual token budget. `ProviderRequest` receives the shared image attachments and `longContext` option.
 
 ## TypeSafe capabilities and limits
 
-Supported models are `jev-1.13.0`, `jev-latest`, and `jev-preview`. `choice` supports up to 255 candidates; `score` supports 2–10 levels. The fixed model reports context information of 64k tokens per request and 32k tokens for state plus the longest individual question. The backend enforces exact token limits. HTTP 422 responses remain `provider_error` with `httpStatus`; without a stable error code, the service does not infer that the response means a length limit was exceeded.
+Supported models are `jev-1.13.0`, `jev-1.14.0`, `jev-latest`, and `jev-preview`. The versioned IDs are fixed; TypeSafe can move the `jev-latest` and `jev-preview` aliases over time. `choice` supports up to 255 candidates; `score` supports 2–10 levels. Jev 1.13 and 1.14 have default context limits of 64k tokens per request and 32k tokens for state plus the longest individual question; `longContext: true` opts into a 262k limit. Image input supports PNG/JPEG; `box` is available with Jev 1.14 and the current `jev-preview` alias. The provider sends TypeSafe's experimental request headers when needed. TypeSafe labels image and Box support experimental; the request format, limits, and accuracy may change. The backend enforces exact token limits. HTTP 422 responses remain `provider_error` with `httpStatus`; without a stable error code, the service does not infer that the response means a length limit was exceeded.
 
 The provider plugin accepts `id`, `apiKeyEnv`, and optional `baseURL`; the first two default to `typesafe` and `TYPESAFE_API_KEY`. `createTypesafeProvider` accepts an explicit API key, optional base URL, and fetch implementation for embedding and local fixtures.

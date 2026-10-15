@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '../index.js'
 import type {
   DecideResponse,
+  ImageInput,
   JsonValue,
   Question,
   Questions,
@@ -11,7 +12,7 @@ export const TOOL_NAME = 'system1_decide'
 // The bundle mounts this entry enabled; its row switch in DSH turns the tool off.
 export const inject = ['system1', 'tools']
 
-const PRIMITIVES = ['noul', 'choice', 'score'] as const
+const PRIMITIVES = ['noul', 'choice', 'score', 'box'] as const
 const ERROR_CODES = [
   'unavailable',
   'unsupported',
@@ -23,13 +24,15 @@ const ERROR_CODES = [
 ] as const
 
 const DESCRIPTION =
-  'Ask System One, a fast classifier model, for probabilistic judgments about a piece of text. ' +
-  'Use it for quick yes/no checks (noul), picking one category (choice) or rating on an ordered scale (score); ' +
-  'several questions about the same text can go in one call. ' +
+  'Ask System One for probabilistic judgments about shared text, JSON state, and optional image attachments. ' +
+  'Use noul for yes/no checks, choice for categories, score for an ordered scale, and box to locate an object in an image; ' +
+  'several questions about the same input can go in one call. ' +
   'Results are probabilities, not decisions: weigh them and decide the next step yourself. ' +
   'Probabilities are in the range 0-1; score.value is the zero-based expected level index matching a criteria position. ' +
+  'A box answer contains top, bottom, left, and right image coordinates from 0 to 1. ' +
   'Confidence is backend-defined, is not a probability, and is not comparable across backends. ' +
   'Probabilities from different models are not calibrated against each other. When a provider succeeds, the model field identifies who answered; if every provider fails, model is omitted. ' +
+  'A box question needs an image and a model that supports box answers. ' +
   'A question that fails returns status "error" without affecting the others.'
 
 /** Raw JSON Schema accepted by the DSH tool registry (the enforced subset). */
@@ -40,6 +43,29 @@ const PARAMETERS = {
   properties: {
     state: {
       description: 'The text or JSON value to judge.',
+    },
+    images: {
+      type: 'array',
+      maxItems: 4,
+      description:
+        'Optional image attachments visible to every question. Each data value is padded base64 without a data-URL prefix. PNG and JPEG are supported across TypeSafe and Cloudflare; WebP requires Cloudflare.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['mediaType', 'data'],
+        properties: {
+          mediaType: {
+            type: 'string',
+            enum: ['image/png', 'image/jpeg', 'image/webp'],
+          },
+          data: { type: 'string' },
+        },
+      },
+    },
+    longContext: {
+      type: 'boolean',
+      description:
+        'Opt in to extended context on providers that support it. TypeSafe Jev supports up to 262k tokens; other providers may reject this request.',
     },
     questions: {
       type: 'array',
@@ -125,6 +151,8 @@ const OUTPUT_SCHEMA = {
 
 interface ToolArgs {
   state: JsonValue
+  images?: readonly ImageInput[]
+  longContext?: boolean
   questions: readonly { id: string; type: string; instructions: string; criteria?: JsonValue }[]
   model?: { provider: string; model: string }
 }
@@ -152,6 +180,8 @@ export function apply(ctx: Context) {
         const response = await ctx.system1.decide({
           state: args.state,
           questions: toQuestions(args.questions),
+          ...(args.images ? { images: args.images } : {}),
+          ...(args.longContext ? { longContext: true } : {}),
           ...(args.model ? { model: args.model } : {}),
           signal: exec.signal,
         })

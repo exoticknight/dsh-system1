@@ -25,6 +25,12 @@ const MODELS = new Map([
 const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
   primitives: ['noul', 'choice', 'score'],
   maxQuestions: 64,
+  images: {
+    formats: ['image/png', 'image/jpeg', 'image/webp'],
+    maxCount: 4,
+    maxBytesPerImage: 4 * 1024 * 1024,
+    maxTotalBytes: 8 * 1024 * 1024,
+  },
 }
 
 /** Cloudflare REST transport for the native System One Clef models. */
@@ -85,6 +91,13 @@ export function createCloudflareProvider(
             body: JSON.stringify({
               model: selectedModel.requestModel,
               state: request.state,
+              ...(request.images?.length
+                ? {
+                    images: request.images.map(
+                      ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
+                    ),
+                  }
+                : {}),
               questions: request.questions,
             }),
             signal,

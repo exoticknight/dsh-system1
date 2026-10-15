@@ -17,8 +17,9 @@
 | `noul`   | 命题为真的概率（`probabilityTrue`） |
 | `choice` | 候选键和完整概率分布                |
 | `score`  | 从 0 开始的期望等级和概率分布       |
+| `box`    | 对象在图片中的归一化边界坐标         |
 
-服务提供请求与响应校验、逐题结果、取消、超时、provider 注册和执行元数据。内置 TypeSafe/Jev、Laya 和 Cloudflare Clef provider，通过 System One HTTP 协议接入。其他后端可实现公开的 provider 契约。
+服务提供请求与响应校验、逐题结果、取消、超时、provider 注册和执行元数据。TypeSafe/Jev 和 Cloudflare Clef 支持统一的图片附件；Jev 1.14 还支持 box 判断和可选的扩展上下文。其他后端可实现公开的 provider 契约。
 
 ## 从 npm 安装
 
@@ -81,9 +82,9 @@ export async function apply(ctx: Context) {
 }
 ```
 
-`noul` 返回 `probabilityTrue`；`choice` 返回候选键及完整分布；`score` 返回期望等级和按 `criteria` 排列的概率。它们都是模型输出，阈值和后续动作由消费插件决定。运行故障通过逐题 `status: 'error'` 返回；调用结构无效时抛出 `System1InputError`。
+`noul` 返回 `probabilityTrue`；`choice` 返回候选键及完整分布；`score` 返回期望等级和按 `criteria` 排列的概率；`box` 返回归一化图片边界。它们都是模型输出，阈值和后续动作由消费插件决定。运行故障通过逐题 `status: 'error'` 返回；调用结构无效时抛出 `System1InputError`。
 
-完整契约见 [API 与 provider 开发](docs/api.md)，调用示例见[消费插件示例](examples/consumer.ts)。TypeSafe 支持 `jev-latest`、`jev-preview` 和 `jev-1.13.0`；其他服务的模型与限制见[模型服务配置](docs/providers.md)。
+完整契约见 [API 与 provider 开发](docs/api.md)，调用示例见[消费插件示例](examples/consumer.ts)。TypeSafe 支持 `jev-latest`、`jev-preview`、`jev-1.14.0` 和 `jev-1.13.0`；其他服务的模型与限制见[模型服务配置](docs/providers.md)。
 
 ## 开发
 

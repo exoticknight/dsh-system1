@@ -1,7 +1,8 @@
 {
   "name": "dsh-system1",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Typed System One decision service for DeepSeek Harness plugins",
+  "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [
     "deepseek-harness",
@@ -35,6 +36,7 @@
       "import": "./lib/providers/typesafe/index.js"
     },
     "./providers/typesafe/locale/*.json": "./locale/providers/typesafe/*.json",
+    "./providers/typesafe/icon": "./assets/provider-icons/typesafe.png",
     "./providers": {
       "types": "./lib/providers/index.d.ts",
       "import": "./lib/providers/index.js"
@@ -44,11 +46,13 @@
       "import": "./lib/providers/laya/index.js"
     },
     "./providers/laya/locale/*.json": "./locale/providers/laya/*.json",
+    "./providers/laya/icon": "./assets/provider-icons/laya.png",
     "./providers/cloudflare": {
       "types": "./lib/providers/cloudflare/index.d.ts",
       "import": "./lib/providers/cloudflare/index.js"
     },
     "./providers/cloudflare/locale/*.json": "./locale/providers/cloudflare/*.json",
+    "./providers/cloudflare/icon": "./assets/provider-icons/cloudflare-clef.svg",
     "./tool": {
       "types": "./lib/tool/index.d.ts",
       "import": "./lib/tool/index.js"
@@ -64,6 +68,10 @@
   "files": [
     "lib",
     "locale",
+    "icon.png",
+    "assets/provider-icons/typesafe.png",
+    "assets/provider-icons/laya.png",
+    "assets/provider-icons/cloudflare-clef.svg",
     "LICENSE",
     "cordis.patch.yml",
     "README.md",

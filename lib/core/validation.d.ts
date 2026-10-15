@@ -23,7 +23,15 @@ export declare function parseRequest(input: unknown): {
         type: "score";
         instructions: string | z.JSONType[] | Record<string, z.JSONType>;
         criteria: (string | z.JSONType[] | Record<string, z.JSONType>)[];
+    } | {
+        type: "box";
+        instructions: string | z.JSONType[] | Record<string, z.JSONType>;
     }>;
+    images?: {
+        mediaType: "image/jpeg" | "image/png" | "image/webp";
+        data: string;
+    }[] | undefined;
+    longContext?: boolean | undefined;
     model?: {
         provider: string;
         model: string;
@@ -58,6 +66,7 @@ export declare const responseSchema: z.ZodObject<{
 }, z.core.$strict>;
 export declare const capabilitiesSchema: z.ZodObject<{
     primitives: z.ZodArray<z.ZodEnum<{
+        box: "box";
         choice: "choice";
         noul: "noul";
         score: "score";
@@ -65,6 +74,19 @@ export declare const capabilitiesSchema: z.ZodObject<{
     maxQuestions: z.ZodOptional<z.ZodNumber>;
     maxChoiceOptions: z.ZodOptional<z.ZodNumber>;
     maxScoreLevels: z.ZodOptional<z.ZodNumber>;
+    images: z.ZodOptional<z.ZodObject<{
+        formats: z.ZodArray<z.ZodEnum<{
+            "image/jpeg": "image/jpeg";
+            "image/png": "image/png";
+            "image/webp": "image/webp";
+        }>>;
+        maxCount: z.ZodOptional<z.ZodNumber>;
+        maxBytesPerImage: z.ZodOptional<z.ZodNumber>;
+        maxTotalBytes: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>;
+    longContext: z.ZodOptional<z.ZodObject<{
+        maxTokens: z.ZodNumber;
+    }, z.core.$strict>>;
     context: z.ZodOptional<z.ZodObject<{
         maxTokens: z.ZodNumber;
         includesQuestions: z.ZodBoolean;

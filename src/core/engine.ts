@@ -205,7 +205,7 @@ export class System1Engine {
               code: 'invalid_response',
               message: 'Provider returned invalid model capabilities.',
             })
-          const limitation = checkCapabilities(described.data, req.questions)
+          const limitation = checkCapabilities(described.data, req)
           if (limitation) throw new System1ProviderError(limitation)
           signal.throwIfAborted()
           const raw = await entry.provider.evaluate(
@@ -213,6 +213,8 @@ export class System1Engine {
               model: model.model,
               state: req.state,
               questions: req.questions,
+              ...(req.images ? { images: req.images } : {}),
+              ...(req.longContext ? { longContext: true } : {}),
               requestId,
             }),
             signal,
@@ -269,9 +271,57 @@ function modelChain(
 
 function checkCapabilities(
   c: ModelCapabilities,
-  questions: Questions,
+  request: DecideRequest,
 ): DecisionError | undefined {
-  const all = Object.values(questions)
+  const all = Object.values(request.questions)
+  if (request.longContext && !c.longContext)
+    return {
+      code: 'unsupported',
+      message: 'Model does not support extended context.',
+    }
+  if (request.images?.length) {
+    const imageCapabilities = c.images
+    if (!imageCapabilities)
+      return {
+        code: 'unsupported',
+        message: 'Model does not support image input.',
+      }
+    if (
+      imageCapabilities.maxCount !== undefined &&
+      request.images.length > imageCapabilities.maxCount
+    )
+      return {
+        code: 'limit_exceeded',
+        message: 'Too many images for this model.',
+      }
+    if (
+      request.images.some(
+        (image) => !imageCapabilities.formats.includes(image.mediaType),
+      )
+    )
+      return {
+        code: 'unsupported',
+        message: 'Image format is not supported by this model.',
+      }
+    const imageBytes = request.images.map((image) => decodedBase64Length(image.data))
+    const maxBytesPerImage = imageCapabilities.maxBytesPerImage
+    if (
+      maxBytesPerImage !== undefined &&
+      imageBytes.some((size) => size > maxBytesPerImage)
+    )
+      return {
+        code: 'limit_exceeded',
+        message: 'An image exceeds this model’s per-image size limit.',
+      }
+    if (
+      imageCapabilities.maxTotalBytes !== undefined &&
+      imageBytes.reduce((sum, size) => sum + size, 0) > imageCapabilities.maxTotalBytes
+    )
+      return {
+        code: 'limit_exceeded',
+        message: 'Image attachments exceed this model’s size limit.',
+      }
+  }
   if (c.maxQuestions !== undefined && all.length > c.maxQuestions)
     return {
       code: 'limit_exceeded',
@@ -302,4 +352,9 @@ function checkCapabilities(
         message: 'Too many score levels for this model.',
       }
   }
+}
+
+function decodedBase64Length(data: string): number {
+  const padding = data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0
+  return (data.length * 3) / 4 - padding
 }

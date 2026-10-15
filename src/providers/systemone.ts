@@ -19,6 +19,16 @@ const wireAnswer = z.discriminatedUnion('type', [
     probabilities: z.record(z.string(), z.number()),
     confidence: z.number().optional(),
   }),
+  z.object({
+    type: z.literal('box'),
+    box: z.object({
+      top: z.number(),
+      bottom: z.number(),
+      left: z.number(),
+      right: z.number(),
+    }),
+    confidence: z.number().optional(),
+  }),
 ])
 
 const wireResponse = z.object({
@@ -38,7 +48,13 @@ export interface SystemOneHttpProviderOptions {
   readonly apiKeyRequired?: boolean
   readonly isModelSupported: (model: string) => boolean
   readonly requestModel?: (model: string) => string | undefined
-  readonly capabilities?: ModelCapabilities
+  readonly capabilities?:
+    | ModelCapabilities
+    | ((model: string) => ModelCapabilities)
+  readonly serializeRequest?: (request: ProviderRequest) => {
+    readonly body: Readonly<Record<string, unknown>>
+    readonly headers?: Readonly<Record<string, string>>
+  }
   readonly selectResponseModel?: (
     response: z.infer<typeof wireResponse>,
   ) => string | undefined
@@ -60,7 +76,9 @@ export function createSystemOneHttpProvider(
           code: 'unsupported',
           message: `${options.providerName} model is not supported.`,
         })
-      return options.capabilities ?? { primitives: ['noul', 'choice', 'score'] }
+      return typeof options.capabilities === 'function'
+        ? options.capabilities(model)
+        : options.capabilities ?? { primitives: ['noul', 'choice', 'score'] }
     },
     async evaluate(request, signal) {
       let apiKey: string | undefined
@@ -79,6 +97,9 @@ export function createSystemOneHttpProvider(
         })
 
       const baseURL = options.resolveBaseURL?.() ?? options.defaultBaseURL
+      const serialized = options.serializeRequest?.(request) ?? {
+        body: { state: request.state, questions: request.questions },
+      }
       let response: Response
       try {
         response = await fetchFn(`${trimTrailingSlashes(baseURL)}/v1/systemone`, {
@@ -86,14 +107,14 @@ export function createSystemOneHttpProvider(
           redirect: 'error',
           headers: {
             'Content-Type': 'application/json',
+            ...serialized.headers,
             ...(apiKey?.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
           },
           body: JSON.stringify({
+            ...serialized.body,
             ...(options.requestModel
               ? modelField(options.requestModel(request.model))
               : { model: request.model }),
-            state: request.state,
-            questions: request.questions,
           }),
           signal,
         })
@@ -195,6 +216,17 @@ function normalizeAnswers(
             value: answer.choice,
             probabilities: answer.probabilities,
             ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
+          },
+        }]
+      if (answer.type === 'box')
+        return [id, {
+          status: 'ok',
+          answer: {
+            type: 'box',
+            box: answer.box,
+            ...(answer.confidence !== undefined
+              ? { confidence: answer.confidence }
+              : {}),
           },
         }]
 

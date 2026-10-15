@@ -17,8 +17,9 @@ English | [简体中文](README.zh-CN.md)
 | `noul`    | Probability that a proposition is true (`probabilityTrue`) |
 | `choice`  | Candidate key and the full probability distribution        |
 | `score`   | Expected zero-based level and the probability distribution |
+| `box`     | Normalized image coordinates for a located object          |
 
-The service provides request and response validation, per-question results, cancellation, timeouts, provider registration, and execution metadata. Built-in providers connect to TypeSafe/Jev, Laya, and Cloudflare Clef through the System One HTTP protocol. Other backends can implement the public provider contract.
+The service provides request and response validation, per-question results, cancellation, timeouts, provider registration, and execution metadata. TypeSafe/Jev and Cloudflare Clef accept shared image attachments; Jev 1.14 also supports box answers and optional extended context. Other backends can implement the public provider contract.
 
 ## Install from npm
 
@@ -84,9 +85,9 @@ export async function apply(ctx: Context) {
 }
 ```
 
-`noul` returns `probabilityTrue`; `choice` returns a candidate key and its full distribution; `score` returns an expected level and probabilities ordered by `criteria`. These are model outputs, so consumer plugins choose their own decision thresholds and actions. Runtime failures are reported per question with `status: 'error'`; malformed call structures throw `System1InputError`.
+`noul` returns `probabilityTrue`; `choice` returns a candidate key and its full distribution; `score` returns an expected level and probabilities ordered by `criteria`; `box` returns normalized image edges. These are model outputs, so consumer plugins choose their own decision thresholds and actions. Runtime failures are reported per question with `status: 'error'`; malformed call structures throw `System1InputError`.
 
-See [API and provider development](docs/api.en.md) for the full contract and [the consumer example](examples/consumer.ts). TypeSafe supports `jev-latest`, `jev-preview`, and `jev-1.13.0`; see [provider setup](docs/providers.en.md) for other services and their limits.
+See [API and provider development](docs/api.en.md) for the full contract and [the consumer example](examples/consumer.ts). TypeSafe supports `jev-latest`, `jev-preview`, `jev-1.14.0`, and `jev-1.13.0`; see [provider setup](docs/providers.en.md) for other services and their limits.
 
 ## Development
 
