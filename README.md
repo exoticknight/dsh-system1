@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**A typed System One decision service for DeepSeek Harness plugins.** Consumer plugins call `ctx.system1.decide()`, interpret the results, and choose their own actions.
+**Typed System One judgments for DeepSeek Harness.** The agent can call the built-in `system1_decide` tool, and plugins can call `ctx.system1.decide()`. Both return per-question probabilities instead of generated text; the caller decides what to do next.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -13,14 +13,24 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
-| Primitive | Result                                                     |
-| --------- | ---------------------------------------------------------- |
-| `noul`    | Probability that a proposition is true (`probabilityTrue`) |
-| `choice`  | Candidate key and the full probability distribution        |
-| `score`   | Expected zero-based level and the probability distribution |
-| `box`     | Normalized image coordinates for a located object          |
+[System One models](https://systemonemodels.org/guides/what-is-a-system-one-model/) are decision models that return typed answers with probabilities instead of generated text. The name borrows Kahneman's "fast thinking": they handle narrow judgments such as gating, routing, and scoring, while the main LLM writes and reasons.
 
-The service provides request and response validation, per-question results, cancellation, timeouts, provider registration, and execution metadata. TypeSafe/Jev and Cloudflare Clef accept shared image attachments; Jev 1.14 also supports box answers and optional extended context. Other backends can implement the public provider contract.
+| Primitive | Result                                                               |
+| --------- | -------------------------------------------------------------------- |
+| `noul`    | Yes/no: probability that the proposition is true (`probabilityTrue`) |
+| `choice`  | Candidate key and the full probability distribution                  |
+| `score`   | Expected zero-based level and the probability distribution           |
+| `box`     | Normalized image coordinates for a located object (model-dependent)  |
+
+Requests and responses are validated, and each question gets its own result. Calls support cancellation, per-attempt timeouts, and fallback models, and return execution metadata.
+
+Built-in providers:
+
+- **TypeSafe** (`typesafe`): hosted Jev models with PNG/JPEG input and optional 262k context; `box` requires `jev-1.14.0` or `jev-preview`.
+- **Laya** (`laya`): a self-hosted [Laya server](https://github.com/NandhaKishorM/laya); API key optional; text only.
+- **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, `clef-omni` with PNG/JPEG/WebP input; can also point at a local Clef service.
+
+Other backends can implement the public provider contract.
 
 ## Install from npm
 

@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**为 DeepSeek Harness 插件提供类型安全的 System One 判断服务。** 消费插件调用 `ctx.system1.decide()`，解释返回结果并自行决定后续动作。
+**为 DeepSeek Harness 提供类型安全的 System One 判断。** agent 可以直接调用内置的 `system1_decide` 工具，插件可以调用 `ctx.system1.decide()`。返回的是逐题的概率结果而不是生成文本，下一步由调用方决定。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -13,14 +13,24 @@
 
 </div>
 
-| 原语     | 返回结果                            |
-| -------- | ----------------------------------- |
-| `noul`   | 命题为真的概率（`probabilityTrue`） |
-| `choice` | 候选键和完整概率分布                |
-| `score`  | 从 0 开始的期望等级和概率分布       |
-| `box`    | 对象在图片中的归一化边界坐标         |
+[System One 模型](https://systemonemodels.org/guides/what-is-a-system-one-model/)是一类决策模型，返回带类型的答案和概率，而不是生成文本。名字借用了 Kahneman 的“快思考”：它们负责门控、路由、评分这类范围明确的判断，写作和推理交给主模型。
 
-服务提供请求与响应校验、逐题结果、取消、超时、provider 注册和执行元数据。TypeSafe/Jev 和 Cloudflare Clef 支持统一的图片附件；Jev 1.14 还支持 box 判断和可选的扩展上下文。其他后端可实现公开的 provider 契约。
+| 原语     | 返回结果                                      |
+| -------- | --------------------------------------------- |
+| `noul`   | 是非判断：命题为真的概率（`probabilityTrue`） |
+| `choice` | 候选键和完整概率分布                          |
+| `score`  | 从 0 开始的期望等级和概率分布                 |
+| `box`    | 对象在图片中的归一化边界坐标（取决于模型）    |
+
+服务提供请求与响应校验和逐题结果，支持取消、按次超时和备选模型回退，并返回执行元数据。
+
+内置 provider：
+
+- **TypeSafe**（`typesafe`）：托管的 Jev 模型，支持 PNG/JPEG 图片和可选的 262k 上下文；`box` 需要 `jev-1.14.0` 或 `jev-preview`。
+- **Laya**（`laya`）：自建的 [Laya 服务](https://github.com/NandhaKishorM/laya)，API Key 可选，仅支持文本。
+- **Cloudflare**（`cloudflare`）：`clef`、`clef-flash`、`clef-omni`，支持 PNG/JPEG/WebP 图片；也可以接本地 Clef 服务。
+
+其他后端可实现公开的 provider 契约。
 
 ## 从 npm 安装
 

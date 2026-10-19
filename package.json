@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.3.0",
-  "description": "Typed System One decision service for DeepSeek Harness plugins",
+  "description": "Typed System One judgments (yes/no, choice, score, box) for DeepSeek Harness agents and plugins",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [
@@ -13,7 +13,11 @@
     "typescript",
     "typesafe",
     "jev",
-    "laya"
+    "laya",
+    "llm",
+    "classification",
+    "probability",
+    "agent-tool"
   ],
   "type": "module",
   "packageManager": "pnpm@11.19.0",
