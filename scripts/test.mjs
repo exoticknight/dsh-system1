@@ -1,10 +1,10 @@
-// Usage: node scripts/test.mjs [plugin|providers|<provider>...]
+// Usage: node scripts/test.mjs [plugin|providers|shared|<provider>...]
 // No argument runs everything; a provider name runs tests/providers/<name>.test.ts.
 import { readdirSync } from 'node:fs'
 import { delimiter, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const groups = ['plugin', 'providers']
+const groups = ['plugin', 'providers', 'shared']
 const providers = readdirSync('tests/providers')
   .filter((file) => file.endsWith('.test.ts'))
   .map((file) => file.slice(0, -'.test.ts'.length))

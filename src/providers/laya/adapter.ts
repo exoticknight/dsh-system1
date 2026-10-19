@@ -1,5 +1,7 @@
 import type { System1Provider } from '../../contracts/index.js'
+import { findProviderModel } from '../models.js'
 import { createSystemOneHttpProvider } from '../systemone.js'
+import { LAYA_MODELS } from './models.js'
 
 export interface LayaOptions {
   apiKey?: string
@@ -9,8 +11,6 @@ export interface LayaOptions {
   fetch?: typeof fetch
 }
 
-const MODELS = new Set(['auto', 'english', 'multilingual', 'typed-decisions'])
-
 export function createLayaProvider(options: LayaOptions): System1Provider {
   return createSystemOneHttpProvider({
     providerName: 'Laya',
@@ -18,7 +18,7 @@ export function createLayaProvider(options: LayaOptions): System1Provider {
     resolveApiKey: options.resolveApiKey ?? (() => options.apiKey),
     ...(options.resolveBaseURL ? { resolveBaseURL: options.resolveBaseURL } : {}),
     apiKeyRequired: false,
-    isModelSupported: (model) => MODELS.has(model),
+    resolveModel: (model) => findProviderModel(LAYA_MODELS, model),
     requestModel: (model) => model === 'auto' ? undefined : model,
     selectResponseModel: (response) => {
       const routing = response.routing

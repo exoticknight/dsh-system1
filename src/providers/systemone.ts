@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { isDeepStrictEqual } from 'node:util'
 import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js'
-import type { ModelCapabilities } from '../contracts/provider.js'
+import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js'
 import { System1ProviderError } from '../contracts/error.js'
 
 const wireAnswer = z.discriminatedUnion('type', [
@@ -46,7 +46,7 @@ export interface SystemOneHttpProviderOptions {
   readonly resolveApiKey: () => string | undefined | Promise<string | undefined>
   readonly resolveBaseURL?: () => string | undefined
   readonly apiKeyRequired?: boolean
-  readonly isModelSupported: (model: string) => boolean
+  readonly resolveModel: (model: string) => ProviderModel | undefined
   readonly requestModel?: (model: string) => string | undefined
   readonly capabilities?:
     | ModelCapabilities
@@ -71,16 +71,28 @@ export function createSystemOneHttpProvider(
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
     async describe(model) {
-      if (!options.isModelSupported(model))
+      const selectedModel = options.resolveModel(model)
+      if (!selectedModel)
         throw new System1ProviderError({
           code: 'unsupported',
           message: `${options.providerName} model is not supported.`,
         })
       return typeof options.capabilities === 'function'
-        ? options.capabilities(model)
+        ? options.capabilities(selectedModel.id)
         : options.capabilities ?? { primitives: ['noul', 'choice', 'score'] }
     },
     async evaluate(request, signal) {
+      const selectedModel = options.resolveModel(request.model)
+      if (!selectedModel)
+        throw new System1ProviderError({
+          code: 'unsupported',
+          message: `${options.providerName} model is not supported.`,
+        })
+      const canonicalRequest =
+        request.model === selectedModel.id
+          ? request
+          : { ...request, model: selectedModel.id }
+
       let apiKey: string | undefined
       try {
         apiKey = await options.resolveApiKey()
@@ -97,8 +109,8 @@ export function createSystemOneHttpProvider(
         })
 
       const baseURL = options.resolveBaseURL?.() ?? options.defaultBaseURL
-      const serialized = options.serializeRequest?.(request) ?? {
-        body: { state: request.state, questions: request.questions },
+      const serialized = options.serializeRequest?.(canonicalRequest) ?? {
+        body: { state: canonicalRequest.state, questions: canonicalRequest.questions },
       }
       let response: Response
       try {
@@ -113,8 +125,8 @@ export function createSystemOneHttpProvider(
           body: JSON.stringify({
             ...serialized.body,
             ...(options.requestModel
-              ? modelField(options.requestModel(request.model))
-              : { model: request.model }),
+              ? modelField(options.requestModel(canonicalRequest.model))
+              : { model: canonicalRequest.model }),
           }),
           signal,
         })
@@ -149,7 +161,7 @@ export function createSystemOneHttpProvider(
         })
       }
       return normalizeSystemOneResponse(
-        request,
+        canonicalRequest,
         raw,
         options.providerName,
         options.selectResponseModel,

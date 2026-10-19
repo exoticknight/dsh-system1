@@ -1,6 +1,7 @@
 import type { Context, Volatile } from '@deepseek-ai/cordis';
 import Schema from '@deepseek-ai/schemastery';
 export { createLayaProvider, type LayaOptions } from './adapter.js';
+export { LAYA_MODELS } from './models.js';
 export interface Config {
     id: string;
     apiKeyEnv: string;

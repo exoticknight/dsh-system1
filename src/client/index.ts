@@ -8,6 +8,9 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
+import { CLOUDFLARE_MODELS } from '../providers/cloudflare/models.js'
+import { LAYA_MODELS } from '../providers/laya/models.js'
+import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
 import {
   Button,
   IconChevronDownOutlineRegular,
@@ -200,6 +203,13 @@ type ProviderSettings = {
   }
 }
 
+const LAYA_MODEL_LABELS: Readonly<Record<(typeof LAYA_MODELS)[number]['id'], keyof typeof en>> = {
+  auto: 'modelAuto',
+  english: 'modelEnglish',
+  multilingual: 'modelMultilingual',
+  'typed-decisions': 'modelTypedDecisions',
+}
+
 const PROVIDERS: ReadonlyArray<ProviderSettings> = [
   {
     id: 'typesafe',
@@ -211,12 +221,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointLabel: 'typesafeEndpoint',
     endpointHint: 'typesafeEndpointHint',
     baseURL: 'https://api.typesafe.ai',
-    models: [
-      { id: 'jev-latest' },
-      { id: 'jev-preview' },
-      { id: 'jev-1.14.0' },
-      { id: 'jev-1.13.0' },
-    ],
+    models: TYPESAFE_MODELS.map(({ id }) => ({ id })),
   },
   {
     id: 'laya',
@@ -228,12 +233,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointLabel: 'layaEndpoint',
     endpointHint: 'layaEndpointHint',
     baseURL: 'http://127.0.0.1:8000',
-    models: [
-      { id: 'auto', label: 'modelAuto' },
-      { id: 'english', label: 'modelEnglish' },
-      { id: 'multilingual', label: 'modelMultilingual' },
-      { id: 'typed-decisions', label: 'modelTypedDecisions' },
-    ],
+    models: LAYA_MODELS.map(({ id }) => ({ id, label: LAYA_MODEL_LABELS[id] })),
   },
   {
     id: 'cloudflare',
@@ -245,7 +245,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointLabel: 'cloudflareEndpoint',
     endpointHint: 'cloudflareEndpointHint',
     baseURL: 'https://api.cloudflare.com/client/v4',
-    models: [{ id: 'clef' }, { id: 'clef-flash' }, { id: 'clef-omni' }],
+    models: CLOUDFLARE_MODELS.map(({ id }) => ({ id })),
     accountId: {
       path: 'accountId',
       label: 'cloudflareAccountId',

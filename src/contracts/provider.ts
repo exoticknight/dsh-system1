@@ -1,5 +1,12 @@
 import type { JsonValue, Primitive, Questions } from './question.js'
 import type { ImageInput, ImageMediaType, Usage } from './request.js'
+
+/** A selectable model ID and provider-owned alternate IDs accepted at runtime. */
+export interface ProviderModel {
+  readonly id: string
+  readonly aliases?: readonly string[]
+}
+
 export interface ModelCapabilities {
   readonly primitives: readonly Primitive[]
   readonly maxQuestions?: number | undefined

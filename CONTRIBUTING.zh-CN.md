@@ -25,12 +25,13 @@ pnpm verify
 | `examples/`               | 消费者与第三方 provider 示例                       |
 | `tests/plugin/`           | 使用假 provider 的服务契约与生命周期测试           |
 | `tests/providers/`        | 各 provider 的协议、错误和挂载测试，使用本地 HTTP fixture；`clef-local/` 为本地 Clef 测试服务 |
+| `tests/shared/`           | 不属于单个 provider 的共享传输测试                 |
 | `scripts/`                | 构建与安装包检查；`probe/` 为真实模型和宿主探针 |
 | `docs/`                    | 简体中文 API 与发布指南；英文版本使用 `.en.md` 后缀 |
 
 生成的 `lib/` JavaScript、类型声明和 source map 会提交到仓库，供 dsh 直接从 GitHub 安装。提交前钩子会运行 `pnpm build` 并暂存更新后的 `lib/`。提交前请先暂存构建输入；如果发现 source 有未暂存或未跟踪的改动，钩子会停止提交，避免生成物与提交中的源文件不一致。
 
-钩子通过仅用于开发的 `simple-git-hooks` 管理。仓库在 `pnpm-workspace.yaml` 中明确允许它的安装脚本，以便 `pnpm install` 注册维护者钩子。该包不属于 dsh 的运行时依赖。修改钩子配置后，可运行 `pnpm hooks:install` 更新本地钩子。
+钩子会跟踪 `src/`、包清单和生产构建使用的 TypeScript 配置：`tsconfig.json`、`tsconfig.client.json`、`tsconfig.build.json`。钩子通过仅用于开发的 `simple-git-hooks` 管理。仓库在 `pnpm-workspace.yaml` 中明确允许它的安装脚本，以便 `pnpm install` 注册维护者钩子。该包不属于 dsh 的运行时依赖。修改钩子配置后，可运行 `pnpm hooks:install` 更新本地钩子。
 
 ## 实现约定
 
@@ -56,6 +57,6 @@ pnpm build
 pnpm probe:host <path-to-node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-修改 provider 协议时，还应按[测试与真实模型验证](docs/testing.md)运行 `pnpm test <provider>` 和对应的真实探针 `pnpm probe <target>`。单次响应仅作为接口样本；延迟和判断质量需要在实际场景中评估。
+修改 provider 协议时，还应按[测试与真实模型验证](docs/testing.md)运行 `pnpm test <provider>` 和对应的真实探针 `pnpm probe <target>`。修改共用的 System One 传输时运行 `pnpm test shared`。单次响应仅作为接口样本；延迟和判断质量需要在实际场景中评估。
 
 提交 PR 时说明问题、行为变化和验证结果。除 GitHub 安装所需的 `lib/` 外，生成物、凭据和本地调研记录由 Git 忽略。发布流程见[发布指南](docs/releasing.md)。

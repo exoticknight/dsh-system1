@@ -7,6 +7,7 @@ import {
 import type {} from '../../index.js'
 import { createCloudflareProvider } from './adapter.js'
 export { createCloudflareProvider, type CloudflareOptions } from './adapter.js'
+export { CLOUDFLARE_MODELS } from './models.js'
 
 export interface Config {
   id: string

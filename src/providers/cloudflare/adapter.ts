@@ -1,7 +1,9 @@
 import type { System1Provider } from '../../contracts/index.js'
 import type { ModelCapabilities } from '../../contracts/provider.js'
 import { System1ProviderError } from '../../contracts/error.js'
+import { findProviderModel } from '../models.js'
 import { normalizeSystemOneResponse } from '../systemone.js'
+import { CLOUDFLARE_MODELS } from './models.js'
 
 export interface CloudflareOptions {
   apiKey?: string
@@ -13,14 +15,19 @@ export interface CloudflareOptions {
   fetch?: typeof fetch
 }
 
-const MODELS = new Map([
-  ['clef', { path: '@cf/cloudflare/clef', requestModel: 'clef', maxTokens: 65_536 }],
-  ['@cf/cloudflare/clef', { path: '@cf/cloudflare/clef', requestModel: 'clef', maxTokens: 65_536 }],
-  ['clef-flash', { path: '@cf/cloudflare/clef-flash', requestModel: 'clef-flash', maxTokens: 24_576 }],
-  ['@cf/cloudflare/clef-flash', { path: '@cf/cloudflare/clef-flash', requestModel: 'clef-flash', maxTokens: 24_576 }],
-  ['clef-omni', { path: '@cf/cloudflare/clef-omni', requestModel: 'clef-omni', maxTokens: 64_000 }],
-  ['@cf/cloudflare/clef-omni', { path: '@cf/cloudflare/clef-omni', requestModel: 'clef-omni', maxTokens: 64_000 }],
-])
+type CloudflareModelId = (typeof CLOUDFLARE_MODELS)[number]['id']
+
+const MAX_TOKENS_BY_MODEL: Readonly<Record<CloudflareModelId, number>> = {
+  clef: 65_536,
+  'clef-flash': 24_576,
+  'clef-omni': 64_000,
+}
+
+function resolveCloudflareModel(model: string) {
+  const definition = findProviderModel(CLOUDFLARE_MODELS, model)
+  if (!definition) return undefined
+  return { id: definition.id, maxTokens: MAX_TOKENS_BY_MODEL[definition.id] }
+}
 
 const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
   primitives: ['noul', 'choice', 'score'],
@@ -40,7 +47,7 @@ export function createCloudflareProvider(
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
     async describe(model) {
-      const selectedModel = MODELS.get(model)
+      const selectedModel = resolveCloudflareModel(model)
       if (!selectedModel)
         throw new System1ProviderError({
           code: 'unsupported',
@@ -52,12 +59,16 @@ export function createCloudflareProvider(
       }
     },
     async evaluate(request, signal) {
-      const selectedModel = MODELS.get(request.model)
+      const selectedModel = resolveCloudflareModel(request.model)
       if (!selectedModel)
         throw new System1ProviderError({
           code: 'unsupported',
           message: 'Cloudflare model is not supported.',
         })
+      const canonicalRequest =
+        request.model === selectedModel.id
+          ? request
+          : { ...request, model: selectedModel.id }
 
       let apiKey: string | undefined
       let accountId: string | undefined
@@ -80,7 +91,7 @@ export function createCloudflareProvider(
       let response: Response
       try {
         response = await fetchFn(
-          `${trimTrailingSlashes(baseURL)}/accounts/${encodeURIComponent(accountId.trim())}/ai/run/${selectedModel.path}`,
+          `${trimTrailingSlashes(baseURL)}/accounts/${encodeURIComponent(accountId.trim())}/ai/run/@cf/cloudflare/${selectedModel.id}`,
           {
             method: 'POST',
             redirect: 'error',
@@ -89,7 +100,7 @@ export function createCloudflareProvider(
               Authorization: `Bearer ${apiKey.trim()}`,
             },
             body: JSON.stringify({
-              model: selectedModel.requestModel,
+              model: selectedModel.id,
               state: request.state,
               ...(request.images?.length
                 ? {
@@ -135,7 +146,7 @@ export function createCloudflareProvider(
       }
 
       const result = unwrapCloudflareResult(raw)
-      return normalizeSystemOneResponse(request, result, 'Cloudflare')
+      return normalizeSystemOneResponse(canonicalRequest, result, 'Cloudflare')
     },
   }
 }

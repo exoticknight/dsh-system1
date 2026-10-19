@@ -3,6 +3,8 @@ node_modules/
 .research/
 .evolve/
 .test-build/
+/lib/types/contracts/
+/lib/types/providers/
 .scratch/
 .package-check/
 artifacts/

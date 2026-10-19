@@ -6,7 +6,7 @@
 
 `decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. Each model attempt gets the full budget, including capability checks and the backend call.
 
-Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types only. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, and `dsh-system1/providers/cloudflare` entry points export their plugins and the `createTypesafeProvider`, `createLayaProvider`, and `createCloudflareProvider` factories respectively. See [provider setup](providers.en.md) for connection details and model selection.
+Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, and `dsh-system1/providers/cloudflare` entry points each export their provider plugin, the `createTypesafeProvider`, `createLayaProvider`, or `createCloudflareProvider` factory, and the `TYPESAFE_MODELS`, `LAYA_MODELS`, or `CLOUDFLARE_MODELS` model array. See [provider setup](providers.en.md) for connection details and model selection.
 
 Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
 
@@ -84,7 +84,21 @@ The tool description tells models that probabilities range from 0 to 1, `score.v
 
 ## Implementing a provider
 
-Import types from `dsh-system1/contracts` and `System1ProviderError` from the package root. Error messages must be safe to display. Implement `describe(model, signal)` and `evaluate(request, signal)` and return standard per-question answers. Treat request parameters as read-only. See the [provider example](../examples/provider.ts).
+Each provider declares canonical IDs and optional aliases in its own model array; there is no cross-provider catalog to maintain. `ProviderModel` uses `id` for the canonical model ID and `aliases` for other input names accepted by that provider. Settings use the canonical IDs; aliases do not appear as separate menu options. `findProviderModel(models, input)` resolves a definition by canonical ID or alias. Use the matched `id` for capability checks and upstream requests. Built-in providers validate the model ID first, returning `unsupported` for an unknown model before resolving credentials. Capability limits remain provider-adapter-owned; localized settings labels live in the client locale strings.
+
+Import types from `dsh-system1/contracts`, `System1ProviderError` from the package root, and `findProviderModel` from `dsh-system1/providers` when resolving aliases. Error messages must be safe to display. Implement `describe(model, signal)` and `evaluate(request, signal)` and return standard per-question answers. Treat request parameters as read-only. See the [provider example](../examples/provider.ts).
+
+```ts
+import { findProviderModel } from 'dsh-system1/providers'
+import type { ProviderModel } from 'dsh-system1/contracts'
+
+const MODELS = [
+  { id: 'example-v2', aliases: ['example-latest'] },
+] as const satisfies readonly ProviderModel[]
+
+const selected = findProviderModel(MODELS, requestedModel)
+// selected?.id is the canonical ID for capability checks and upstream requests
+```
 
 ```ts
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))

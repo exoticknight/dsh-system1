@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { System1Provider } from '../../contracts/index.js'
+import { findProviderModel } from '../models.js'
+import { TYPESAFE_MODELS } from './models.js'
 import { createSystemOneHttpProvider } from '../systemone.js'
 
 export interface TypesafeOptions {
@@ -10,8 +12,6 @@ export interface TypesafeOptions {
   fetch?: typeof fetch
 }
 
-const MODELS = new Set(['jev-latest', 'jev-preview', 'jev-1.13.0', 'jev-1.14.0'])
-
 export function createTypesafeProvider(
   options: TypesafeOptions,
 ): System1Provider {
@@ -21,7 +21,7 @@ export function createTypesafeProvider(
     resolveApiKey: options.resolveApiKey ?? (() => options.apiKey),
     ...(options.resolveBaseURL ? { resolveBaseURL: options.resolveBaseURL } : {}),
     apiKeyRequired: true,
-    isModelSupported: (model) => MODELS.has(model),
+    resolveModel: (model) => findProviderModel(TYPESAFE_MODELS, model),
     capabilities: (model) => ({
       primitives: [
         'noul',

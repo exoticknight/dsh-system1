@@ -25,12 +25,13 @@ Use the machine's existing toolchain and default cache locations. Submit changes
 | `examples/`               | Consumer and third-party provider examples                                        |
 | `tests/plugin/`           | Service contract and lifecycle tests with fake providers                          |
 | `tests/providers/`        | Per-provider protocol, error, and mount tests with local HTTP fixtures; `clef-local/` holds the local Clef test service |
+| `tests/shared/`           | Shared transport tests that do not belong to one provider                          |
 | `scripts/`                | Build and package checks; `probe/` holds live model and host probes |
 | `docs/`                    | Chinese API and release guides; English versions use the `.en.md` suffix         |
 
 The generated `lib/` JavaScript, declarations, and source maps are committed so dsh can install this package directly from GitHub. The pre-commit hook runs `pnpm build` and stages the updated `lib/`. Stage build inputs before committing; the hook stops if it finds unstaged or untracked source changes that could make the generated output differ from the commit.
 
-The hook uses the dev-only `simple-git-hooks` package. Its install script is approved in this repository's `pnpm-workspace.yaml` so `pnpm install` can register the maintainer hook. It is not part of the dsh runtime dependencies. Run `pnpm hooks:install` to refresh the hook after changing its configuration.
+The hook tracks `src/`, package manifests, and the TypeScript configuration files used by the production build: `tsconfig.json`, `tsconfig.client.json`, and `tsconfig.build.json`. It uses the dev-only `simple-git-hooks` package. Its install script is approved in this repository's `pnpm-workspace.yaml` so `pnpm install` can register the maintainer hook. It is not part of the dsh runtime dependencies. Run `pnpm hooks:install` to refresh the hook after changing its configuration.
 
 ## Implementation guidelines
 
@@ -56,6 +57,6 @@ pnpm build
 pnpm probe:host <path-to-node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-When changing a provider's protocol, also run `pnpm test <provider>` and its live probe, `pnpm probe <target>`, as described in [testing and live model validation](docs/testing.en.md). A single response is an interface sample; latency and decision quality need evaluation in their actual use cases.
+When changing a provider's protocol, also run `pnpm test <provider>` and its live probe, `pnpm probe <target>`, as described in [testing and live model validation](docs/testing.en.md). Run `pnpm test shared` when changing the shared System One transport. A single response is an interface sample; latency and decision quality need evaluation in their actual use cases.
 
 Describe the problem, behavior change, and verification in a pull request. Generated output, credentials, and local research records are ignored by Git, except the committed `lib/` output required for GitHub installation. See the [release process](docs/releasing.en.md).

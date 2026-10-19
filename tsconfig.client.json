@@ -3,8 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "rootDir": "src/client",
-    "declarationDir": "lib/types/client",
+    "rootDir": "src",
+    "declarationDir": "lib/types",
     "declaration": true,
     "declarationMap": false,
     "sourceMap": false,

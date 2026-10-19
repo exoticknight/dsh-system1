@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js';
-import type { ModelCapabilities } from '../contracts/provider.js';
+import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js';
 declare const wireResponse: z.ZodObject<{
     model: z.ZodOptional<z.ZodString>;
     answers: z.ZodRecord<z.ZodString, z.ZodUnknown>;
@@ -15,7 +15,7 @@ export interface SystemOneHttpProviderOptions {
     readonly resolveApiKey: () => string | undefined | Promise<string | undefined>;
     readonly resolveBaseURL?: () => string | undefined;
     readonly apiKeyRequired?: boolean;
-    readonly isModelSupported: (model: string) => boolean;
+    readonly resolveModel: (model: string) => ProviderModel | undefined;
     readonly requestModel?: (model: string) => string | undefined;
     readonly capabilities?: ModelCapabilities | ((model: string) => ModelCapabilities);
     readonly serializeRequest?: (request: ProviderRequest) => {

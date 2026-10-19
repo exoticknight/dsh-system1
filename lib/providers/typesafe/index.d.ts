@@ -1,6 +1,7 @@
 import type { Context, Volatile } from '@deepseek-ai/cordis';
 import Schema from '@deepseek-ai/schemastery';
 export { createTypesafeProvider, type TypesafeOptions } from './adapter.js';
+export { TYPESAFE_MODELS } from './models.js';
 export interface Config {
     id: string;
     apiKeyEnv: string;

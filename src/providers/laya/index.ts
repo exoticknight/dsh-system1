@@ -7,6 +7,7 @@ import {
 import type {} from '../../index.js'
 import { createLayaProvider } from './adapter.js'
 export { createLayaProvider, type LayaOptions } from './adapter.js'
+export { LAYA_MODELS } from './models.js'
 
 export interface Config {
   id: string

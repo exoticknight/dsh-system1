@@ -1,5 +1,6 @@
 import type { Context, Volatile } from '@deepseek-ai/cordis';
 import Schema from '@deepseek-ai/schemastery';
+export { findProviderModel } from './models.js';
 interface ConfigInput {
     typesafeBaseURL?: string | null;
     layaBaseURL?: string | null;
@@ -16,5 +17,4 @@ export declare const inject: string[];
 export declare const Config: Schema<ConfigInput, RuntimeConfig>;
 /** One DSH component exposes the distinct provider routes. */
 export declare function apply(ctx: Context, config: RuntimeConfig): void;
-export {};
 //# sourceMappingURL=index.d.ts.map

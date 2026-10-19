@@ -67,6 +67,8 @@
   },
   "files": [
     "lib",
+    "!lib/types/contracts/**",
+    "!lib/types/providers/**",
     "locale",
     "icon.png",
     "assets/provider-icons/typesafe.png",

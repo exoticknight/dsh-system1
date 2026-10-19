@@ -6,6 +6,7 @@ const buildInputs = [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   'tsconfig.json',
+  'tsconfig.client.json',
   'tsconfig.build.json',
 ]
 

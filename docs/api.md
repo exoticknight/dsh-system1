@@ -6,7 +6,7 @@
 
 `decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，默认 800；每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
 
-公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 只导出类型。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件及 `createTypesafeProvider`、`createLayaProvider`、`createCloudflareProvider` 工厂。连接参数与模型选择见[模型服务配置](providers.md)。
+公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出类型，包括 `ProviderModel`；`dsh-system1/providers` 导出 `findProviderModel`。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件、`createTypesafeProvider` / `createLayaProvider` / `createCloudflareProvider` 工厂，以及 `TYPESAFE_MODELS` / `LAYA_MODELS` / `CLOUDFLARE_MODELS` 模型数组。连接参数与模型选择见[模型服务配置](providers.md)。
 
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 
@@ -81,7 +81,21 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 
 ## 实现 provider
 
-从 `dsh-system1/contracts` 导入类型，从包根入口导入 `System1ProviderError`。错误消息必须安全可展示。实现 `describe(model, signal)` 和 `evaluate(request, signal)`，并返回标准逐题答案。请求参数按只读处理。参见[provider 示例](../examples/provider.ts)。
+每个 provider 在自己的模型数组中声明规范 ID 和可选别名，不需要维护跨 provider 的总目录。`ProviderModel` 使用 `id` 表示规范模型 ID，`aliases` 表示该 provider 也接受的输入名称；设置页使用数组中的规范 ID，别名不会成为单独的菜单项。`findProviderModel(models, input)` 可按规范 ID 或别名查找模型定义，匹配成功后的 `id` 用于能力查询和上游请求。内置 provider 会先检查模型 ID，未知模型返回 `unsupported`，然后再解析凭据。能力限制由 provider adapter 声明；设置页的本地化显示文案由 client locale 维护。
+
+从 `dsh-system1/contracts` 导入类型，从包根入口导入 `System1ProviderError`；别名解析可从 `dsh-system1/providers` 导入 `findProviderModel`。错误消息必须安全可展示。实现 `describe(model, signal)` 和 `evaluate(request, signal)`，并返回标准逐题答案。请求参数按只读处理。参见[provider 示例](../examples/provider.ts)。
+
+```ts
+import { findProviderModel } from 'dsh-system1/providers'
+import type { ProviderModel } from 'dsh-system1/contracts'
+
+const MODELS = [
+  { id: 'example-v2', aliases: ['example-latest'] },
+] as const satisfies readonly ProviderModel[]
+
+const selected = findProviderModel(MODELS, requestedModel)
+// selected?.id 是供能力查询和上游请求使用的规范 ID
+```
 
 ```ts
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))

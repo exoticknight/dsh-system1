@@ -5,6 +5,8 @@ import { apply as applyCloudflare } from './cloudflare/index.js'
 import { apply as applyLaya } from './laya/index.js'
 import { apply as applyTypesafe } from './typesafe/index.js'
 
+export { findProviderModel } from './models.js'
+
 interface ConfigInput {
   typesafeBaseURL?: string | null
   layaBaseURL?: string | null

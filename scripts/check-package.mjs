@@ -48,8 +48,13 @@ try {
   const consumer = `import { Context } from '@deepseek-ai/cordis'
 import Service, { type System1Provider } from 'dsh-system1'
 import type { Questions } from 'dsh-system1/contracts'
+import type {} from 'dsh-system1/client'
+import { findProviderModel } from 'dsh-system1/providers'
 import * as typesafe from 'dsh-system1/providers/typesafe'
+import { TYPESAFE_MODELS } from 'dsh-system1/providers/typesafe'
+import { LAYA_MODELS } from 'dsh-system1/providers/laya'
 import * as cloudflare from 'dsh-system1/providers/cloudflare'
+import { CLOUDFLARE_MODELS } from 'dsh-system1/providers/cloudflare'
 import * as tool from 'dsh-system1/tool'
 const ctx=new Context()
 const service=await ctx.plugin(Service,{defaultModel:{provider:'test',model:'fixture'}})
@@ -60,6 +65,8 @@ const result=await ctx.system1.decide({state:'fixture',questions})
 if(result.answers.topic.status!=='ok')throw new Error('Consumer failed')
 const value:'a'|'b'=result.answers.topic.answer.value
 if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
+if(!TYPESAFE_MODELS.some(({id})=>id==='jev-latest')||!LAYA_MODELS.some(({id})=>id==='auto'))throw new Error('Missing provider model catalog')
+if(findProviderModel(CLOUDFLARE_MODELS,'@cf/cloudflare/clef')?.id!=='clef')throw new Error('Provider model alias did not resolve')
 if(typeof tool.apply!=='function'||tool.TOOL_NAME!=='system1_decide')throw new Error('Invalid agent tool public entry')
 await service.dispose()
 const cloudflareCtx=new Context()

@@ -7,6 +7,7 @@ import {
 import type {} from '../../index.js'
 import { createTypesafeProvider } from './adapter.js'
 export { createTypesafeProvider, type TypesafeOptions } from './adapter.js'
+export { TYPESAFE_MODELS } from './models.js'
 
 export interface Config {
   id: string
