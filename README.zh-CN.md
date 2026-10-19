@@ -6,7 +6,8 @@
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
-[![dsh.pub registry 状态](https://dsh.pub/api/badges/exoticknight/dsh-system1.svg)](https://dsh.pub/en/plugins/?q=exoticknight%2Fdsh-system1)
+[![dsh.pub registry 状态](https://dsh.pub/api/badges/exoticknight/dsh-system1.svg)](https://dsh.pub/en/plugins/?q=exoticknight%2Fdsh-system1) [![dsh-plugin.org 收录](https://dsh-plugin.org/badges/listed.svg)](https://dsh-plugin.org/plugins/exoticknight/dsh-system1)
+[![dsh-xray 能力卡](https://img.shields.io/endpoint?url=https%3A%2F%2Funstone.github.io%2Fdsh-xray%2Fbadge%2Fexoticknight__dsh-system1.json)](https://unstone.github.io/dsh-xray/p/exoticknight__dsh-system1.html) [![DSH Market 已收录](https://raw.githubusercontent.com/2BingLing/dsh-market/master/assets/readme/badge-listed-zh.svg)](https://dsh.market/) [![Awesome DSH Plugin 已收录](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 简体中文 | [English](README.md)
 
