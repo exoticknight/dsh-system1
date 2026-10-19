@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Typed System One judgments for DeepSeek Harness.** The agent can call the built-in `system1_decide` tool, and plugins can call `ctx.system1.decide()`. Both return per-question probabilities instead of generated text; the caller decides what to do next.
+**Ask System One models for yes/no, choice, score, and image-box judgments with probabilities.** The agent can call the built-in `system1_decide` tool, and plugins can call `ctx.system1.decide()`. Results come back per question instead of as generated text; the caller decides what to do next.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 

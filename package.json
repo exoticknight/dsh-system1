@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.3.0",
-  "description": "Typed System One judgments (yes/no, choice, score, box) for DeepSeek Harness agents and plugins",
+  "description": "Asks System One models for yes/no, choice, score, and image-box judgments with probabilities, via an agent tool or a plugin service",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [

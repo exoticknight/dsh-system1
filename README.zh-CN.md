@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**为 DeepSeek Harness 提供类型安全的 System One 判断。** agent 可以直接调用内置的 `system1_decide` 工具，插件可以调用 `ctx.system1.decide()`。返回的是逐题的概率结果而不是生成文本，下一步由调用方决定。
+**调用 System One 模型做是非、选择、评分和图片定位判断，并返回概率。** agent 可以直接调用内置的 `system1_decide` 工具，插件可以调用 `ctx.system1.decide()`。结果按题返回，不生成文本，下一步由调用方决定。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
