@@ -22,21 +22,12 @@ export const RELEASE_NOTICE = JSON.parse(
 ) as ReleaseNotice
 
 const manualRequestListeners = new Set<() => void>()
-let manualRequestPending = false
 
 export function requestManualReleaseNotes(): void {
-  if (manualRequestListeners.size === 0) {
-    manualRequestPending = true
-    return
-  }
   for (const listener of manualRequestListeners) listener()
 }
 
 export function onManualReleaseNotesRequest(listener: () => void): () => void {
   manualRequestListeners.add(listener)
-  if (manualRequestPending) {
-    manualRequestPending = false
-    listener()
-  }
   return () => manualRequestListeners.delete(listener)
 }

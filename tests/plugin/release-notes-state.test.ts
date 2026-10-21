@@ -10,6 +10,11 @@ import {
 } from '../../src/client/release-notes-state.js'
 import type { ReleaseNoticeLocks, ReleaseNoticeStorage } from '../../src/client/release-notes-state.js'
 
+Object.assign(globalThis, { __DSH_SYSTEM1_RELEASE_NOTICE_JSON__: '{}' })
+const { onManualReleaseNotesRequest, requestManualReleaseNotes } = await import(
+  '../../src/client/release-notes.js'
+)
+
 class MemoryStorage implements ReleaseNoticeStorage {
   readonly values = new Map<string, string>()
 
@@ -182,6 +187,19 @@ test('manual viewing always presents the current notice even after its id was re
   assert.deepEqual(result, { status: 'shown', persisted: true })
   assert.equal(presentations, 1)
   assert.equal(storage.values.size, 1)
+})
+
+test('manual requests without a mounted overlay are ignored rather than replayed later', () => {
+  requestManualReleaseNotes()
+  let requests = 0
+  const dispose = onManualReleaseNotesRequest(() => { requests++ })
+  try {
+    assert.equal(requests, 0)
+    requestManualReleaseNotes()
+    assert.equal(requests, 1)
+  } finally {
+    dispose()
+  }
 })
 
 test('a cancelled presentation does not consume the notice id', async () => {
