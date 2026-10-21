@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { IDBFactory } from 'fake-indexeddb'
 import { groupReleaseNoticeHighlights } from '../../src/client/release-notes-groups.js'
+import { resolveReleaseNoticeLocks } from '../../src/client/release-notes-locks.js'
 import {
   presentReleaseNotice,
   RELEASE_NOTICE_LOCK_NAME,
@@ -123,7 +125,34 @@ test('storage failure suppresses automatic presentation but does not block manua
   assert.equal(presentations, 1)
 })
 
-test('automatic presentation is skipped when Web Locks are unavailable', async () => {
+test('automatic presentation is coordinated by IndexedDB when Web Locks are unavailable', async () => {
+  const storage = new MemoryStorage()
+  const locks = resolveReleaseNoticeLocks(undefined, new IDBFactory())!
+  let presentations = 0
+  const options = {
+    noticeId: '0.3.0',
+    automatic: true,
+    storage,
+    locks,
+    present: async () => {
+      presentations++
+      assert.equal(storage.getItem(RELEASE_NOTICE_STORAGE_KEY), null)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return true
+    },
+  }
+
+  const attempts = await Promise.all([
+    presentReleaseNotice(options),
+    presentReleaseNotice(options),
+  ])
+
+  assert.equal(presentations, 1)
+  assert.deepEqual(attempts.map(({ status }) => status).sort(), ['shown', 'skipped'])
+  assert.equal(storage.getItem(RELEASE_NOTICE_STORAGE_KEY), '0.3.0')
+})
+
+test('automatic presentation is skipped when no cross-tab lock provider is available', async () => {
   const storage = new MemoryStorage()
   let presentations = 0
   const result = await presentReleaseNotice({

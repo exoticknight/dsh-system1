@@ -1,7 +1,8 @@
+import type { ReleaseNoticeLocks } from './release-notes-locks.js';
 export declare const RELEASE_NOTICE_STORAGE_KEY = "dsh-system1:release-notes:lastShownNoticeId";
-export declare const RELEASE_NOTICE_LOCK_NAME = "dsh-system1:release-notes";
+export { RELEASE_NOTICE_LOCK_NAME } from './release-notes-locks.js';
+export type { ReleaseNoticeLocks } from './release-notes-locks.js';
 export type ReleaseNoticeStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
-export type ReleaseNoticeLocks = Pick<LockManager, 'request'>;
 export type ReleaseNoticeAttempt = {
     status: 'shown';
     persisted: boolean;
@@ -20,4 +21,3 @@ type PresentReleaseNoticeOptions = {
 };
 /** Serialize every automatic and manual presentation across tabs of the same origin. */
 export declare function presentReleaseNotice({ noticeId, automatic, storage, locks, signal, present, }: PresentReleaseNoticeOptions): Promise<ReleaseNoticeAttempt>;
-export {};

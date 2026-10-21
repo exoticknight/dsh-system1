@@ -58,6 +58,7 @@ import { overriddenAgainstDefault } from './overrides.js'
 import { RELEASE_NOTICE, onManualReleaseNotesRequest, requestManualReleaseNotes } from './release-notes.js'
 import type { ReleaseNotice, ReleaseNoticeKind } from './release-notes.js'
 import { groupReleaseNoticeHighlights } from './release-notes-groups.js'
+import { resolveReleaseNoticeLocks } from './release-notes-locks.js'
 import { presentReleaseNotice } from './release-notes-state.js'
 import type { ReleaseNoticeAttempt, ReleaseNoticeLocks, ReleaseNoticeStorage } from './release-notes-state.js'
 
@@ -381,7 +382,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
       if (result.reason === 'storage-unavailable')
         reportUnavailable('Automatic update notice skipped because browser storage is unavailable.')
       else if (result.reason === 'lock-unavailable')
-        reportUnavailable('Automatic update notice skipped because Web Locks are unavailable in this browser context.')
+        reportUnavailable('Automatic update notice skipped because no cross-tab locking API is available.')
       else if (result.reason === 'failed')
         reportUnavailable(`Release notice could not be shown: ${String(result.error)}`)
     }
@@ -543,7 +544,9 @@ function readNoticeStorage(): ReleaseNoticeStorage | undefined {
 
 function readNoticeLocks(): ReleaseNoticeLocks | undefined {
   try {
-    return typeof navigator === 'undefined' ? undefined : navigator.locks
+    if (typeof navigator === 'undefined') return undefined
+    const factory = typeof window === 'undefined' ? undefined : window.indexedDB
+    return resolveReleaseNoticeLocks(navigator.locks ?? undefined, factory)
   } catch {
     return undefined
   }
