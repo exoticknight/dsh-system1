@@ -1,30 +1,40 @@
 {
-  "0.3.1": {
-    "id": "0.3.1",
-    "version": "0.3.1",
+  "0.3.2": {
+    "id": "0.3.2",
+    "version": "0.3.2",
     "highlights": {
       "zh": [
         {
-          "kind": "added",
-          "title": "首次运行时查看更新内容",
-          "description": "新版首次加载时展示更新摘要，关闭后不再重复提示；摘要随插件提供，离线也能阅读。"
+          "kind": "fixed",
+          "title": "切到后台时不再错过更新提示",
+          "description": "新版加载时如果页面恰好不在前台，更新摘要会在回到页面后再出现，而不是被跳过。"
         },
         {
-          "kind": "added",
-          "title": "随时重看更新说明",
-          "description": "在 System One 插件设置页点击“更新内容”重新查看摘要，或打开完整发布说明。"
+          "kind": "fixed",
+          "title": "HTTP 地址下多标签页的更新提示不再卡住",
+          "description": "通过局域网 HTTP 地址使用时，关闭或刷新一个标签页不会再让其他标签页的更新提示延迟约 30 秒。"
+        },
+        {
+          "kind": "fixed",
+          "title": "更新提示的诊断日志更准确",
+          "description": "无法展示更新摘要时，日志会写明具体原因，同类问题不再重复刷屏。"
         }
       ],
       "en": [
         {
-          "kind": "added",
-          "title": "See what's new on first run",
-          "description": "The first load of a new release shows a one-time update summary. The summary ships with the plugin and is available offline."
+          "kind": "fixed",
+          "title": "Update notices are no longer missed in background tabs",
+          "description": "If the page is not in the foreground when a new release loads, the summary now appears once you return instead of being skipped."
         },
         {
-          "kind": "added",
-          "title": "Revisit release notes at any time",
-          "description": "Select Release notes in the System One plugin settings to read the summary again or open the full release notes."
+          "kind": "fixed",
+          "title": "Update notices no longer stall across tabs on HTTP addresses",
+          "description": "On a plain HTTP LAN address, closing or reloading one tab no longer delays the update notice in other tabs by about 30 seconds."
+        },
+        {
+          "kind": "fixed",
+          "title": "Clearer update notice diagnostics",
+          "description": "When the summary cannot be shown, the log now states the reason, and repeated causes are logged only once."
         }
       ]
     }
