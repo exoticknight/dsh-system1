@@ -261,7 +261,11 @@ test('a failed mount is distinct from cancellation and does not consume the noti
     present: () => false,
   })
 
-  assert.deepEqual(result, { status: 'skipped', reason: 'failed' })
+  assert.deepEqual(result, {
+    status: 'skipped',
+    reason: 'failed',
+    error: new Error('Release notice dialog did not mount.'),
+  })
   assert.equal(storage.values.size, 0)
 })
 
@@ -282,6 +286,23 @@ test('a temporarily lost presentation slot is reported separately so automatic d
     persisted: true,
   })
   assert.equal(storage.getItem(RELEASE_NOTICE_STORAGE_KEY), '0.3.0')
+})
+
+test('an asynchronously lost presentation slot is not persisted', async () => {
+  const storage = new MemoryStorage()
+  const result = await presentReleaseNotice({
+    noticeId: '0.3.0',
+    automatic: true,
+    storage,
+    locks: createLocks(),
+    present: async () => {
+      await Promise.resolve()
+      return 'slot-lost' as const
+    },
+  })
+
+  assert.deepEqual(result, { status: 'skipped', reason: 'slot-lost' })
+  assert.equal(storage.values.size, 0)
 })
 
 test('migration highlights are grouped before ordinary release note categories', () => {

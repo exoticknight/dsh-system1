@@ -34,9 +34,10 @@ type ReleaseNoticeCopyKey =
 type ReleaseNoticeLabel = 'releaseMigration' | 'releaseAdded' | 'releaseImproved' | 'releaseFixed'
 type Copy = Translate<ReleaseNoticeCopyKey>
 type ReleaseNotesOverlayProps = { t: Copy; log: (message: string) => void }
+type ReleaseNoticeMountResult = boolean | 'slot-lost'
 type ActiveReleaseNotice = {
   notice: ReleaseNotice
-  mounted: (value: boolean) => void
+  mounted: (value: ReleaseNoticeMountResult) => void
 }
 
 const RELEASE_NOTICE_SLOT_SETTLE_MS = 500
@@ -129,17 +130,18 @@ function mountNotice(
   activeRef: { current: ActiveReleaseNotice | null },
   setActive: (active: ActiveReleaseNotice | null) => void,
   signal: AbortSignal,
-): Promise<boolean> {
-  if (signal.aborted || activeRef.current !== null) return Promise.resolve(false)
+): Promise<ReleaseNoticeMountResult> {
+  if (signal.aborted) return Promise.resolve(false)
+  if (activeRef.current !== null) return Promise.resolve('slot-lost')
   return new Promise((resolve) => {
     let settled = false
     let timeout = 0
-    const finish = (mounted: boolean) => {
+    const finish = (mounted: ReleaseNoticeMountResult) => {
       if (settled) return
       settled = true
       window.clearTimeout(timeout)
       signal.removeEventListener('abort', onAbort)
-      if (!mounted) {
+      if (mounted !== true) {
         activeRef.current = null
         setActive(null)
       }
@@ -165,7 +167,9 @@ function ReleaseNotesDialog({
 }) {
   useLayoutEffect(() => {
     const dialog = document.querySelector('.dsh-system1-release-notes-modal[role="dialog"][aria-modal="true"]')
-    active.mounted(document.visibilityState === 'visible' && dialog !== null)
+    active.mounted(document.visibilityState === 'visible'
+      ? dialog !== null
+      : 'slot-lost')
   }, [active])
 
   const releaseURL = `https://github.com/exoticknight/dsh-system1/releases/tag/v${encodeURIComponent(active.notice.version)}`

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createReleaseNoticeReporter } from '../../src/client/release-notes-diagnostics.js'
+import { presentReleaseNotice } from '../../src/client/release-notes-state.js'
 
 test('automatic release-notice diagnostics deduplicate by reason while manual failures always log', () => {
   const messages: string[] = []
@@ -25,4 +26,24 @@ test('automatic release-notice diagnostics deduplicate by reason while manual fa
     'The notice was shown, but its display marker could not be saved.',
     'The notice was shown, but its display marker could not be saved.',
   ])
+})
+
+test('a failed mount carries a useful error into diagnostics instead of logging undefined', async () => {
+  const messages: string[] = []
+  const report = createReleaseNoticeReporter((message) => messages.push(message))
+  const result = await presentReleaseNotice({
+    noticeId: '0.3.0',
+    automatic: false,
+    present: () => false,
+  })
+
+  report(result, false)
+
+  assert.deepEqual(result, {
+    status: 'skipped',
+    reason: 'failed',
+    error: new Error('Release notice dialog did not mount.'),
+  })
+  assert.deepEqual(messages, ['Release notice could not be shown: Error: Release notice dialog did not mount.'])
+  assert.equal(messages.some((message) => message.includes('undefined')), false)
 })

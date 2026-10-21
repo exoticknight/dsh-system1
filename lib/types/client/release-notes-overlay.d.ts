@@ -6,9 +6,10 @@ type ReleaseNotesOverlayProps = {
     t: Copy;
     log: (message: string) => void;
 };
+type ReleaseNoticeMountResult = boolean | 'slot-lost';
 type ActiveReleaseNotice = {
     notice: ReleaseNotice;
-    mounted: (value: boolean) => void;
+    mounted: (value: ReleaseNoticeMountResult) => void;
 };
 export declare function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps): import("react").FunctionComponentElement<{
     active: ActiveReleaseNotice;

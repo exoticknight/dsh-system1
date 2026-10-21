@@ -50,8 +50,14 @@ export async function presentReleaseNotice({
       return { status: 'skipped', reason: 'failed', error }
     }
     if (mounted === 'slot-lost') return { status: 'skipped', reason: 'slot-lost' }
-    if (!mounted)
-      return { status: 'skipped', reason: signal?.aborted ? 'cancelled' : 'failed' }
+    if (!mounted) {
+      if (signal?.aborted) return { status: 'skipped', reason: 'cancelled' }
+      return {
+        status: 'skipped',
+        reason: 'failed',
+        error: new Error('Release notice dialog did not mount.'),
+      }
+    }
 
     return {
       status: 'shown',
