@@ -1,30 +1,30 @@
 {
-  "0.3.0": {
-    "id": "0.3.0",
-    "version": "0.3.0",
+  "0.3.1": {
+    "id": "0.3.1",
+    "version": "0.3.1",
     "highlights": {
       "zh": [
         {
           "kind": "added",
-          "title": "支持向兼容模型发送图片",
-          "description": "System One 请求现在可以包含图片输入，由支持视觉的模型处理。"
+          "title": "首次运行时查看更新内容",
+          "description": "新版首次加载时展示更新摘要，关闭后不再重复提示；摘要随插件提供，离线也能阅读。"
         },
         {
           "kind": "added",
-          "title": "可通过 box 题型定位图中目标",
-          "description": "询问图片中物体的位置，并获取归一化边界坐标。"
+          "title": "随时重看更新说明",
+          "description": "在 System One 插件设置页点击“更新内容”重新查看摘要，或打开完整发布说明。"
         }
       ],
       "en": [
         {
           "kind": "added",
-          "title": "Send images to compatible models",
-          "description": "System One requests can include image input for models that support vision."
+          "title": "See what's new on first run",
+          "description": "The first load of a new release shows a one-time update summary. The summary ships with the plugin and is available offline."
         },
         {
           "kind": "added",
-          "title": "Locate objects with box questions",
-          "description": "Ask where an object appears in an image and receive normalized bounding coordinates."
+          "title": "Revisit release notes at any time",
+          "description": "Select Release notes in the System One plugin settings to read the summary again or open the full release notes."
         }
       ]
     }

@@ -52,6 +52,12 @@ The bundled patch mounts the service and built-in providers. Defaults are model 
 
 Cloudflare uses provider `cloudflare` with `clef`, `clef-flash`, or `clef-omni`. See [provider setup](docs/providers.en.md) for configuration.
 
+## Update notices
+
+The first load of a new plugin release in DSH Web automatically shows an update summary. Select **Release notes** in the System One plugin settings to read it again. The summary ships with the plugin and works offline; the full release notes link requires a connection.
+
+The current browser stores only the last shown notice ID for the current DSH origin. Refreshing or restarting does not repeat the notice; clearing site data, switching browsers, or downgrading and upgrading again may show it again. If browser storage or cross-tab coordination is unavailable, automatic notices are skipped and manual viewing remains available.
+
 ## Agent tool
 
 Once installed, the agent can call the `system1_decide` tool without a consumer plugin. The main model can hand yes/no checks, classification, and scoring to System One and decide the next step from the returned probabilities. The tool uses the default service and model configured above.

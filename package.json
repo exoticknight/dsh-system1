@@ -1,6 +1,6 @@
 {
   "name": "dsh-system1",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Asks System One models for yes/no, choice, score, and image-box judgments with probabilities, via an agent tool or a plugin service",
   "icon": "./icon.png",
   "license": "Apache-2.0",

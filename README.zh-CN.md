@@ -52,6 +52,12 @@ dsh plugin --profile <profile> add dsh-system1
 
 Cloudflare 使用 `cloudflare` provider 的 `clef`、`clef-flash` 或 `clef-omni`。配置步骤见[模型服务配置](docs/providers.md)。
 
+## 更新内容提示
+
+在 DSH Web 中首次加载新版插件时，会自动展示更新摘要；也可从 System One 插件设置页的“更新内容”入口随时重看。摘要随插件提供，离线可读，“完整发布说明”链接需要联网。
+
+展示记录保存在当前浏览器、当前 DSH 地址下，只保留最后展示的提示 ID。刷新和重启不会重复提示；清除站点数据、更换浏览器或回退再升级后可能再次提示。浏览器存储或跨标签协调不可用时跳过自动提示，仍可手动查看。
+
 ## Agent 工具
 
 安装后 agent 可以直接使用 `system1_decide` 工具，无需编写消费插件。主模型可以把是否判断、分类和打分交给 System One，再根据返回的概率决定下一步。该工具使用上面配置的默认服务和模型。
