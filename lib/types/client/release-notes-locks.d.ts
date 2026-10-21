@@ -1,5 +1,7 @@
 export declare const RELEASE_NOTICE_LOCK_NAME = "dsh-system1:release-notes";
-export type ReleaseNoticeLocks = Pick<LockManager, 'request'>;
+export type ReleaseNoticeLocks = Pick<LockManager, 'request'> & {
+    close?: () => void;
+};
 /**
  * Web Locks are the primary coordinator. IndexedDB is the insecure-HTTP
  * fallback: overlapping readwrite transactions serialize acquisition, and

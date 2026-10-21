@@ -1,5 +1,5 @@
 export const RELEASE_NOTICE_LOCK_NAME = 'dsh-system1:release-notes'
-export type ReleaseNoticeLocks = Pick<LockManager, 'request'>
+export type ReleaseNoticeLocks = Pick<LockManager, 'request'> & { close?: () => void }
 
 const DATABASE_NAME = 'dsh-system1-release-notes-locks'
 const DATABASE_VERSION = 1
@@ -23,7 +23,23 @@ export function createIndexedDbReleaseNoticeLocks(
   factory: Pick<IDBFactory, 'open'>,
   databaseName = DATABASE_NAME,
 ): ReleaseNoticeLocks {
-  const database = openDatabase(factory, databaseName)
+  let databasePromise: Promise<IDBDatabase> | undefined
+  let database: IDBDatabase | undefined
+  let closed = false
+  const getDatabase = () => {
+    if (closed) return Promise.reject(new Error('Release notice locks have been closed.'))
+    if (databasePromise === undefined) {
+      databasePromise = openDatabase(factory, databaseName).then((opened) => {
+        if (closed) {
+          opened.close()
+          throw new Error('Release notice locks have been closed.')
+        }
+        database = opened
+        return opened
+      })
+    }
+    return databasePromise
+  }
   const request = <T>(
     name: string,
     optionsOrCallback: LockOptions | LockCallback<T>,
@@ -37,10 +53,16 @@ export function createIndexedDbReleaseNoticeLocks(
     const signal = typeof optionsOrCallback === 'function'
       ? undefined
       : optionsOrCallback.signal
-    return runWithIndexedDbLock(database, name, signal, () => callback(null))
+    return runWithIndexedDbLock(getDatabase, name, signal, () => callback(null))
   }
 
-  return { request } as unknown as ReleaseNoticeLocks
+  const close = () => {
+    closed = true
+    database?.close()
+    database = undefined
+  }
+
+  return { request, close } as unknown as ReleaseNoticeLocks
 }
 
 export function resolveReleaseNoticeLocks(
@@ -75,12 +97,13 @@ function openDatabase(factory: Pick<IDBFactory, 'open'>, name: string): Promise<
 }
 
 async function runWithIndexedDbLock<T>(
-  databasePromise: Promise<IDBDatabase>,
+  getDatabase: () => Promise<IDBDatabase>,
   name: string,
   signal: AbortSignal | undefined,
   callback: () => T | PromiseLike<T>,
 ): Promise<T> {
-  const database = await databasePromise
+  if (signal?.aborted) throw abortReason(signal)
+  const database = await waitForPromise(getDatabase(), signal)
   const owner = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 
   while (true) {
@@ -99,6 +122,28 @@ async function runWithIndexedDbLock<T>(
       // The lease expires if the browser cannot clear it explicitly.
     }
   }
+}
+
+function waitForPromise<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return promise
+  if (signal.aborted) return Promise.reject(abortReason(signal))
+
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (complete: () => void) => {
+      if (settled) return
+      settled = true
+      signal.removeEventListener('abort', onAbort)
+      complete()
+    }
+    const onAbort = () => finish(() => reject(abortReason(signal)))
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(
+      (value) => finish(() => resolve(value)),
+      (error) => finish(() => reject(error)),
+    )
+    if (signal.aborted) onAbort()
+  })
 }
 
 function tryAcquire(database: IDBDatabase, name: string, owner: string): Promise<boolean> {

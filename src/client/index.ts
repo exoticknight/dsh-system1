@@ -422,6 +422,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
 
     return () => {
       controller.abort()
+      locks?.close?.()
       observer.disconnect()
       document.removeEventListener('visibilitychange', onVisibilityChange)
       disposeManualListener()
