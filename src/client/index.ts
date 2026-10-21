@@ -55,6 +55,7 @@ import {
 } from './fallback-models.js'
 import type { FallbackModelDraft } from './fallback-models.js'
 import { overriddenAgainstDefault } from './overrides.js'
+import { createReleaseNoticeReporter } from './release-notes-diagnostics.js'
 import {
   acquireReleaseNotesOverlayController,
   RELEASE_NOTICE,
@@ -65,7 +66,7 @@ import type { ReleaseNotice, ReleaseNoticeKind } from './release-notes.js'
 import { groupReleaseNoticeHighlights } from './release-notes-groups.js'
 import { resolveReleaseNoticeLocks } from './release-notes-locks.js'
 import { presentReleaseNotice } from './release-notes-state.js'
-import type { ReleaseNoticeAttempt, ReleaseNoticeLocks, ReleaseNoticeStorage } from './release-notes-state.js'
+import type { ReleaseNoticeLocks, ReleaseNoticeStorage } from './release-notes-state.js'
 
 const NS = 'dsh-system1'
 const PACKAGE = 'dsh-system1'
@@ -350,7 +351,6 @@ type ActiveReleaseNotice = {
 function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
   const [active, setActive] = useState<ActiveReleaseNotice | null>(null)
   const activeRef = useRef<ActiveReleaseNotice | null>(null)
-  const loggedUnavailable = useRef(false)
 
   useEffect(() => {
     const releaseController = acquireReleaseNotesOverlayController()
@@ -362,6 +362,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
     let automaticFinished = false
     let automaticAttempt: Promise<void> | undefined
     let stopAutomaticWatching = () => {}
+    const report = createReleaseNoticeReporter(log)
 
     const present = (automatic: boolean) => presentReleaseNotice({
       noticeId: RELEASE_NOTICE.id,
@@ -377,40 +378,15 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
       },
     })
 
-    const reportUnavailable = (message: string) => {
-      if (loggedUnavailable.current) return
-      loggedUnavailable.current = true
-      log(message)
-    }
-
-    const report = (result: ReleaseNoticeAttempt) => {
-      if (result.status === 'shown') {
-        if (!result.persisted)
-          reportUnavailable('The notice was shown, but its display marker could not be saved.')
-        return
-      }
-      if (
-        result.reason === 'already-shown' ||
-        result.reason === 'slot-lost' ||
-        result.reason === 'cancelled'
-      ) return
-      if (result.reason === 'storage-unavailable')
-        reportUnavailable('Automatic update notice skipped because browser storage is unavailable.')
-      else if (result.reason === 'lock-unavailable')
-        reportUnavailable('Automatic update notice skipped because no cross-tab locking API is available.')
-      else if (result.reason === 'failed')
-        reportUnavailable(`Release notice could not be shown: ${String(result.error)}`)
-    }
-
     const onManualRequest = () => {
-      void present(false).then(report)
+      void present(false).then((result) => report(result, false))
     }
     const scheduleAutomatic = () => {
       if (automaticFinished || automaticAttempt !== undefined || controller.signal.aborted) return
       automaticAttempt = (async () => {
         if (!await waitForPresentationSlot(controller.signal)) return
         const result = await present(true)
-        report(result)
+        report(result, true)
         automaticFinished = !(result.status === 'skipped' && result.reason === 'slot-lost')
         if (automaticFinished) stopAutomaticWatching()
       })().finally(() => {
