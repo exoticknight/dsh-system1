@@ -27,6 +27,12 @@ export function createIndexedDbReleaseNoticeLocks(
   let databasePromise: Promise<IDBDatabase> | undefined
   let database: IDBDatabase | undefined
   let closed = false
+  let inFlightRequests = 0
+  const closeDatabase = () => {
+    const opened = database
+    database = undefined
+    opened?.close()
+  }
   const getDatabase = () => {
     if (closed) return Promise.reject(new Error('Release notice locks have been closed.'))
     if (databasePromise === undefined) {
@@ -46,6 +52,7 @@ export function createIndexedDbReleaseNoticeLocks(
     optionsOrCallback: LockOptions | LockCallback<T>,
     maybeCallback?: LockCallback<T>,
   ): Promise<T> => {
+    if (closed) return Promise.reject(new Error('Release notice locks have been closed.'))
     const callback = typeof optionsOrCallback === 'function'
       ? optionsOrCallback
       : maybeCallback
@@ -54,13 +61,17 @@ export function createIndexedDbReleaseNoticeLocks(
     const signal = typeof optionsOrCallback === 'function'
       ? undefined
       : optionsOrCallback.signal
+    inFlightRequests++
     return runWithIndexedDbLock(getDatabase, name, signal, now, () => callback(null))
+      .finally(() => {
+        inFlightRequests--
+        if (closed && inFlightRequests === 0) closeDatabase()
+      })
   }
 
   const close = () => {
     closed = true
-    database?.close()
-    database = undefined
+    if (inFlightRequests === 0) closeDatabase()
   }
 
   return { request, close } as unknown as ReleaseNoticeLocks
