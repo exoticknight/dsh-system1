@@ -11,7 +11,7 @@ export type ReleaseNoticeAttempt =
   | { status: 'shown'; persisted: boolean }
   | {
       status: 'skipped'
-      reason: 'already-shown' | 'storage-unavailable' | 'lock-unavailable' | 'cancelled' | 'failed'
+      reason: 'already-shown' | 'storage-unavailable' | 'lock-unavailable' | 'slot-lost' | 'cancelled' | 'failed'
       error?: unknown
     }
 
@@ -21,7 +21,7 @@ type PresentReleaseNoticeOptions = {
   storage?: ReleaseNoticeStorage
   locks?: ReleaseNoticeLocks
   signal?: AbortSignal
-  present: () => boolean | Promise<boolean>
+  present: () => boolean | 'slot-lost' | Promise<boolean | 'slot-lost'>
 }
 
 /** Serialize every automatic and manual presentation across tabs of the same origin. */
@@ -44,13 +44,15 @@ export async function presentReleaseNotice({
       if (!probeStorage(storage)) return { status: 'skipped', reason: 'storage-unavailable' }
     }
 
-    let mounted: boolean
+    let mounted: boolean | 'slot-lost'
     try {
       mounted = await present()
     } catch (error) {
       return { status: 'skipped', reason: 'failed', error }
     }
-    if (!mounted) return { status: 'skipped', reason: 'cancelled' }
+    if (mounted === 'slot-lost') return { status: 'skipped', reason: 'slot-lost' }
+    if (!mounted)
+      return { status: 'skipped', reason: signal?.aborted ? 'cancelled' : 'failed' }
 
     return {
       status: 'shown',

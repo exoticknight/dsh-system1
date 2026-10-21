@@ -8,7 +8,7 @@ export type ReleaseNoticeAttempt = {
     persisted: boolean;
 } | {
     status: 'skipped';
-    reason: 'already-shown' | 'storage-unavailable' | 'lock-unavailable' | 'cancelled' | 'failed';
+    reason: 'already-shown' | 'storage-unavailable' | 'lock-unavailable' | 'slot-lost' | 'cancelled' | 'failed';
     error?: unknown;
 };
 type PresentReleaseNoticeOptions = {
@@ -17,7 +17,7 @@ type PresentReleaseNoticeOptions = {
     storage?: ReleaseNoticeStorage;
     locks?: ReleaseNoticeLocks;
     signal?: AbortSignal;
-    present: () => boolean | Promise<boolean>;
+    present: () => boolean | 'slot-lost' | Promise<boolean | 'slot-lost'>;
 };
 /** Serialize every automatic and manual presentation across tabs of the same origin. */
 export declare function presentReleaseNotice({ noticeId, automatic, storage, locks, signal, present, }: PresentReleaseNoticeOptions): Promise<ReleaseNoticeAttempt>;

@@ -361,7 +361,9 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
       ...(locks === undefined ? {} : { locks }),
       signal: controller.signal,
       present: () => {
-        if (controller.signal.aborted || (automatic && !hasPresentationSlot())) return false
+        if (controller.signal.aborted) return false
+        if (automatic && (!hasPresentationSlot() || activeRef.current !== null))
+          return 'slot-lost'
         return mountNotice(RELEASE_NOTICE, activeRef, setActive, controller.signal)
       },
     })
@@ -378,7 +380,11 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
           reportUnavailable('The notice was shown, but its display marker could not be saved.')
         return
       }
-      if (result.reason === 'already-shown' || result.reason === 'cancelled') return
+      if (
+        result.reason === 'already-shown' ||
+        result.reason === 'slot-lost' ||
+        result.reason === 'cancelled'
+      ) return
       if (result.reason === 'storage-unavailable')
         reportUnavailable('Automatic update notice skipped because browser storage is unavailable.')
       else if (result.reason === 'lock-unavailable')
@@ -396,9 +402,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
         if (!await waitForPresentationSlot(controller.signal)) return
         const result = await present(true)
         report(result)
-        automaticFinished = result.status === 'shown' ||
-          (result.status === 'skipped' && result.reason !== 'cancelled') ||
-          (result.status === 'skipped' && result.reason === 'cancelled' && hasPresentationSlot())
+        automaticFinished = !(result.status === 'skipped' && result.reason === 'slot-lost')
       })().finally(() => {
         automaticAttempt = undefined
         if (!automaticFinished && !controller.signal.aborted && hasPresentationSlot())

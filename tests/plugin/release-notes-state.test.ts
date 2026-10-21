@@ -186,6 +186,25 @@ test('manual viewing always presents the current notice even after its id was re
 
 test('a cancelled presentation does not consume the notice id', async () => {
   const storage = new MemoryStorage()
+  const controller = new AbortController()
+  const result = await presentReleaseNotice({
+    noticeId: '0.3.0',
+    automatic: true,
+    storage,
+    locks: createLocks(),
+    signal: controller.signal,
+    present: () => {
+      controller.abort()
+      return false
+    },
+  })
+
+  assert.deepEqual(result, { status: 'skipped', reason: 'cancelled' })
+  assert.equal(storage.values.size, 0)
+})
+
+test('a failed mount is distinct from cancellation and does not consume the notice id', async () => {
+  const storage = new MemoryStorage()
   const result = await presentReleaseNotice({
     noticeId: '0.3.0',
     automatic: true,
@@ -194,8 +213,27 @@ test('a cancelled presentation does not consume the notice id', async () => {
     present: () => false,
   })
 
-  assert.deepEqual(result, { status: 'skipped', reason: 'cancelled' })
+  assert.deepEqual(result, { status: 'skipped', reason: 'failed' })
   assert.equal(storage.values.size, 0)
+})
+
+test('a temporarily lost presentation slot is reported separately so automatic display can retry', async () => {
+  const storage = new MemoryStorage()
+  const options = {
+    noticeId: '0.3.0',
+    automatic: true,
+    storage,
+    locks: createLocks(),
+    present: () => 'slot-lost' as const,
+  }
+
+  assert.deepEqual(await presentReleaseNotice(options), { status: 'skipped', reason: 'slot-lost' })
+  assert.equal(storage.values.size, 0)
+  assert.deepEqual(await presentReleaseNotice({ ...options, present: () => true }), {
+    status: 'shown',
+    persisted: true,
+  })
+  assert.equal(storage.getItem(RELEASE_NOTICE_STORAGE_KEY), '0.3.0')
 })
 
 test('migration highlights are grouped before ordinary release note categories', () => {
