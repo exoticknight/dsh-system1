@@ -13,5 +13,6 @@ export type ReleaseNotice = {
     };
 };
 export declare const RELEASE_NOTICE: ReleaseNotice;
+export declare function acquireReleaseNotesOverlayController(): (() => void) | undefined;
 export declare function requestManualReleaseNotes(): void;
 export declare function onManualReleaseNotesRequest(listener: () => void): () => void;

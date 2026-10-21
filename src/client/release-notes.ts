@@ -22,6 +22,17 @@ export const RELEASE_NOTICE = JSON.parse(
 ) as ReleaseNotice
 
 const manualRequestListeners = new Set<() => void>()
+let activeReleaseNotesOverlayController: symbol | undefined
+
+export function acquireReleaseNotesOverlayController(): (() => void) | undefined {
+  if (activeReleaseNotesOverlayController !== undefined) return undefined
+  const token = Symbol('release-notes-overlay')
+  activeReleaseNotesOverlayController = token
+  return () => {
+    if (activeReleaseNotesOverlayController === token)
+      activeReleaseNotesOverlayController = undefined
+  }
+}
 
 export function requestManualReleaseNotes(): void {
   for (const listener of manualRequestListeners) listener()

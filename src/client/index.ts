@@ -55,7 +55,12 @@ import {
 } from './fallback-models.js'
 import type { FallbackModelDraft } from './fallback-models.js'
 import { overriddenAgainstDefault } from './overrides.js'
-import { RELEASE_NOTICE, onManualReleaseNotesRequest, requestManualReleaseNotes } from './release-notes.js'
+import {
+  acquireReleaseNotesOverlayController,
+  RELEASE_NOTICE,
+  onManualReleaseNotesRequest,
+  requestManualReleaseNotes,
+} from './release-notes.js'
 import type { ReleaseNotice, ReleaseNoticeKind } from './release-notes.js'
 import { groupReleaseNoticeHighlights } from './release-notes-groups.js'
 import { resolveReleaseNoticeLocks } from './release-notes-locks.js'
@@ -348,6 +353,9 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
   const loggedUnavailable = useRef(false)
 
   useEffect(() => {
+    const releaseController = acquireReleaseNotesOverlayController()
+    if (releaseController === undefined) return
+
     const controller = new AbortController()
     const storage = readNoticeStorage()
     const locks = readNoticeLocks()
@@ -437,6 +445,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
       disposeManualListener()
       activeRef.current?.mounted(false)
       activeRef.current = null
+      releaseController()
     }
   }, [log])
 

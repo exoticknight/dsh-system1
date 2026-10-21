@@ -11,7 +11,11 @@ import {
 import type { ReleaseNoticeLocks, ReleaseNoticeStorage } from '../../src/client/release-notes-state.js'
 
 Object.assign(globalThis, { __DSH_SYSTEM1_RELEASE_NOTICE_JSON__: '{}' })
-const { onManualReleaseNotesRequest, requestManualReleaseNotes } = await import(
+const {
+  acquireReleaseNotesOverlayController,
+  onManualReleaseNotesRequest,
+  requestManualReleaseNotes,
+} = await import(
   '../../src/client/release-notes.js'
 )
 
@@ -200,6 +204,31 @@ test('manual requests without a mounted overlay are ignored rather than replayed
   } finally {
     dispose()
   }
+})
+
+test('only one release-notes overlay controller can register a manual request listener', () => {
+  const releaseFirst = acquireReleaseNotesOverlayController()
+  assert.equal(typeof releaseFirst, 'function')
+  let presentations = 0
+  const disposeManualListener = onManualReleaseNotesRequest(() => { presentations++ })
+  const releaseSecond = acquireReleaseNotesOverlayController()
+  const disposeSecondListener = releaseSecond === undefined
+    ? undefined
+    : onManualReleaseNotesRequest(() => { presentations++ })
+
+  try {
+    assert.equal(releaseSecond, undefined)
+    requestManualReleaseNotes()
+    assert.equal(presentations, 1)
+  } finally {
+    disposeSecondListener?.()
+    disposeManualListener()
+    releaseFirst?.()
+  }
+
+  const releaseNext = acquireReleaseNotesOverlayController()
+  assert.equal(typeof releaseNext, 'function')
+  releaseNext?.()
 })
 
 test('a cancelled presentation does not consume the notice id', async () => {
