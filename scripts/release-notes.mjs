@@ -19,6 +19,8 @@ export function readCurrentReleaseNotice(root = process.cwd()) {
     const highlights = notice.highlights?.[locale]
     if (!Array.isArray(highlights) || highlights.length === 0)
       throw new Error(`Release-notes entry ${packageJson.version} needs non-empty ${locale} highlights.`)
+    if (highlights.length > 5)
+      throw new Error(`Release-notes entry ${packageJson.version} needs at most 5 ${locale} highlights.`)
     for (const [index, highlight] of highlights.entries()) {
       if (!highlight || typeof highlight !== 'object' || !kinds.has(highlight.kind))
         throw new Error(`Release-notes ${locale} highlight ${index + 1} needs a valid kind.`)
