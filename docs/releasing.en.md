@@ -2,7 +2,7 @@
 
 [简体中文](releasing.md) | [English](releasing.en.md)
 
-Pushing a `v*` tag starts the Release workflow. It checks that the tag matches `package.json.version`, reuses the CI matrix, publishes to npm, and then creates a GitHub Release with generated release notes. GitHub automatically provides a source archive for each tag. Versions with a prerelease suffix are marked as prereleases and published under npm's `next` dist-tag; stable versions use `latest`.
+Pushing a `v*` tag starts the Release workflow. It checks that the tag matches `package.json.version` and validates the current bilingual notice in `src/client/release-notes.json`, then reuses the CI matrix, publishes to npm, and creates a GitHub Release with generated release notes. The client build embeds only the current version's notice; older notices remain available in their own release packages and GitHub Releases. GitHub automatically provides a source archive for each tag. Versions with a prerelease suffix are marked as prereleases and published under npm's `next` dist-tag; stable versions use `latest`.
 
 ## npm publishing identity
 
@@ -13,7 +13,7 @@ A Trusted Publisher cannot be configured before the npm package exists. The main
 ## Prepare a release
 
 1. Confirm that CI passes on the default branch and that public APIs and docs are current.
-2. Update `package.json.version`, then run `pnpm install --lockfile-only` and `pnpm verify`.
+2. Update `package.json.version` and replace the entry in `src/client/release-notes.json` with the current version's bilingual notice. Keep only the current version's entry in that file, then run `pnpm install --lockfile-only` and `pnpm verify`.
 3. Commit the version change and push it to `main`.
 4. Create and push a tag matching the version. For `0.1.0`:
 

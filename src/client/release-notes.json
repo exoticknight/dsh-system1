@@ -6,15 +6,25 @@
       "zh": [
         {
           "kind": "added",
-          "title": "支持图片输入与目标定位判断",
-          "description": "向兼容的模型发送图片，并用 box 题型请求目标在图中的归一化边界坐标。"
+          "title": "支持向兼容模型发送图片",
+          "description": "System One 请求现在可以包含图片输入，由支持视觉的模型处理。"
+        },
+        {
+          "kind": "added",
+          "title": "可通过 box 题型定位图中目标",
+          "description": "询问图片中物体的位置，并获取归一化边界坐标。"
         }
       ],
       "en": [
         {
           "kind": "added",
-          "title": "Send images and ask object-localization questions",
-          "description": "Send images to compatible models and use box questions to get normalized coordinates for an object in the image."
+          "title": "Send images to compatible models",
+          "description": "System One requests can include image input for models that support vision."
+        },
+        {
+          "kind": "added",
+          "title": "Locate objects with box questions",
+          "description": "Ask where an object appears in an image and receive normalized bounding coordinates."
         }
       ]
     }

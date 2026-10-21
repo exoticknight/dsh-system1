@@ -57,6 +57,7 @@ declare const en: {
     modelMultilingual: string;
     modelTypedDecisions: string;
     releaseLanguage: string;
+    releaseMigration: string;
     releaseTitle: string;
     releaseEntry: string;
     releaseAdded: string;

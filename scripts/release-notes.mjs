@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const kinds = new Set(['added', 'improved', 'fixed'])
+const kinds = new Set(['migration', 'added', 'improved', 'fixed'])
 
 export function readCurrentReleaseNotice(root = process.cwd()) {
   const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))

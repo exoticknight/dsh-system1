@@ -2,7 +2,7 @@
 
 [简体中文](releasing.md) | [English](releasing.en.md)
 
-推送 `v*` tag 会触发 Release workflow。工作流检查 tag 是否与 `package.json.version` 一致，复用 CI 矩阵，发布到 npm，然后创建包含自动生成发布说明的 GitHub Release。GitHub 会为每个 tag 自动提供源码压缩包。带预发布后缀的版本会标记为预发布，并以 npm `next` dist-tag 发布；正式版使用 `latest`。
+推送 `v*` tag 会触发 Release workflow。工作流检查 tag 是否与 `package.json.version` 一致，并校验 `src/client/release-notes.json` 中当前版本的中英文更新摘要；随后复用 CI 矩阵、发布到 npm，再创建包含自动生成发布说明的 GitHub Release。构建只将当前版本摘要打入客户端；旧版本说明由各自的发布包和 GitHub Release 承载。GitHub 会为每个 tag 自动提供源码压缩包。带预发布后缀的版本会标记为预发布，并以 npm `next` dist-tag 发布；正式版使用 `latest`。
 
 ## npm 发布身份
 
@@ -13,7 +13,7 @@
 ## 准备发布
 
 1. 确认默认分支 CI 通过，公开接口和文档已更新。
-2. 修改 `package.json.version`，然后运行 `pnpm install --lockfile-only` 和 `pnpm verify`。
+2. 修改 `package.json.version`，并将 `src/client/release-notes.json` 更新为该版本的中英文摘要。该文件只需保留当前版本的条目；然后运行 `pnpm install --lockfile-only` 和 `pnpm verify`。
 3. 提交版本变更并推送到 `main`。
 4. 创建与版本匹配的 tag 并推送。例如版本为 `0.1.0`：
 

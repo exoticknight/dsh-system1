@@ -1,4 +1,4 @@
-export type ReleaseNoticeKind = 'added' | 'improved' | 'fixed'
+export type ReleaseNoticeKind = 'migration' | 'added' | 'improved' | 'fixed'
 
 export type ReleaseNoticeHighlight = {
   kind: ReleaseNoticeKind

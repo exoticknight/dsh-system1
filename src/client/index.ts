@@ -57,6 +57,7 @@ import type { FallbackModelDraft } from './fallback-models.js'
 import { overriddenAgainstDefault } from './overrides.js'
 import { RELEASE_NOTICE, onManualReleaseNotesRequest, requestManualReleaseNotes } from './release-notes.js'
 import type { ReleaseNotice, ReleaseNoticeKind } from './release-notes.js'
+import { groupReleaseNoticeHighlights } from './release-notes-groups.js'
 import { presentReleaseNotice } from './release-notes-state.js'
 import type { ReleaseNoticeAttempt, ReleaseNoticeLocks, ReleaseNoticeStorage } from './release-notes-state.js'
 
@@ -121,6 +122,7 @@ const en = {
   modelMultilingual: 'Multilingual checkpoint',
   modelTypedDecisions: 'Typed-decisions checkpoint',
   releaseLanguage: 'en',
+  releaseMigration: 'Migration notes',
   releaseTitle: "System1 · What's New",
   releaseEntry: 'Release notes',
   releaseAdded: 'New',
@@ -189,6 +191,7 @@ const zh = {
   modelMultilingual: '多语言模型',
   modelTypedDecisions: '类型化决策模型',
   releaseLanguage: 'zh',
+  releaseMigration: '迁移说明',
   releaseTitle: 'System1 · 更新内容',
   releaseEntry: '更新内容',
   releaseAdded: '新增',
@@ -509,23 +512,21 @@ function ReleaseNotesDialog({
 
 function releaseNoticeSections(notice: ReleaseNotice, t: Copy) {
   const highlights = notice.highlights[noticeLanguage(t)]
-  const groups: ReadonlyArray<{ kind: ReleaseNoticeKind; label: keyof typeof en }> = [
-    { kind: 'added', label: 'releaseAdded' },
-    { kind: 'improved', label: 'releaseImproved' },
-    { kind: 'fixed', label: 'releaseFixed' },
-  ]
-  return groups.flatMap(({ kind, label }) => {
-    const items = highlights.filter((highlight) => highlight.kind === kind)
-    if (items.length === 0) return []
-    return [h('section', { key: kind, style: releaseNoticeSectionStyle },
-      h('h3', { style: releaseNoticeHeadingStyle }, t(label)),
+  const labels: Record<ReleaseNoticeKind, keyof typeof en> = {
+    migration: 'releaseMigration',
+    added: 'releaseAdded',
+    improved: 'releaseImproved',
+    fixed: 'releaseFixed',
+  }
+  return groupReleaseNoticeHighlights(highlights).map(({ kind, highlights: items }) =>
+    h('section', { key: kind, style: releaseNoticeSectionStyle },
+      h('h3', { style: releaseNoticeHeadingStyle }, t(labels[kind])),
       h('ul', { style: releaseNoticeListStyle }, items.map((item, index) =>
         h('li', { key: `${kind}-${index}`, style: releaseNoticeItemStyle },
           h('div', { style: releaseNoticeItemTitleStyle }, item.title),
           item.description === undefined
             ? null
-            : h('p', { style: releaseNoticeDescriptionStyle }, item.description)))))]
-  })
+            : h('p', { style: releaseNoticeDescriptionStyle }, item.description))))))
 }
 
 function noticeLanguage(t: Copy): 'zh' | 'en' {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
+import { groupReleaseNoticeHighlights } from '../../src/client/release-notes-groups.js'
 import {
   presentReleaseNotice,
   RELEASE_NOTICE_LOCK_NAME,
@@ -123,6 +123,21 @@ test('storage failure suppresses automatic presentation but does not block manua
   assert.equal(presentations, 1)
 })
 
+test('automatic presentation is skipped when Web Locks are unavailable', async () => {
+  const storage = new MemoryStorage()
+  let presentations = 0
+  const result = await presentReleaseNotice({
+    noticeId: '0.3.0',
+    automatic: true,
+    storage,
+    present: () => { presentations++; return true },
+  })
+
+  assert.deepEqual(result, { status: 'skipped', reason: 'lock-unavailable' })
+  assert.equal(presentations, 0)
+  assert.equal(storage.values.size, 0)
+})
+
 test('manual viewing always presents the current notice even after its id was recorded', async () => {
   const storage = new MemoryStorage()
   storage.setItem(RELEASE_NOTICE_STORAGE_KEY, '0.3.0')
@@ -154,22 +169,19 @@ test('a cancelled presentation does not consume the notice id', async () => {
   assert.equal(storage.values.size, 0)
 })
 
-test('the current release entry is bilingual and keyed to package.json version', () => {
-  const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }
-  const catalog = JSON.parse(readFileSync('src/client/release-notes.json', 'utf8')) as Record<string, {
-    id: string
-    version: string
-    highlights: Record<'zh' | 'en', Array<{ title: string; kind: string }>>
-  }>
-  const current = catalog[version]
-  assert.ok(current, `missing release entry for ${version}`)
-  assert.equal(current.version, version)
-  assert.notEqual(current.id.trim(), '')
-  for (const locale of ['zh', 'en'] as const) {
-    assert.ok(current.highlights[locale].length > 0)
-    for (const highlight of current.highlights[locale]) {
-      assert.notEqual(highlight.title.trim(), '')
-      assert.ok(['added', 'improved', 'fixed'].includes(highlight.kind))
-    }
-  }
+test('migration highlights are grouped before ordinary release note categories', () => {
+  const groups = groupReleaseNoticeHighlights([
+    { kind: 'added', title: 'Image input' },
+    { kind: 'fixed', title: 'A bug fix' },
+    { kind: 'migration', title: 'Configuration change' },
+    { kind: 'improved', title: 'A behavior change' },
+  ])
+
+  assert.deepEqual(groups.map(({ kind }) => kind), [
+    'migration',
+    'added',
+    'improved',
+    'fixed',
+  ])
+  assert.deepEqual(groups[0]?.highlights.map(({ title }) => title), ['Configuration change'])
 })
