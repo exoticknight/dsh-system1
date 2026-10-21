@@ -1,9 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { build } from 'esbuild'
+import { readCurrentReleaseNotice } from './release-notes.mjs'
 
 const root = process.cwd()
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+const releaseNotice = readCurrentReleaseNotice(root)
 const output = resolve(root, 'lib/client.js')
 const result = await build({
   entryPoints: [resolve(root, 'src/client/index.ts')],
@@ -13,6 +15,9 @@ const result = await build({
   format: 'cjs',
   platform: 'browser',
   target: 'es2022',
+  define: {
+    __DSH_SYSTEM1_RELEASE_NOTICE_JSON__: JSON.stringify(JSON.stringify(releaseNotice)),
+  },
   write: false,
   legalComments: 'none',
 })

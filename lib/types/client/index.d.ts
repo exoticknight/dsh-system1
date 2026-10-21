@@ -56,6 +56,15 @@ declare const en: {
     modelEnglish: string;
     modelMultilingual: string;
     modelTypedDecisions: string;
+    releaseLanguage: string;
+    releaseTitle: string;
+    releaseEntry: string;
+    releaseAdded: string;
+    releaseImproved: string;
+    releaseFixed: string;
+    releaseClose: string;
+    releaseLink: string;
+    releaseAcknowledge: string;
 };
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {

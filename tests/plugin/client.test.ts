@@ -2,22 +2,30 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-// The client bundle needs a browser host, so check its source: since DSH 0.1.7 each
-// remote namespace is its own `remote.<name>` service, and reading one without
-// injecting it throws inside Cordis.
-test('client injects every remote namespace it calls', () => {
+// The browser notice must boot with only slots/locale. Settings services are
+// awaited separately so a delayed config or credentials provider cannot block it.
+test('release notice boots independently from settings services', () => {
   const source = readFileSync('src/client/index.ts', 'utf8')
-  const declared = source.match(/export const inject = \[([^\]]*)\]/)
-  assert.ok(declared, 'client inject declaration is missing')
-  const inject = new Set(
-    [...declared[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]),
+  const boot = source.match(/export const inject = \[([^\]]*)\]/)
+  assert.ok(boot, 'client inject declaration is missing')
+  const bootServices = new Set(
+    [...boot[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]),
   )
-  const used = new Set(
+  assert.deepEqual([...bootServices], ['slots', 'locale'])
+
+  const settings = source.match(/ctx\.inject\(\[([^\]]*)\], registerSettingsPages\)/)
+  assert.ok(settings, 'settings page services must be injected separately')
+  const settingsServices = new Set(
+    [...settings[1]!.matchAll(/'([^']+)'/g)].map((match) => match[1]),
+  )
+  const usedRemote = new Set(
     [...source.matchAll(/\.remote\.([A-Za-z]\w*)/g)].map(
       (match) => `remote.${match[1]}`,
     ),
   )
-  assert.ok(used.size > 0)
-  for (const service of used)
-    assert.ok(inject.has(service), `${service} is used but not injected`)
+  assert.ok(usedRemote.size > 0)
+  for (const service of usedRemote)
+    assert.ok(settingsServices.has(service), `${service} is used but not deferred for settings`)
+  assert.ok(settingsServices.has('configForms'))
+  assert.match(source, /slots\.inject\('shell\.overlay'/)
 })

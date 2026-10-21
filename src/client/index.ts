@@ -2,7 +2,9 @@ import {
   createElement as h,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
@@ -13,16 +15,19 @@ import { LAYA_MODELS } from '../providers/laya/models.js'
 import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
 import {
   Button,
+  IconInfoOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronUpOutlineRegular,
   IconPlusOutlineRegular,
   IconTrashOutlineRegular,
+  Modal,
   Menu,
   SettingsForm,
   SettingsFormModel,
   SettingsSecretField,
   SettingsValueField,
   Tag,
+  modalSelector,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   SettingsFieldSpec,
@@ -37,6 +42,7 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -49,6 +55,10 @@ import {
 } from './fallback-models.js'
 import type { FallbackModelDraft } from './fallback-models.js'
 import { overriddenAgainstDefault } from './overrides.js'
+import { RELEASE_NOTICE, onManualReleaseNotesRequest, requestManualReleaseNotes } from './release-notes.js'
+import type { ReleaseNotice, ReleaseNoticeKind } from './release-notes.js'
+import { presentReleaseNotice } from './release-notes-state.js'
+import type { ReleaseNoticeAttempt, ReleaseNoticeLocks, ReleaseNoticeStorage } from './release-notes-state.js'
 
 const NS = 'dsh-system1'
 const PACKAGE = 'dsh-system1'
@@ -110,6 +120,15 @@ const en = {
   modelEnglish: 'English checkpoint',
   modelMultilingual: 'Multilingual checkpoint',
   modelTypedDecisions: 'Typed-decisions checkpoint',
+  releaseLanguage: 'en',
+  releaseTitle: "System1 · What's New",
+  releaseEntry: 'Release notes',
+  releaseAdded: 'New',
+  releaseImproved: 'Improved',
+  releaseFixed: 'Fixed',
+  releaseClose: 'Close',
+  releaseLink: 'Full release notes',
+  releaseAcknowledge: 'Got it',
 }
 
 const zh = {
@@ -169,6 +188,15 @@ const zh = {
   modelEnglish: '英文模型',
   modelMultilingual: '多语言模型',
   modelTypedDecisions: '类型化决策模型',
+  releaseLanguage: 'zh',
+  releaseTitle: 'System1 · 更新内容',
+  releaseEntry: '更新内容',
+  releaseAdded: '新增',
+  releaseImproved: '改进',
+  releaseFixed: '修复',
+  releaseClose: '关闭',
+  releaseLink: '完整发布说明',
+  releaseAcknowledge: '知道了',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -256,10 +284,30 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
   },
 ]
 
-export const inject = ['slots', 'locale', 'remote', 'remote.credentials', 'configForms']
+export const inject = ['slots', 'locale']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-system1 client copy')
+  const releaseNotesLogger = ctx.logger('dsh-system1 release notes')
+  const reportReleaseNoteIssue = (message: string) => releaseNotesLogger.warn(message)
+  ctx.effect(
+    () =>
+      ctx.slots.inject('shell.overlay', () =>
+        ctx.slots.register(
+          { name: 'shell.overlay', id: 'dsh-system1.release-notes', locale: NS },
+          (props: { t: Copy }) => h(ReleaseNotesOverlay, {
+            ...props,
+            log: reportReleaseNoteIssue,
+          }),
+        ),
+      ),
+    'dsh-system1 release notes overlay',
+  )
+
+  ctx.inject(['remote', 'remote.credentials', 'configForms'], registerSettingsPages)
+}
+
+function registerSettingsPages(ctx: Context): void {
   ctx.effect(
     () =>
       ctx.slots.inject('plugins.bundle.config', () =>
@@ -283,6 +331,312 @@ export function apply(ctx: Context): void {
     )
   }
 }
+
+type ReleaseNotesOverlayProps = { t: Copy; log: (message: string) => void }
+type ActiveReleaseNotice = {
+  notice: ReleaseNotice
+  mounted: (value: boolean) => void
+}
+
+function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
+  const [active, setActive] = useState<ActiveReleaseNotice | null>(null)
+  const activeRef = useRef<ActiveReleaseNotice | null>(null)
+  const loggedUnavailable = useRef(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const storage = readNoticeStorage()
+    const locks = readNoticeLocks()
+    let automaticFinished = false
+    let automaticAttempt: Promise<void> | undefined
+
+    const present = (automatic: boolean) => presentReleaseNotice({
+      noticeId: RELEASE_NOTICE.id,
+      automatic,
+      ...(storage === undefined ? {} : { storage }),
+      ...(locks === undefined ? {} : { locks }),
+      signal: controller.signal,
+      present: () => {
+        if (controller.signal.aborted || (automatic && !hasPresentationSlot())) return false
+        return mountNotice(RELEASE_NOTICE, activeRef, setActive, controller.signal)
+      },
+    })
+
+    const reportUnavailable = (message: string) => {
+      if (loggedUnavailable.current) return
+      loggedUnavailable.current = true
+      log(message)
+    }
+
+    const report = (result: ReleaseNoticeAttempt) => {
+      if (result.status === 'shown') {
+        if (!result.persisted)
+          reportUnavailable('The notice was shown, but its display marker could not be saved.')
+        return
+      }
+      if (result.reason === 'already-shown' || result.reason === 'cancelled') return
+      if (result.reason === 'storage-unavailable')
+        reportUnavailable('Automatic update notice skipped because browser storage is unavailable.')
+      else if (result.reason === 'lock-unavailable')
+        reportUnavailable('Automatic update notice skipped because Web Locks are unavailable in this browser context.')
+      else if (result.reason === 'failed')
+        reportUnavailable(`Release notice could not be shown: ${String(result.error)}`)
+    }
+
+    const onManualRequest = () => {
+      void present(false).then(report)
+    }
+    const scheduleAutomatic = () => {
+      if (automaticFinished || automaticAttempt !== undefined || controller.signal.aborted) return
+      automaticAttempt = (async () => {
+        if (!await waitForPresentationSlot(controller.signal)) return
+        const result = await present(true)
+        report(result)
+        automaticFinished = result.status === 'shown' ||
+          (result.status === 'skipped' && result.reason !== 'cancelled') ||
+          (result.status === 'skipped' && result.reason === 'cancelled' && hasPresentationSlot())
+      })().finally(() => {
+        automaticAttempt = undefined
+        if (!automaticFinished && !controller.signal.aborted && hasPresentationSlot())
+          scheduleAutomatic()
+      })
+    }
+    const observer = new MutationObserver(scheduleAutomatic)
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['role', 'aria-modal'],
+    })
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') scheduleAutomatic()
+    }
+
+    const disposeManualListener = onManualReleaseNotesRequest(onManualRequest)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    scheduleAutomatic()
+
+    return () => {
+      controller.abort()
+      observer.disconnect()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      disposeManualListener()
+      activeRef.current?.mounted(false)
+      activeRef.current = null
+    }
+  }, [log])
+
+  const close = useCallback(() => {
+    activeRef.current = null
+    setActive(null)
+  }, [])
+
+  return active === null
+    ? null
+    : h(ReleaseNotesDialog, { active, t, onClose: close })
+}
+
+function mountNotice(
+  notice: ReleaseNotice,
+  activeRef: { current: ActiveReleaseNotice | null },
+  setActive: (active: ActiveReleaseNotice | null) => void,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (signal.aborted || activeRef.current !== null) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    let settled = false
+    let timeout = 0
+    const finish = (mounted: boolean) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      signal.removeEventListener('abort', onAbort)
+      if (!mounted) {
+        activeRef.current = null
+        setActive(null)
+      }
+      resolve(mounted)
+    }
+    const onAbort = () => finish(false)
+    timeout = window.setTimeout(() => finish(false), 10000)
+    const next = { notice, mounted: finish }
+    activeRef.current = next
+    signal.addEventListener('abort', onAbort, { once: true })
+    setActive(next)
+  })
+}
+
+function ReleaseNotesDialog({
+  active,
+  t,
+  onClose,
+}: {
+  active: ActiveReleaseNotice
+  t: Copy
+  onClose: () => void
+}) {
+  useLayoutEffect(() => {
+    const dialog = document.querySelector('.dsh-system1-release-notes-modal[role="dialog"][aria-modal="true"]')
+    active.mounted(document.visibilityState === 'visible' && dialog !== null)
+  }, [active])
+
+  const releaseURL = `https://github.com/exoticknight/dsh-system1/releases/tag/v${encodeURIComponent(active.notice.version)}`
+  return h(Modal, {
+    open: true,
+    onClose,
+    title: t('releaseTitle'),
+    description: `v${active.notice.version}`,
+    closeLabel: t('releaseClose'),
+    className: 'dsh-system1-release-notes-modal',
+    contentClassName: 'dsh-system1-release-notes-content',
+    children: h('div', { style: releaseNoticeBodyStyle },
+      h('style', null, releaseNoticeCSS),
+      releaseNoticeSections(active.notice, t)),
+    footer: h('div', { style: releaseNoticeFooterStyle },
+      h(Button, {
+        variant: 'ghost',
+        size: 'sm',
+        onClick: () => window.open(releaseURL, '_blank', 'noopener,noreferrer'),
+      }, t('releaseLink')),
+      h(Button, {
+        variant: 'primary',
+        size: 'sm',
+        ...{ 'data-modal-autofocus': true },
+        onClick: onClose,
+      }, t('releaseAcknowledge'))),
+  })
+}
+
+function releaseNoticeSections(notice: ReleaseNotice, t: Copy) {
+  const highlights = notice.highlights[noticeLanguage(t)]
+  const groups: ReadonlyArray<{ kind: ReleaseNoticeKind; label: keyof typeof en }> = [
+    { kind: 'added', label: 'releaseAdded' },
+    { kind: 'improved', label: 'releaseImproved' },
+    { kind: 'fixed', label: 'releaseFixed' },
+  ]
+  return groups.flatMap(({ kind, label }) => {
+    const items = highlights.filter((highlight) => highlight.kind === kind)
+    if (items.length === 0) return []
+    return [h('section', { key: kind, style: releaseNoticeSectionStyle },
+      h('h3', { style: releaseNoticeHeadingStyle }, t(label)),
+      h('ul', { style: releaseNoticeListStyle }, items.map((item, index) =>
+        h('li', { key: `${kind}-${index}`, style: releaseNoticeItemStyle },
+          h('div', { style: releaseNoticeItemTitleStyle }, item.title),
+          item.description === undefined
+            ? null
+            : h('p', { style: releaseNoticeDescriptionStyle }, item.description)))))]
+  })
+}
+
+function noticeLanguage(t: Copy): 'zh' | 'en' {
+  return t('releaseLanguage') === 'zh' ? 'zh' : 'en'
+}
+
+function readNoticeStorage(): ReleaseNoticeStorage | undefined {
+  try {
+    return window.localStorage
+  } catch {
+    return undefined
+  }
+}
+
+function readNoticeLocks(): ReleaseNoticeLocks | undefined {
+  try {
+    return typeof navigator === 'undefined' ? undefined : navigator.locks
+  } catch {
+    return undefined
+  }
+}
+
+function hasPresentationSlot(): boolean {
+  return document.visibilityState === 'visible' && document.querySelector(modalSelector) === null
+}
+
+function waitForPresentationSlot(signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false)
+
+  return new Promise((resolve) => {
+    let observer: MutationObserver
+    let settleTimer: number | undefined
+    const finish = (value: boolean) => {
+      if (settleTimer !== undefined) window.clearTimeout(settleTimer)
+      observer.disconnect()
+      document.removeEventListener('visibilitychange', check)
+      signal.removeEventListener('abort', onAbort)
+      resolve(value)
+    }
+    const check = () => {
+      if (signal.aborted) finish(false)
+      else if (!hasPresentationSlot()) {
+        if (settleTimer !== undefined) {
+          window.clearTimeout(settleTimer)
+          settleTimer = undefined
+        }
+      } else if (settleTimer === undefined) {
+        settleTimer = window.setTimeout(() => {
+          settleTimer = undefined
+          finish(hasPresentationSlot())
+        }, RELEASE_NOTICE_SLOT_SETTLE_MS)
+      }
+    }
+    const onAbort = () => finish(false)
+    observer = new MutationObserver(check)
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['role', 'aria-modal'],
+    })
+    document.addEventListener('visibilitychange', check)
+    signal.addEventListener('abort', onAbort, { once: true })
+    check()
+  })
+}
+
+const releaseNoticeBodyStyle = {
+  maxHeight: 'min(420px, calc(100dvh - 260px))',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+}
+const releaseNoticeFooterStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  width: '100%',
+}
+const releaseNoticeSectionStyle = { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }
+const releaseNoticeHeadingStyle = {
+  margin: 0,
+  color: 'var(--dsw-alias-label-secondary)',
+  fontSize: 12,
+  lineHeight: '18px',
+  fontWeight: 600,
+}
+const releaseNoticeListStyle = { margin: 0, paddingLeft: 20, color: 'var(--dsw-alias-label-primary)' }
+const releaseNoticeItemStyle = { paddingLeft: 2, marginBottom: 12 }
+const releaseNoticeItemTitleStyle = { fontSize: 14, lineHeight: '21px', fontWeight: 500 }
+const releaseNoticeDescriptionStyle = {
+  margin: '4px 0 0',
+  color: 'var(--dsw-alias-label-secondary)',
+  fontSize: 13,
+  lineHeight: '20px',
+}
+const releaseNoticeCSS = `
+.dsh-system1-release-notes-modal {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 96px);
+}
+.dsh-system1-release-notes-content {
+  min-height: 0;
+}
+@media (max-width: 480px) {
+  .dsh-system1-release-notes-modal {
+    width: 100%;
+    max-height: calc(100dvh - 48px);
+  }
+}
+`
+
+const RELEASE_NOTICE_SLOT_SETTLE_MS = 500
 
 type FieldStates = Record<string, SettingsFieldState>
 type FormView = { shell: SettingsFormShell; fields: FieldStates }
@@ -377,12 +731,20 @@ const timeoutSpec: SettingsFieldSpec = {
 
 const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec, timeoutSpec]
 const NO_SECRETS: SettingsSecretSpec[] = []
+const releaseSettingsPageStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }
 
 function BundleSettingsPage(props: BoundPageProps) {
   const { t } = props
   const { scope, status } = useConfigScope(props.ctx, 'system1')
   if (props.view === 'summary') return h('p', null, t('coreSummary'))
-  return settingsState(t, status) ?? h(BundleSettingsForm, { t, scope })
+  return h('div', { style: releaseSettingsPageStyle },
+    h(Button, {
+      variant: 'ghost',
+      size: 'sm',
+      icon: h(IconInfoOutlineRegular, { size: 14 }),
+      onClick: requestManualReleaseNotes,
+    }, t('releaseEntry')),
+    settingsState(t, status) ?? h(BundleSettingsForm, { t, scope }))
 }
 
 function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigValues> }) {

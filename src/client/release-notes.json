@@ -1,0 +1,22 @@
+{
+  "0.3.0": {
+    "id": "0.3.0",
+    "version": "0.3.0",
+    "highlights": {
+      "zh": [
+        {
+          "kind": "added",
+          "title": "支持图片输入与目标定位判断",
+          "description": "向兼容的模型发送图片，并用 box 题型请求目标在图中的归一化边界坐标。"
+        }
+      ],
+      "en": [
+        {
+          "kind": "added",
+          "title": "Send images and ask object-localization questions",
+          "description": "Send images to compatible models and use box questions to get normalized coordinates for an object in the image."
+        }
+      ]
+    }
+  }
+}
