@@ -14,6 +14,8 @@ export function readCurrentReleaseNotice(root = process.cwd()) {
     throw new Error(`Release-notes version must equal package.json version ${packageJson.version}.`)
   if (typeof notice.id !== 'string' || notice.id.trim() === '')
     throw new Error(`Release-notes entry ${packageJson.version} needs a non-empty id.`)
+  if (notice.id !== notice.version)
+    throw new Error(`Release-notes id must equal package.json version ${packageJson.version}.`)
 
   for (const locale of ['zh', 'en']) {
     const highlights = notice.highlights?.[locale]

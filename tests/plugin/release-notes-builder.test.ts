@@ -32,6 +32,25 @@ test('release notice validation allows five and rejects six highlights per local
   }
 })
 
+test('release notice id must equal its release version', () => {
+  const root = createReleaseRoot({ zh: createHighlights(1), en: createHighlights(1) })
+  try {
+    const catalogPath = join(root, 'src', 'client', 'release-notes.json')
+    writeFileSync(catalogPath, JSON.stringify({
+      '1.2.3': { id: '1.2.2', version: '1.2.3', highlights: {
+        zh: createHighlights(1),
+        en: createHighlights(1),
+      } },
+    }))
+    assert.throws(
+      () => readCurrentReleaseNotice(root),
+      /Release-notes id must equal package\.json version 1\.2\.3\./,
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 function createReleaseRoot(highlights: Record<'zh' | 'en', Array<{ kind: string; title: string }>>): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-release-notes-'))
   mkdirSync(join(root, 'src', 'client'), { recursive: true })
