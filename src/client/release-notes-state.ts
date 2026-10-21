@@ -3,7 +3,6 @@ import type { ReleaseNoticeLocks } from './release-notes-locks.js'
 
 export const RELEASE_NOTICE_STORAGE_KEY = 'dsh-system1:release-notes:lastShownNoticeId'
 export { RELEASE_NOTICE_LOCK_NAME } from './release-notes-locks.js'
-export type { ReleaseNoticeLocks } from './release-notes-locks.js'
 
 export type ReleaseNoticeStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 

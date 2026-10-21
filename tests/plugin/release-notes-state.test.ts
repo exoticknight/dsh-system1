@@ -3,12 +3,13 @@ import { test } from 'node:test'
 import { IDBFactory } from 'fake-indexeddb'
 import { groupReleaseNoticeHighlights } from '../../src/client/release-notes-groups.js'
 import { resolveReleaseNoticeLocks } from '../../src/client/release-notes-locks.js'
+import type { ReleaseNoticeLocks } from '../../src/client/release-notes-locks.js'
 import {
   presentReleaseNotice,
   RELEASE_NOTICE_LOCK_NAME,
   RELEASE_NOTICE_STORAGE_KEY,
 } from '../../src/client/release-notes-state.js'
-import type { ReleaseNoticeLocks, ReleaseNoticeStorage } from '../../src/client/release-notes-state.js'
+import type { ReleaseNoticeStorage } from '../../src/client/release-notes-state.js'
 
 Object.assign(globalThis, { __DSH_SYSTEM1_RELEASE_NOTICE_JSON__: '{}' })
 const {
