@@ -353,6 +353,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
     const locks = readNoticeLocks()
     let automaticFinished = false
     let automaticAttempt: Promise<void> | undefined
+    let stopAutomaticWatching = () => {}
 
     const present = (automatic: boolean) => presentReleaseNotice({
       noticeId: RELEASE_NOTICE.id,
@@ -403,6 +404,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
         const result = await present(true)
         report(result)
         automaticFinished = !(result.status === 'skipped' && result.reason === 'slot-lost')
+        if (automaticFinished) stopAutomaticWatching()
       })().finally(() => {
         automaticAttempt = undefined
         if (!automaticFinished && !controller.signal.aborted && hasPresentationSlot())
@@ -419,6 +421,10 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') scheduleAutomatic()
     }
+    stopAutomaticWatching = () => {
+      observer.disconnect()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
 
     const disposeManualListener = onManualReleaseNotesRequest(onManualRequest)
     document.addEventListener('visibilitychange', onVisibilityChange)
@@ -427,8 +433,7 @@ function ReleaseNotesOverlay({ t, log }: ReleaseNotesOverlayProps) {
     return () => {
       controller.abort()
       locks?.close?.()
-      observer.disconnect()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
+      stopAutomaticWatching()
       disposeManualListener()
       activeRef.current?.mounted(false)
       activeRef.current = null
