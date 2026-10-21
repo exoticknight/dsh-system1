@@ -7,5 +7,5 @@ export type ReleaseNoticeLocks = Pick<LockManager, 'request'> & {
  * fallback: overlapping readwrite transactions serialize acquisition, and
  * the short lease lets another tab recover if its owner disappears.
  */
-export declare function createIndexedDbReleaseNoticeLocks(factory: Pick<IDBFactory, 'open'>, databaseName?: string): ReleaseNoticeLocks;
+export declare function createIndexedDbReleaseNoticeLocks(factory: Pick<IDBFactory, 'open'>, databaseName?: string, now?: () => number): ReleaseNoticeLocks;
 export declare function resolveReleaseNoticeLocks(webLocks: ReleaseNoticeLocks | undefined, factory: Pick<IDBFactory, 'open'> | undefined): ReleaseNoticeLocks | undefined;

@@ -89,6 +89,32 @@ test('an abort while IndexedDB is opening returns promptly without running the c
   closeLocks(locks)
 })
 
+test('a second tab recovers a lease after the first holder stops releasing it', async () => {
+  const factory = new IDBFactory()
+  const databaseName = `release-notes-lease-recovery-${Math.random()}`
+  let now = 1_000
+  const firstLocks = createIndexedDbReleaseNoticeLocks(factory, databaseName, () => now)
+  const secondLocks = createIndexedDbReleaseNoticeLocks(factory, databaseName, () => now)
+  let releaseFirst!: () => void
+  let markFirstAcquired!: () => void
+  const firstAcquired = new Promise<void>((resolve) => { markFirstAcquired = resolve })
+  const first = firstLocks.request('release-notes', async () => {
+    markFirstAcquired()
+    await new Promise<void>((resolve) => { releaseFirst = resolve })
+  })
+
+  try {
+    await firstAcquired
+    now += 30_001
+    assert.equal(await secondLocks.request('release-notes', () => 'recovered'), 'recovered')
+  } finally {
+    releaseFirst()
+    await first
+    closeLocks(firstLocks)
+    closeLocks(secondLocks)
+  }
+})
+
 function closeLocks(locks: ReleaseNoticeLocks): void {
   const close = (locks as ReleaseNoticeLocks & { close?: () => void }).close
   close?.()

@@ -22,6 +22,7 @@ type LockCallback<T> = (lock: Lock | null) => T | PromiseLike<T>
 export function createIndexedDbReleaseNoticeLocks(
   factory: Pick<IDBFactory, 'open'>,
   databaseName = DATABASE_NAME,
+  now: () => number = Date.now,
 ): ReleaseNoticeLocks {
   let databasePromise: Promise<IDBDatabase> | undefined
   let database: IDBDatabase | undefined
@@ -53,7 +54,7 @@ export function createIndexedDbReleaseNoticeLocks(
     const signal = typeof optionsOrCallback === 'function'
       ? undefined
       : optionsOrCallback.signal
-    return runWithIndexedDbLock(getDatabase, name, signal, () => callback(null))
+    return runWithIndexedDbLock(getDatabase, name, signal, now, () => callback(null))
   }
 
   const close = () => {
@@ -100,6 +101,7 @@ async function runWithIndexedDbLock<T>(
   getDatabase: () => Promise<IDBDatabase>,
   name: string,
   signal: AbortSignal | undefined,
+  now: () => number,
   callback: () => T | PromiseLike<T>,
 ): Promise<T> {
   if (signal?.aborted) throw abortReason(signal)
@@ -108,7 +110,7 @@ async function runWithIndexedDbLock<T>(
 
   while (true) {
     if (signal?.aborted) throw abortReason(signal)
-    if (await tryAcquire(database, name, owner)) break
+    if (await tryAcquire(database, name, owner, now)) break
     await waitForRetry(signal)
   }
 
@@ -146,17 +148,22 @@ function waitForPromise<T>(promise: Promise<T>, signal: AbortSignal | undefined)
   })
 }
 
-function tryAcquire(database: IDBDatabase, name: string, owner: string): Promise<boolean> {
+function tryAcquire(
+  database: IDBDatabase,
+  name: string,
+  owner: string,
+  now: () => number,
+): Promise<boolean> {
   const transaction = database.transaction(LOCK_STORE, 'readwrite')
   const finished = transactionFinished(transaction)
   let acquired = false
   const request = transaction.objectStore(LOCK_STORE).get(name)
   request.onsuccess = () => {
-    if (isLiveLease(request.result, Date.now())) return
+    if (isLiveLease(request.result, now())) return
     acquired = true
     transaction.objectStore(LOCK_STORE).put({
       owner,
-      expiresAt: Date.now() + LOCK_LEASE_MS,
+      expiresAt: now() + LOCK_LEASE_MS,
     } satisfies Lease, name)
   }
   return finished.then(() => acquired)
