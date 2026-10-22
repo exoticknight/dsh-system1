@@ -21,6 +21,11 @@ declare const en: {
     defaultHint: string;
     timeoutHint: string;
     providerEnabledHint: string;
+    feedbackPrompt: string;
+    providerFeedbackPrompt: string;
+    reportIssue: string;
+    requestProvider: string;
+    requestModel: string;
     reset: string;
     overridden: string;
     save: string;
