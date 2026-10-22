@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "System One",
-    "description": "Fast probability judgments for DSH: yes/no, choice, and score."
+    "description": "Structured results for agents and plugins: classify content, filter candidates, score against criteria, and locate objects in images. One interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers; callers choose what happens next."
   }
 }

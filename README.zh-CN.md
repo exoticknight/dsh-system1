@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**调用 System One 模型做是非、选择、评分和图片定位判断，并返回概率。** agent 可以直接调用内置的 `system1_decide` 工具，插件可以调用 `ctx.system1.decide()`。结果按题返回，不生成文本，下一步由调用方决定。
+**让 Agent 和插件把内容分类、筛选候选、按标准评分或图片定位交给决策模型，并拿到可直接处理的结果。统一调用接口支持 TypeSafe/Jev、Laya、Cloudflare/Clef 和自定义 provider，方便按场景选择后端；后续动作由 Agent 或插件决定。** Agent 可以直接调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
