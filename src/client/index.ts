@@ -80,6 +80,11 @@ const en = {
   defaultHint: 'Used when a decision request does not specify a model.',
   timeoutHint: 'Applies when a decision request does not provide its own timeout.',
   providerEnabledHint: 'Enable the matching service component in the list below.',
+  feedbackPrompt: 'Need help or a provider/model you would like to use?',
+  providerFeedbackPrompt: 'Having trouble configuring this provider?',
+  reportIssue: 'Report a problem',
+  requestProvider: 'Request a provider',
+  requestModel: 'Request a model',
   reset: 'Reset to package default',
   overridden: 'Overridden',
   save: 'Save settings',
@@ -149,6 +154,11 @@ const zh = {
   defaultHint: '决策请求未指定模型时使用。',
   timeoutHint: '决策请求没有单独指定超时时使用。',
   providerEnabledHint: '请在下方组件列表中启用对应的服务组件。',
+  feedbackPrompt: '遇到问题，或缺少想用的提供商/模型？',
+  providerFeedbackPrompt: '配置此提供商时遇到问题？',
+  reportIssue: '反馈问题',
+  requestProvider: '请求接入提供商',
+  requestModel: '请求添加模型',
   reset: '恢复默认值',
   overridden: '已覆盖',
   save: '保存设置',
@@ -423,6 +433,20 @@ const timeoutSpec: SettingsFieldSpec = {
 const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec, timeoutSpec]
 const NO_SECRETS: SettingsSecretSpec[] = []
 const releaseSettingsPageStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }
+const settingsPageStyle = { display: 'flex', flexDirection: 'column', gap: 16 }
+
+const GITHUB_ISSUE_URLS = {
+  bug: 'https://github.com/exoticknight/dsh-system1/issues/new?template=bug_report.yml',
+  provider: 'https://github.com/exoticknight/dsh-system1/issues/new?template=provider_request.yml',
+  model: 'https://github.com/exoticknight/dsh-system1/issues/new?template=model_request.yml',
+} as const
+
+type IssueLinkKind = keyof typeof GITHUB_ISSUE_URLS
+const issueLinkLabels: Readonly<Record<IssueLinkKind, keyof typeof en>> = {
+  bug: 'reportIssue',
+  provider: 'requestProvider',
+  model: 'requestModel',
+}
 
 function BundleSettingsPage(props: BoundPageProps) {
   const { t } = props
@@ -435,7 +459,26 @@ function BundleSettingsPage(props: BoundPageProps) {
       icon: h(IconInfoOutlineRegular, { size: 14 }),
       onClick: requestManualReleaseNotes,
     }, t('releaseEntry')),
-    settingsState(t, status) ?? h(BundleSettingsForm, { t, scope }))
+    h('div', { style: settingsPageStyle },
+      settingsState(t, status) ?? h(BundleSettingsForm, { t, scope }),
+      h(IssueLinks, { t, kinds: ['bug', 'provider', 'model'], prompt: 'feedbackPrompt' })))
+}
+
+function IssueLinks(props: {
+  t: Copy
+  kinds: ReadonlyArray<IssueLinkKind>
+  prompt: 'feedbackPrompt' | 'providerFeedbackPrompt'
+}) {
+  return h('div', { style: issueLinksSectionStyle },
+    h('p', { style: settingsHintStyle }, props.t(props.prompt)),
+    h('nav', { 'aria-label': props.t(props.prompt), style: issueLinksStyle },
+      ...props.kinds.map((kind) => h('a', {
+        key: kind,
+        href: GITHUB_ISSUE_URLS[kind],
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        style: issueLinkStyle,
+      }, props.t(issueLinkLabels[kind]), h('span', { 'aria-hidden': true }, ' ↗')))))
 }
 
 function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigValues> }) {
@@ -667,8 +710,10 @@ function ProviderSettingsPage(props: BoundPageProps & { provider: ProviderSettin
   const { t, provider } = props
   const { scope, status } = useConfigScope(props.ctx, provider.rowId)
   if (props.view === 'summary') return h('p', null, t(provider.summary))
-  return settingsState(t, status) ??
-    h(ProviderSettingsForm, { t, provider, scope, ctx: props.ctx })
+  return h('div', { style: settingsPageStyle },
+    settingsState(t, status) ??
+      h(ProviderSettingsForm, { t, provider, scope, ctx: props.ctx }),
+    h(IssueLinks, { t, kinds: ['bug'], prompt: 'providerFeedbackPrompt' }))
 }
 
 function ProviderSettingsForm(props: {
@@ -909,4 +954,11 @@ const settingsHintStyle = {
   fontSize: 12,
   lineHeight: 1.5,
   color: 'var(--dsw-alias-label-tertiary)',
+}
+const issueLinksSectionStyle = { display: 'flex', flexDirection: 'column', gap: 8 }
+const issueLinksStyle = { display: 'flex', flexWrap: 'wrap', gap: '8px 16px', fontSize: 13, lineHeight: 1.5 }
+const issueLinkStyle = {
+  color: 'var(--dsw-alias-label-secondary)',
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
 }

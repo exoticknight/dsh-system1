@@ -1,0 +1,48 @@
+name: Model request / 请求添加模型
+description: Request a model from a supported provider / 请求在已支持的提供商中增加模型
+title: "[Model request] "
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: 提供商 / Provider
+      description: 例如 TypeSafe、Laya 或 Cloudflare。 / For example, TypeSafe, Laya, or Cloudflare.
+      placeholder: Provider name
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: 模型名称或 ID / Model name or ID
+      placeholder: Exact model name or identifier
+    validations:
+      required: true
+  - type: input
+    id: documentation
+    attributes:
+      label: 官方模型文档 / Official model documentation
+      description: 请提供模型能力、输入限制和版本信息的官方链接。 / Link official details on capabilities, input limits, and versioning.
+      placeholder: https://...
+    validations:
+      required: true
+  - type: textarea
+    id: decision_capabilities
+    attributes:
+      label: System One 判断能力 / System One decision capabilities
+      description: 模型支持哪些结构化判断（是否、选择、评分、图片定位等）？ / Which structured judgments does it support (yes/no, choice, score, image-box, etc.)?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 为什么需要这个模型？ / Why is this model useful?
+      description: 描述目标用户和现有模型无法满足的需求。 / Describe the users and needs not met by currently supported models.
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: 其他信息 / Additional context
+      description: 可补充版本、地区、费用或兼容性细节。 / Add relevant version, availability, cost, or compatibility details.
+    validations:
+      required: false
