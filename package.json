@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.3.2",
-  "description": "Asks System One models for yes/no, choice, score, and image-box judgments with probabilities, via an agent tool or a plugin service",
+  "description": "Structured results for agents and plugins: classify content, filter candidates, score against criteria, and locate objects in images. One interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers; callers choose what happens next.",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [

@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Ask System One models for yes/no, choice, score, and image-box judgments with probabilities.** The agent can call the built-in `system1_decide` tool, and plugins can call `ctx.system1.decide()`. Results come back per question instead of as generated text; the caller decides what to do next.
+**Give agents and plugins structured results for classifying content, filtering candidates, scoring against criteria, and locating objects in images. One interface works with TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers; callers decide what happens next.** The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
