@@ -39,6 +39,19 @@ const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
     maxTotalBytes: 8 * 1024 * 1024,
   },
 }
+const OMNI_CAPABILITIES: Pick<ModelCapabilities, 'audio' | 'videos' | 'audioVideo'> = {
+  audio: {
+    formats: ['audio/wav', 'audio/mpeg'],
+    maxCount: 4,
+    maxBytesPerItem: 8 * 1024 * 1024,
+  },
+  videos: {
+    formats: ['video/mp4', 'video/webm'],
+    maxCount: 2,
+    maxBytesPerItem: 16 * 1024 * 1024,
+  },
+  audioVideo: { maxTotalBytes: 16 * 1024 * 1024 },
+}
 
 /** Cloudflare REST transport for the native System One Clef models. */
 export function createCloudflareProvider(
@@ -55,6 +68,7 @@ export function createCloudflareProvider(
         })
       return {
         ...CAPABILITIES,
+        ...(selectedModel.id === 'clef-omni' ? OMNI_CAPABILITIES : {}),
         context: { maxTokens: selectedModel.maxTokens, includesQuestions: true },
       }
     },
@@ -105,6 +119,20 @@ export function createCloudflareProvider(
               ...(request.images?.length
                 ? {
                     images: request.images.map(
+                      ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
+                    ),
+                  }
+                : {}),
+              ...(request.audio?.length
+                ? {
+                    audio: request.audio.map(
+                      ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
+                    ),
+                  }
+                : {}),
+              ...(request.videos?.length
+                ? {
+                    videos: request.videos.map(
                       ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
                     ),
                   }

@@ -57,7 +57,7 @@ pnpm may report `ERR_PNPM_IGNORED_BUILDS`. The Loader probe does not depend on t
 
 ## Cloudflare credentials
 
-Workers AI includes 10,000 free Neurons per day on both the Workers Free and Paid plans, with no payment method required. `clef-flash` costs about 8,182 Neurons per million input tokens, and one probe uses a few hundred tokens. On the Free plan, requests beyond the allocation fail rather than incur charges. See [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+The live probe sends a real inference request to Cloudflare. Before running it, confirm that the account's permissions, allocation, and billing settings are appropriate for the validation.
 
 1. Open the [Workers AI dashboard](https://dash.cloudflare.com/?to=/:account/ai/workers-ai) and choose **Use REST API**.
 2. Choose **Create a Workers AI API Token**, keep the prefilled permissions (`Workers AI - Read`, `Workers AI - Edit`), then create and copy the token.
