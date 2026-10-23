@@ -44,6 +44,8 @@ export interface ProviderResponse {
     readonly degraded?: boolean | undefined;
 }
 export interface System1Provider {
+    /** Fallback timeout for this provider when the caller and service set none. */
+    readonly defaultTimeoutMs?: number | undefined;
     describe(model: string, signal: AbortSignal): Promise<ModelCapabilities>;
     evaluate(request: ProviderRequest, signal: AbortSignal): Promise<ProviderResponse>;
 }

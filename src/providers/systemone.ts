@@ -15,7 +15,7 @@ const wireAnswer = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('score'),
     score: z.number(),
-    legend: z.record(z.string(), z.unknown()).optional(),
+    legend: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]).optional(),
     probabilities: z.record(z.string(), z.number()),
     confidence: z.number().optional(),
   }),
@@ -243,16 +243,27 @@ function normalizeAnswers(
         }]
 
       if (question.type !== 'score') return [id, invalidAnswer()]
-      if (
-        answer.legend !== undefined &&
-        !isDeepStrictEqual(
-          answer.legend,
-          Object.fromEntries(
-            question.criteria.map((value, index) => [String(index), value]),
-          ),
+      if (answer.legend !== undefined) {
+        const normalizedLegend = Array.isArray(answer.legend)
+          ? Object.fromEntries(
+              answer.legend.map((value, index) => [String(index), value]),
+            )
+          : answer.legend
+        const expectedLegend = Object.fromEntries(
+          question.criteria.map((value, index) => [String(index), value]),
         )
-      )
-        return [id, invalidAnswer()]
+        const expectedTextLegend = Object.fromEntries(
+          question.criteria.map((value, index) => [
+            String(index),
+            stringifyDescription(value),
+          ]),
+        )
+        if (
+          !isDeepStrictEqual(normalizedLegend, expectedLegend) &&
+          !isDeepStrictEqual(normalizedLegend, expectedTextLegend)
+        )
+          return [id, invalidAnswer()]
+      }
       const probabilities = question.criteria.map((_, index) => {
         const probability = answer.probabilities[String(index)]
         return probability
@@ -281,6 +292,12 @@ function invalidAnswer() {
       message: 'Provider returned an invalid answer.',
     },
   }
+}
+
+/** Nace accepts only text descriptions; JSON descriptions retain their structure as compact text. */
+export function stringifyDescription(value: string | object | readonly unknown[]): string {
+  if (typeof value === 'string') return value
+  return JSON.stringify(value)!
 }
 
 function modelField(model: string | undefined): { model?: string } {

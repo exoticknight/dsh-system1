@@ -58,6 +58,77 @@ test('public service returns provider metadata and validates caller input', asyn
   )
 })
 
+test('timeout precedence is request, service, provider, then the legacy 800 ms fallback', async () => {
+  async function decide(options: {
+    serviceTimeoutMs?: number
+    providerTimeoutMs?: number
+    requestTimeoutMs?: number
+    delayMs?: number
+  }) {
+    const engine = new System1Engine({
+      defaultModel: { provider: 'timed', model: 'fixture' },
+      ...(options.serviceTimeoutMs !== undefined
+        ? { timeoutMs: options.serviceTimeoutMs }
+        : {}),
+    })
+    engine.registerProvider('timed', {
+      ...provider,
+      ...(options.providerTimeoutMs !== undefined
+        ? { defaultTimeoutMs: options.providerTimeoutMs }
+        : {}),
+      evaluate(_request, signal) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve(ok), options.delayMs ?? 35)
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer)
+            reject(signal.reason)
+          }, { once: true })
+        })
+      },
+    })
+    try {
+      return await engine.decide({
+        state: null,
+        questions,
+        ...(options.requestTimeoutMs !== undefined
+          ? { timeoutMs: options.requestTimeoutMs }
+          : {}),
+      })
+    } finally {
+      engine.dispose()
+    }
+  }
+
+  const providerDefault = await decide({ providerTimeoutMs: 10 })
+  assert.equal(
+    providerDefault.answers.q.status === 'error' && providerDefault.answers.q.error.code,
+    'timeout',
+  )
+  assert.equal((await decide({ providerTimeoutMs: 10, serviceTimeoutMs: 100 })).answers.q.status, 'ok')
+  assert.equal((await decide({ providerTimeoutMs: 10, serviceTimeoutMs: 10, requestTimeoutMs: 100 })).answers.q.status, 'ok')
+  assert.equal((await decide({ providerTimeoutMs: 10, serviceTimeoutMs: 800 })).answers.q.status, 'ok')
+  assert.equal((await decide({})).answers.q.status, 'ok')
+
+  const unconfigured = System1Service.Config({}) as unknown as { timeoutMs?: unknown }
+  const explicitlyConfigured = System1Service.Config({ timeoutMs: 800 }) as unknown as { timeoutMs?: unknown }
+  const read = (value: unknown) =>
+    value && typeof value === 'object' && 'get' in value && typeof value.get === 'function'
+      ? value.get()
+      : value
+  assert.equal(read(unconfigured.timeoutMs), undefined)
+  assert.equal(read(explicitlyConfigured.timeoutMs), 800)
+
+  const invalidProviderDefault = new System1Engine()
+  assert.throws(
+    () => invalidProviderDefault.registerProvider('bad', {
+      ...provider,
+      defaultTimeoutMs: 0,
+    }),
+    System1InputError,
+  )
+  invalidProviderDefault.dispose()
+})
+
 test('unavailable preferred model falls back and records the failed attempt', async (t) => {
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'model-b' }],

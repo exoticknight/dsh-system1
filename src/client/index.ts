@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { CLOUDFLARE_MODELS } from '../providers/cloudflare/models.js'
 import { LAYA_MODELS } from '../providers/laya/models.js'
+import { NACE_MODELS } from '../providers/nace/models.js'
 import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
 import {
   Button,
@@ -63,6 +64,7 @@ const en = {
   provider: 'Default service',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
+  providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: 'Unsupported service',
   model: 'Default model',
@@ -78,7 +80,7 @@ const en = {
   fallbackRemove: 'Remove',
   timeout: 'Request timeout (ms)',
   defaultHint: 'Used when a decision request does not specify a model.',
-  timeoutHint: 'Applies when a decision request does not provide its own timeout.',
+  timeoutHint: 'Applies when a request has no timeout. Leave blank to use provider defaults (800 ms unless specified; Nace uses 60,000 ms).',
   providerEnabledHint: 'Enable the matching service component in the list below.',
   reset: 'Reset to package default',
   overridden: 'Overridden',
@@ -100,10 +102,14 @@ const en = {
   keyUnavailable: 'The DSH credential service is unavailable.',
   typesafeSummary: 'Configure the TypeSafe endpoint and its API Key.',
   layaSummary: 'Configure the Laya endpoint and optional API Key.',
+  naceSummary: 'Configure Nace.AI Drex and its API Key.',
   typesafeEndpoint: 'TypeSafe API base URL',
   typesafeEndpointHint: 'The TypeSafe System One endpoint is appended automatically.',
   layaEndpoint: 'Laya server base URL',
   layaEndpointHint: 'Use the base URL of a Laya server exposing POST /v1/systemone.',
+  naceEndpoint: 'Nace API base URL',
+  naceEndpointHint: 'Use the Nace API root; POST /v1/systemone is appended automatically.',
+  naceImageRetentionHint: 'Drex Max images that exceed the 4 MiB request limit are uploaded as temporary files. DSH attempts deletion after each call; Nace keeps uploads for 24 hours by default, and backup removal can take up to 35 days.',
   cloudflareSummary: 'Configure the Cloudflare API endpoint, account, and API token.',
   cloudflareEndpoint: 'Cloudflare API base URL',
   cloudflareEndpointHint: 'Use the Cloudflare API v4 base URL.',
@@ -132,6 +138,7 @@ const zh = {
   provider: '默认服务',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
+  providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: '暂不支持的服务',
   model: '默认模型',
@@ -147,7 +154,7 @@ const zh = {
   fallbackRemove: '删除',
   timeout: '请求超时（毫秒）',
   defaultHint: '决策请求未指定模型时使用。',
-  timeoutHint: '决策请求没有单独指定超时时使用。',
+  timeoutHint: '请求未单独指定超时时使用。留空会采用服务默认值（通常为 800 毫秒；Nace 为 60,000 毫秒）。',
   providerEnabledHint: '请在下方组件列表中启用对应的服务组件。',
   reset: '恢复默认值',
   overridden: '已覆盖',
@@ -169,10 +176,14 @@ const zh = {
   keyUnavailable: 'DSH 凭据服务暂不可用。',
   typesafeSummary: '配置 TypeSafe 接口地址和 API Key。',
   layaSummary: '配置 Laya 接口地址和可选 API Key。',
+  naceSummary: '配置 Nace.AI Drex 服务和 API Key。',
   typesafeEndpoint: 'TypeSafe API 根地址',
   typesafeEndpointHint: '插件会自动在地址后拼接 TypeSafe System One 接口路径。',
   layaEndpoint: 'Laya 服务根地址',
   layaEndpointHint: '填写提供 POST /v1/systemone 接口的 Laya 服务根地址。',
+  naceEndpoint: 'Nace API 根地址',
+  naceEndpointHint: '填写 Nace API 根地址；插件会自动拼接 POST /v1/systemone。',
+  naceImageRetentionHint: 'Drex Max 图片请求超过 4 MiB 时会把部分图片作为临时文件上传。DSH 会在每次调用后尝试删除；Nace 默认保留上传文件 24 小时，备份中的数据最长可能需要 35 天清除。',
   cloudflareSummary: '配置 Cloudflare API 地址、账号和 API Token。',
   cloudflareEndpoint: 'Cloudflare API 根地址',
   cloudflareEndpointHint: '填写 Cloudflare API v4 根地址。',
@@ -206,7 +217,7 @@ type Copy = Translate<keyof typeof en>
 type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
-type ProviderId = 'typesafe' | 'laya' | 'cloudflare'
+type ProviderId = 'typesafe' | 'laya' | 'nace' | 'cloudflare'
 type ModelOption = { id: string; label?: keyof typeof en }
 type ProviderSettings = {
   id: ProviderId
@@ -219,6 +230,7 @@ type ProviderSettings = {
   endpointHint: keyof typeof en
   baseURL: string
   models: ReadonlyArray<ModelOption>
+  note?: keyof typeof en
   accountId?: {
     path: 'accountId'
     label: keyof typeof en
@@ -259,6 +271,19 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointHint: 'layaEndpointHint',
     baseURL: 'http://127.0.0.1:8000',
     models: LAYA_MODELS.map(({ id }) => ({ id, label: LAYA_MODEL_LABELS[id] })),
+  },
+  {
+    id: 'nace',
+    rowId: 'system1-nace',
+    label: 'providerNace',
+    summary: 'naceSummary',
+    keyRef: 'NACE_API_KEY',
+    keyHint: 'keyHint',
+    endpointLabel: 'naceEndpoint',
+    endpointHint: 'naceEndpointHint',
+    baseURL: 'https://console.nace.ai',
+    models: NACE_MODELS.map(({ id }) => ({ id })),
+    note: 'naceImageRetentionHint',
   },
   {
     id: 'cloudflare',
@@ -763,6 +788,7 @@ function ProviderSettingsForm(props: {
         onEdit: (text: string) => actions.edit(accountId.path, text),
         onReset: () => actions.resetField(accountId.path),
       }),
+      provider.note && h('p', { key: 'note', style: settingsHintStyle }, t(provider.note)),
     ],
   })
 }

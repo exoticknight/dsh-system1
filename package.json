@@ -14,6 +14,7 @@
     "typesafe",
     "jev",
     "laya",
+    "nace",
     "llm",
     "classification",
     "probability",
@@ -41,6 +42,12 @@
     },
     "./providers/typesafe/locale/*.json": "./locale/providers/typesafe/*.json",
     "./providers/typesafe/icon": "./assets/provider-icons/typesafe.png",
+    "./providers/nace": {
+      "types": "./lib/providers/nace/index.d.ts",
+      "import": "./lib/providers/nace/index.js"
+    },
+    "./providers/nace/locale/*.json": "./locale/providers/nace/*.json",
+    "./providers/nace/icon": "./assets/provider-icons/nace.svg",
     "./providers": {
       "types": "./lib/providers/index.d.ts",
       "import": "./lib/providers/index.js"
@@ -76,6 +83,7 @@
     "locale",
     "icon.png",
     "assets/provider-icons/typesafe.png",
+    "assets/provider-icons/nace.svg",
     "assets/provider-icons/laya.png",
     "assets/provider-icons/cloudflare-clef.svg",
     "LICENSE",
@@ -137,6 +145,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.4",
+    "nace-sdk": "0.2.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

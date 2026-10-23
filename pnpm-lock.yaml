@@ -11,6 +11,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 3.18.4
         version: 3.18.4
+      nace-sdk:
+        specifier: 0.2.0
+        version: 0.2.0
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -515,6 +518,10 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
+  nace-sdk@0.2.0:
+    resolution: {integrity: sha512-WAuxC9UraSs6vUJtdC/JS3iI83nro1+DhAnNQNIGMwka4Zih3fgKPU72zmueezA4MXE+A4eMtYIG2fL7LYQe3Q==}
+    engines: {node: '>=20'}
+
   node-addon-native-custom-loader@0.1.6:
     resolution: {integrity: sha512-QaW7d8lTcGCXrpNVyFDtID3vrpa7vFdpcY9pql2/9FGFSe7tcSnhQOKZX+1aOWq+pB1d2ZwNnKAdQI5nD9wAXA==}
     engines: {node: '>=20'}
@@ -919,6 +926,8 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
+
+  nace-sdk@0.2.0: {}
 
   node-addon-native-custom-loader@0.1.6:
     optional: true
