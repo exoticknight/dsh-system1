@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
+import type { ModelCapabilities } from '../../src/contracts/provider.js'
 import { System1Engine } from '../../src/core/engine.js'
 import System1Service, {
   System1InputError,
@@ -50,6 +51,14 @@ test('public service returns provider metadata and validates caller input', asyn
   assert.equal('attempts' in result.meta, false)
   await assert.rejects(
     ctx.system1.decide({ state: null, questions: {} }),
+    System1InputError,
+  )
+  await assert.rejects(
+    ctx.system1.decide({
+      state: 'sample',
+      questions,
+      audio: [{ mediaType: 'audio/mpeg', data: 'not base64' }],
+    }),
     System1InputError,
   )
   assert.throws(
@@ -333,6 +342,112 @@ test('unsupported preferred model falls back to a capable model', async (t) => {
   assert.deepEqual(result.meta.attempts?.map(({ error }) => error.code), [
     'unsupported',
   ])
+})
+
+test('audio/video requests fall back past models that do not declare those capabilities', async (t) => {
+  const { ctx } = await setup(t, {
+    fallbackModels: [{ provider: 'backup', model: 'clef-omni' }],
+  })
+  let preferredCalls = 0
+  ctx.system1.registerProvider('test', {
+    ...provider,
+    async evaluate() {
+      preferredCalls++
+      throw new Error('a text-only model must not receive media')
+    },
+  })
+  const audio = [{ mediaType: 'audio/mpeg', data: 'QUJD' }] as const
+  const videos = [{ mediaType: 'video/mp4', data: 'REVG' }] as const
+  let backupCalls = 0
+  ctx.system1.registerProvider('backup', {
+    async describe() {
+      return {
+        primitives: ['noul'],
+        audio: { formats: ['audio/mpeg'], maxCount: 4, maxBytesPerItem: 8 },
+        videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
+        audioVideo: { maxTotalBytes: 16 },
+      }
+    },
+    async evaluate(request) {
+      backupCalls++
+      assert.deepEqual(request.audio, audio)
+      assert.deepEqual(request.videos, videos)
+      return ok
+    },
+  })
+
+  const result = await ctx.system1.decide({
+    state: 'sample',
+    questions,
+    audio,
+    videos,
+  })
+
+  assert.equal(result.answers.q.status, 'ok')
+  assert.equal(preferredCalls, 0)
+  assert.equal(backupCalls, 1)
+  assert.equal(result.meta.executed?.provider, 'backup')
+  assert.deepEqual(result.meta.attempts?.map(({ error }) => error.code), [
+    'unsupported',
+  ])
+})
+
+test('audio/video capability preflight checks format, count, item size, and shared size', async (t) => {
+  const { ctx } = await setup(t)
+  let capabilities: ModelCapabilities = {
+    primitives: ['noul'],
+    audio: { formats: ['audio/mpeg'], maxCount: 1, maxBytesPerItem: 2 },
+    videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
+    audioVideo: { maxTotalBytes: 5 },
+  }
+  let evaluateCalls = 0
+  ctx.system1.registerProvider('test', {
+    async describe() {
+      return capabilities
+    },
+    async evaluate() {
+      evaluateCalls++
+      return ok
+    },
+  })
+  const base = { state: 'sample', questions }
+  const cases = [
+    {
+      request: { ...base, audio: [{ mediaType: 'audio/wav', data: 'AA==' }] },
+      code: 'unsupported',
+    },
+    {
+      request: {
+        ...base,
+        audio: [
+          { mediaType: 'audio/mpeg', data: 'AA==' },
+          { mediaType: 'audio/mpeg', data: 'AA==' },
+        ],
+      },
+      code: 'limit_exceeded',
+    },
+    {
+      request: { ...base, audio: [{ mediaType: 'audio/mpeg', data: 'AAAA' }] },
+      code: 'limit_exceeded',
+    },
+    {
+      request: {
+        ...base,
+        audio: [{ mediaType: 'audio/mpeg', data: 'AAAA' }],
+        videos: [{ mediaType: 'video/mp4', data: 'AAAA' }],
+      },
+      code: 'limit_exceeded',
+    },
+  ] as const
+
+  for (const { request, code } of cases) {
+    const result = await ctx.system1.decide(request)
+    assert.equal(
+      result.answers.q.status === 'error' && result.answers.q.error.code,
+      code,
+    )
+  }
+  assert.equal(evaluateCalls, 0)
 })
 
 test('model question limit falls back to a model with sufficient capacity', async (t) => {

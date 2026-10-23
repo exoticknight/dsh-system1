@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Give agents and plugins structured results for classifying content, filtering candidates, scoring against criteria, and locating objects in images. One interface works with TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers; callers decide what happens next.** The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
+**Give agents and plugins structured, per-question results for classifying content, filtering candidates, scoring criteria, and locating objects in images.** Requests can include text, images, audio, and video where the provider and model support them; one interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers. Callers decide what happens next. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -28,7 +28,7 @@ Built-in providers:
 
 - **TypeSafe** (`typesafe`): hosted Jev models with PNG/JPEG input and optional 262k context; `box` requires `jev-1.14.0` or `jev-preview`.
 - **Laya** (`laya`): a self-hosted [Laya server](https://github.com/NandhaKishorM/laya); API key optional; text only.
-- **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, `clef-omni` with PNG/JPEG/WebP input; can also point at a local Clef service.
+- **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, and `clef-omni` accept PNG/JPEG/WebP; Omni also accepts audio and video. Can also point at a local Clef service.
 
 Other backends can implement the public provider contract.
 

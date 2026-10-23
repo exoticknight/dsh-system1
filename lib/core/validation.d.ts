@@ -31,6 +31,14 @@ export declare function parseRequest(input: unknown): {
         mediaType: "image/jpeg" | "image/png" | "image/webp";
         data: string;
     }[] | undefined;
+    audio?: {
+        mediaType: "audio/mpeg" | "audio/wav";
+        data: string;
+    }[] | undefined;
+    videos?: {
+        mediaType: "video/mp4" | "video/webm";
+        data: string;
+    }[] | undefined;
     longContext?: boolean | undefined;
     model?: {
         provider: string;
@@ -82,6 +90,25 @@ export declare const capabilitiesSchema: z.ZodObject<{
         }>>;
         maxCount: z.ZodOptional<z.ZodNumber>;
         maxBytesPerImage: z.ZodOptional<z.ZodNumber>;
+        maxTotalBytes: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>;
+    audio: z.ZodOptional<z.ZodObject<{
+        formats: z.ZodArray<z.ZodEnum<{
+            "audio/mpeg": "audio/mpeg";
+            "audio/wav": "audio/wav";
+        }>>;
+        maxCount: z.ZodOptional<z.ZodNumber>;
+        maxBytesPerItem: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>;
+    videos: z.ZodOptional<z.ZodObject<{
+        formats: z.ZodArray<z.ZodEnum<{
+            "video/mp4": "video/mp4";
+            "video/webm": "video/webm";
+        }>>;
+        maxCount: z.ZodOptional<z.ZodNumber>;
+        maxBytesPerItem: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>;
+    audioVideo: z.ZodOptional<z.ZodObject<{
         maxTotalBytes: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strict>>;
     longContext: z.ZodOptional<z.ZodObject<{

@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.3.2",
-  "description": "Structured results for agents and plugins: classify content, filter candidates, score against criteria, and locate objects in images. One interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers; callers choose what happens next.",
+  "description": "Structured, per-question results for agents and plugins: classify, filter, score, and locate objects in images, with text, image, audio, and video inputs where supported",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [
@@ -97,7 +97,8 @@
       "dshReleases": {
         "0.1.7-rc.1": "compatible",
         "0.1.7-rc.2": "compatible",
-        "0.2.0-rc.2": "compatible"
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-rc.2": "compatible"
       },
       "profiles": [
         "headless",

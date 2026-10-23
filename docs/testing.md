@@ -50,14 +50,14 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.0-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.1-rc.2
 ```
 
 pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的原生构建脚本，应检查包是否已安装后单独运行探针。
 
 ## Cloudflare 凭据
 
-Workers AI 免费额度为每天 10,000 Neurons，Workers Free 与 Paid 计划都有，不需要绑定付款方式。`clef-flash` 约 8,182 Neurons / 百万输入 tokens，一次探针约几百 tokens。免费计划超出额度时请求失败而不扣费。价格见 [Workers AI 定价](https://developers.cloudflare.com/workers-ai/platform/pricing/)。
+实时探针会向 Cloudflare 发送实际推理请求。运行前确认账户权限、配额和费用设置适合本次验证。
 
 1. 打开 [Workers AI 控制台](https://dash.cloudflare.com/?to=/:account/ai/workers-ai)，选择 **Use REST API**。
 2. 选择 **Create a Workers AI API Token**，保留预填权限（`Workers AI - Read`、`Workers AI - Edit`），创建并复制 token。
