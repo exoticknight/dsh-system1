@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import type { Question } from '../contracts/question.js';
 import type { QuestionResult } from '../contracts/answer.js';
+export declare const MAX_ATTACHMENT_COUNT_PER_TYPE = 16;
+export declare const MAX_ATTACHMENT_BYTES: number;
+export declare const MAX_TOTAL_ATTACHMENT_BYTES: number;
+export declare const MAX_ATTACHMENT_BASE64_LENGTH: number;
 export declare const modelSchema: z.ZodObject<{
     provider: z.ZodString;
     model: z.ZodString;
@@ -31,6 +35,14 @@ export declare function parseRequest(input: unknown): {
         mediaType: "image/jpeg" | "image/png" | "image/webp";
         data: string;
     }[] | undefined;
+    audio?: {
+        mediaType: "audio/mpeg" | "audio/wav";
+        data: string;
+    }[] | undefined;
+    videos?: {
+        mediaType: "video/mp4" | "video/webm";
+        data: string;
+    }[] | undefined;
     longContext?: boolean | undefined;
     model?: {
         provider: string;
@@ -39,6 +51,7 @@ export declare function parseRequest(input: unknown): {
     timeoutMs?: number | undefined;
     signal?: AbortSignal | undefined;
 };
+export declare function decodedBase64Length(data: string): number;
 export declare const errorSchema: z.ZodObject<{
     code: z.ZodEnum<{
         cancelled: "cancelled";
@@ -71,17 +84,36 @@ export declare const capabilitiesSchema: z.ZodObject<{
         noul: "noul";
         score: "score";
     }>>;
-    maxQuestions: z.ZodOptional<z.ZodNumber>;
-    maxChoiceOptions: z.ZodOptional<z.ZodNumber>;
-    maxScoreLevels: z.ZodOptional<z.ZodNumber>;
+    maxQuestions: z.ZodNullable<z.ZodNumber>;
+    maxChoiceOptions: z.ZodNullable<z.ZodNumber>;
+    maxScoreLevels: z.ZodNullable<z.ZodNumber>;
     images: z.ZodOptional<z.ZodObject<{
         formats: z.ZodArray<z.ZodEnum<{
             "image/jpeg": "image/jpeg";
             "image/png": "image/png";
             "image/webp": "image/webp";
         }>>;
-        maxCount: z.ZodOptional<z.ZodNumber>;
-        maxBytesPerImage: z.ZodOptional<z.ZodNumber>;
+        maxCount: z.ZodNumber;
+        maxBytesPerImage: z.ZodNumber;
+        maxTotalBytes: z.ZodNumber;
+    }, z.core.$strict>>;
+    audio: z.ZodOptional<z.ZodObject<{
+        formats: z.ZodArray<z.ZodEnum<{
+            "audio/mpeg": "audio/mpeg";
+            "audio/wav": "audio/wav";
+        }>>;
+        maxCount: z.ZodNumber;
+        maxBytesPerItem: z.ZodNumber;
+    }, z.core.$strict>>;
+    videos: z.ZodOptional<z.ZodObject<{
+        formats: z.ZodArray<z.ZodEnum<{
+            "video/mp4": "video/mp4";
+            "video/webm": "video/webm";
+        }>>;
+        maxCount: z.ZodNumber;
+        maxBytesPerItem: z.ZodNumber;
+    }, z.core.$strict>>;
+    audioVideo: z.ZodOptional<z.ZodObject<{
         maxTotalBytes: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strict>>;
     longContext: z.ZodOptional<z.ZodObject<{

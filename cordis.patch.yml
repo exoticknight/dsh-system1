@@ -3,7 +3,6 @@
       name: dsh-system1
       config:
         defaultModel: { provider: typesafe, model: jev-latest }
-        timeoutMs: 800
     - id: system1-typesafe
       name: dsh-system1/providers/typesafe
       config:
@@ -16,6 +15,12 @@
         id: laya
         apiKeyEnv: LAYA_API_KEY
         baseURL: http://127.0.0.1:8000
+    - id: system1-nace
+      name: dsh-system1/providers/nace
+      config:
+        id: nace
+        apiKeyEnv: NACE_API_KEY
+        baseURL: https://console.nace.ai
     - id: system1-cloudflare
       name: dsh-system1/providers/cloudflare
       config:

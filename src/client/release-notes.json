@@ -1,40 +1,80 @@
 {
-  "0.3.2": {
-    "id": "0.3.2",
-    "version": "0.3.2",
+  "0.3.3": {
+    "id": "0.3.3",
+    "version": "0.3.3",
     "highlights": {
       "zh": [
         {
-          "kind": "fixed",
-          "title": "切到后台时不再错过更新提示",
-          "description": "新版加载时如果页面恰好不在前台，更新摘要会在回到页面后再出现，而不是被跳过。"
+          "kind": "added",
+          "title": "新增 Nace.AI Drex provider",
+          "description": "可选择 drex-v1.5、drex-v2.0 或 drex-max；Max 支持图片输入，设置页默认选用 drex-v2.0。"
+        },
+        {
+          "kind": "added",
+          "title": "Clef-omni 支持音频和视频",
+          "description": "Cloudflare Clef-omni 现在可接收音频与视频附件；其他 Clef 模型仍支持图片。"
         },
         {
           "kind": "fixed",
-          "title": "HTTP 地址下多标签页的更新提示不再卡住",
-          "description": "通过局域网 HTTP 地址使用时，关闭或刷新一个标签页不会再让其他标签页的更新提示延迟约 30 秒。"
-        },
-        {
-          "kind": "fixed",
-          "title": "更新提示的诊断日志更准确",
-          "description": "无法展示更新摘要时，日志会写明具体原因，同类问题不再重复刷屏。"
+          "title": "修复 Drex 概率舍入后的结果校验",
+          "description": "Drex 概率经四位小数舍入后略偏离 1 时，只要仍在舍入误差范围内，现在也能正常返回结果。"
         }
       ],
       "en": [
         {
-          "kind": "fixed",
-          "title": "Update notices are no longer missed in background tabs",
-          "description": "If the page is not in the foreground when a new release loads, the summary now appears once you return instead of being skipped."
+          "kind": "added",
+          "title": "Add the Nace.AI Drex provider",
+          "description": "Choose drex-v1.5, drex-v2.0, or drex-max. Max accepts images, and provider settings default to drex-v2.0."
+        },
+        {
+          "kind": "added",
+          "title": "Clef-omni accepts audio and video",
+          "description": "Cloudflare Clef-omni can now receive audio and video attachments; the other Clef models continue to support images."
         },
         {
           "kind": "fixed",
-          "title": "Update notices no longer stall across tabs on HTTP addresses",
-          "description": "On a plain HTTP LAN address, closing or reloading one tab no longer delays the update notice in other tabs by about 30 seconds."
+          "title": "Accept Drex probabilities rounded to four decimal places",
+          "description": "Drex results now pass validation when rounded probabilities differ slightly from 1 but remain within the rounding-error bound."
+        }
+      ]
+    }
+  },
+  "0.4.0": {
+    "id": "0.4.0",
+    "version": "0.4.0",
+    "highlights": {
+      "zh": [
+        {
+          "kind": "migration",
+          "title": "超时改为按 provider 配置",
+          "description": "请求仍可逐次覆盖超时；provider 设置页现在各自控制默认超时。服务级 timeoutMs 已移除，旧服务配置中的残留值会被忽略。"
         },
         {
-          "kind": "fixed",
-          "title": "Clearer update notice diagnostics",
-          "description": "When the summary cannot be shown, the log now states the reason, and repeated causes are logged only once."
+          "kind": "migration",
+          "title": "第三方 provider 契约更新",
+          "description": "自定义 provider 需实现 timeoutMs()，并显式声明问题数量上限及每种支持附件的数量、字节上限。"
+        },
+        {
+          "kind": "improved",
+          "title": "统一附件资源保护与 provider 一致性检查",
+          "description": "公共层为附件设置安全上限，并以一致性套件核对内置模型的能力、原语、附件和实际响应。"
+        }
+      ],
+      "en": [
+        {
+          "kind": "migration",
+          "title": "Configure timeouts per provider",
+          "description": "Calls can still override timeouts individually; provider settings now control each provider's default. Service-level timeoutMs was removed, and residual values in old service configuration are ignored."
+        },
+        {
+          "kind": "migration",
+          "title": "Update custom provider contracts",
+          "description": "Custom providers must implement timeoutMs() and explicitly declare question limits and count/byte limits for each supported attachment type."
+        },
+        {
+          "kind": "improved",
+          "title": "Bound shared attachment resources and verify provider conformance",
+          "description": "The shared layer now enforces attachment safety ceilings, and a conformance suite checks built-in model capabilities, primitives, attachments, and real response normalization."
         }
       ]
     }

@@ -3,9 +3,15 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { Context, Service } from '@deepseek-ai/cordis'
 import System1Service, {
+  type ModelCapabilities,
   type System1Options,
   type System1Provider,
 } from '../../src/index.js'
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_COUNT_PER_TYPE,
+  MAX_TOTAL_ATTACHMENT_BYTES,
+} from '../../src/core/validation.js'
 import * as tool from '../../src/tool/index.js'
 
 interface Registered {
@@ -33,8 +39,9 @@ class FakeTools extends Service {
 }
 
 const provider: System1Provider = {
+  timeoutMs: () => 800,
   async describe() {
-    return { primitives: ['noul', 'choice', 'score'] }
+    return capabilitiesFor(['noul', 'choice', 'score'])
   },
   async evaluate(request) {
     assert.equal(request.state, 'I want my money back')
@@ -57,6 +64,19 @@ const provider: System1Provider = {
       },
     }
   },
+}
+
+function capabilitiesFor(
+  primitives: ModelCapabilities['primitives'],
+  overrides: Partial<ModelCapabilities> = {},
+): ModelCapabilities {
+  return {
+    primitives,
+    maxQuestions: null,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
+    ...overrides,
+  }
 }
 
 async function setup(
@@ -110,6 +130,34 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   assert.match(definition.description, /confidence.*backend/i)
   assert.match(definition.description, /not.*calibrated/i)
   assert.match(definition.description, /every provider fails.*model is omitted/i)
+  assert.match(definition.description, /audio, and video attachments/i)
+  const inputProperties = definition.parameters.properties as Record<
+    string,
+    {
+      type?: string
+      maxItems?: number
+      description?: string
+      items?: { properties?: Record<string, unknown> }
+    }
+  >
+  const expectedLimits = `${MAX_ATTACHMENT_COUNT_PER_TYPE} items, ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB per item, ${MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024)} MiB total decoded across all attachment types`
+  assert.equal(inputProperties.images?.maxItems, MAX_ATTACHMENT_COUNT_PER_TYPE)
+  assert.match(inputProperties.images?.description ?? '', new RegExp(expectedLimits))
+  assert.match(inputProperties.images?.description ?? '', /TypeSafe supports PNG and JPEG; Cloudflare and Nace drex-max also support WebP/u)
+  assert.equal(inputProperties.audio?.type, 'array')
+  assert.equal(inputProperties.audio?.maxItems, MAX_ATTACHMENT_COUNT_PER_TYPE)
+  assert.match(inputProperties.audio?.description ?? '', new RegExp(expectedLimits))
+  assert.equal(inputProperties.videos?.type, 'array')
+  assert.equal(inputProperties.videos?.maxItems, MAX_ATTACHMENT_COUNT_PER_TYPE)
+  assert.match(inputProperties.videos?.description ?? '', new RegExp(expectedLimits))
+  assert.deepEqual(
+    (inputProperties.audio?.items?.properties?.mediaType as { enum: string[] }).enum,
+    ['audio/wav', 'audio/mpeg'],
+  )
+  assert.deepEqual(
+    (inputProperties.videos?.items?.properties?.mediaType as { enum: string[] }).enum,
+    ['video/mp4', 'video/webm'],
+  )
   const outputProperties = definition.output.schema.properties as Record<
     string,
     { type?: string; items?: { properties?: Record<string, unknown> } }
@@ -119,6 +167,44 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   assert.ok(outputProperties.fallbacks?.items?.properties?.error)
   await fiber.dispose()
   assert.equal(tools.registered.has(tool.TOOL_NAME), false)
+})
+
+test('agent tool forwards audio and video attachments to decide', async (t) => {
+  const audio = [{ mediaType: 'audio/mpeg', data: 'bXAz' }] as const
+  const videos = [{ mediaType: 'video/mp4', data: 'bXA0' }] as const
+  const { tools } = await setup(t, {}, {
+    ...provider,
+    async describe() {
+      return capabilitiesFor(['noul', 'choice', 'score'], {
+        audio: { formats: ['audio/mpeg'], maxCount: 4, maxBytesPerItem: 8 },
+        videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
+        audioVideo: { maxTotalBytes: 16 },
+      })
+    },
+    async evaluate(request) {
+      assert.deepEqual(request.audio, audio)
+      assert.deepEqual(request.videos, videos)
+      return {
+        model: 'actual',
+        answers: {
+          q: { status: 'ok', answer: { type: 'noul', probabilityTrue: 0.8 } },
+        },
+      }
+    },
+  })
+  const definition = tools.registered.get(tool.TOOL_NAME)!
+  const value = await definition.execute({
+    state: 'Review the recording and clip.',
+    audio,
+    videos,
+    questions: [{ id: 'q', type: 'noul', instructions: 'Does the audio match the video?' }],
+  }, { signal: new AbortController().signal }) as {
+    answers: Record<string, { status: string }>
+  }
+  assert.deepEqual(value.answers.q, {
+    status: 'ok',
+    answer: { type: 'noul', probabilityTrue: 0.8 },
+  })
 })
 
 test('bundle mounts the agent tool entry enabled by default', () => {

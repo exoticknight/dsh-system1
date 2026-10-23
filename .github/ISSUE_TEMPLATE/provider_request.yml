@@ -1,0 +1,46 @@
+name: Provider request / 请求接入提供商
+description: Request support for a decision-service provider / 请求接入决策服务提供商
+title: "[Provider request] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本项目接入能返回结构化 System One 判断结果的服务；仅提供普通文本生成 API 的服务不适用。
+        This project integrates services that return structured System One judgments; a text-generation-only API is not sufficient.
+  - type: input
+    id: provider
+    attributes:
+      label: 提供商或服务名称 / Provider or service name
+      placeholder: TypeSafe, Laya, ...
+    validations:
+      required: true
+  - type: input
+    id: documentation
+    attributes:
+      label: 官方 API 文档 / Official API documentation
+      description: 请提供 API、认证和响应格式的官方文档链接。 / Link the official API, authentication, and response-format documentation.
+      placeholder: https://...
+    validations:
+      required: true
+  - type: textarea
+    id: system_one_support
+    attributes:
+      label: System One 判断能力 / System One decision support
+      description: 它如何返回是否、选择、评分或图片定位等结构化结果？如果暂不确定，请说明。 / How does it return structured yes/no, choice, score, or image-box judgments? If unknown, say so.
+      placeholder: API endpoint, request/response example, supported judgment types...
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 使用场景 / Use case
+      description: 哪些用户会受益，为什么现有 provider 不够用？ / Who would benefit, and why are existing providers insufficient?
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: 其他信息 / Additional context
+      description: 限制、费用、可用地区或其他相关信息。 / Relevant limits, cost, availability, or other details.
+    validations:
+      required: false

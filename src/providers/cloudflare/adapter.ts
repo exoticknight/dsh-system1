@@ -9,6 +9,8 @@ export interface CloudflareOptions {
   apiKey?: string
   accountId?: string
   baseURL?: string
+  timeoutMs?: number
+  resolveTimeoutMs?: () => number | undefined
   resolveApiKey?: () => string | undefined | Promise<string | undefined>
   resolveAccountId?: () => string | undefined | Promise<string | undefined>
   resolveBaseURL?: () => string | undefined
@@ -16,6 +18,7 @@ export interface CloudflareOptions {
 }
 
 type CloudflareModelId = (typeof CLOUDFLARE_MODELS)[number]['id']
+const DEFAULT_TIMEOUT_MS = 800
 
 const MAX_TOKENS_BY_MODEL: Readonly<Record<CloudflareModelId, number>> = {
   clef: 65_536,
@@ -32,12 +35,27 @@ function resolveCloudflareModel(model: string) {
 const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
   primitives: ['noul', 'choice', 'score'],
   maxQuestions: 64,
+  maxChoiceOptions: null,
+  maxScoreLevels: null,
   images: {
     formats: ['image/png', 'image/jpeg', 'image/webp'],
     maxCount: 4,
     maxBytesPerImage: 4 * 1024 * 1024,
     maxTotalBytes: 8 * 1024 * 1024,
   },
+}
+const OMNI_CAPABILITIES: Pick<ModelCapabilities, 'audio' | 'videos' | 'audioVideo'> = {
+  audio: {
+    formats: ['audio/wav', 'audio/mpeg'],
+    maxCount: 4,
+    maxBytesPerItem: 8 * 1024 * 1024,
+  },
+  videos: {
+    formats: ['video/mp4', 'video/webm'],
+    maxCount: 2,
+    maxBytesPerItem: 16 * 1024 * 1024,
+  },
+  audioVideo: { maxTotalBytes: 16 * 1024 * 1024 },
 }
 
 /** Cloudflare REST transport for the native System One Clef models. */
@@ -46,6 +64,7 @@ export function createCloudflareProvider(
 ): System1Provider {
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
+    timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     async describe(model) {
       const selectedModel = resolveCloudflareModel(model)
       if (!selectedModel)
@@ -55,6 +74,7 @@ export function createCloudflareProvider(
         })
       return {
         ...CAPABILITIES,
+        ...(selectedModel.id === 'clef-omni' ? OMNI_CAPABILITIES : {}),
         context: { maxTokens: selectedModel.maxTokens, includesQuestions: true },
       }
     },
@@ -105,6 +125,20 @@ export function createCloudflareProvider(
               ...(request.images?.length
                 ? {
                     images: request.images.map(
+                      ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
+                    ),
+                  }
+                : {}),
+              ...(request.audio?.length
+                ? {
+                    audio: request.audio.map(
+                      ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
+                    ),
+                  }
+                : {}),
+              ...(request.videos?.length
+                ? {
+                    videos: request.videos.map(
                       ({ mediaType, data }) => `data:${mediaType};base64,${data}`,
                     ),
                   }

@@ -12,6 +12,7 @@ declare const wireResponse: z.ZodObject<{
 export interface SystemOneHttpProviderOptions {
     readonly providerName: string;
     readonly defaultBaseURL: string;
+    readonly timeoutMs: () => number;
     readonly resolveApiKey: () => string | undefined | Promise<string | undefined>;
     readonly resolveBaseURL?: () => string | undefined;
     readonly apiKeyRequired?: boolean;

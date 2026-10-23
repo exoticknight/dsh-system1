@@ -1,0 +1,50 @@
+name: Bug report / 问题反馈
+description: Report a reproducible problem with dsh-system1 / 反馈 dsh-system1 中可复现的问题
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先搜索已有 issue。提交日志前请删除 API Key、Token 和其他敏感信息。
+        Please search existing issues first. Remove API keys, tokens, and other sensitive data from logs.
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题是什么？ / What happened?
+      description: 描述实际发生的情况。 / Describe what you observed.
+      placeholder: 清楚、简短地描述问题 / A concise description of the problem
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 如何复现？ / Steps to reproduce
+      description: 列出触发问题的具体步骤和配置。 / List the exact steps and relevant configuration.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果与实际结果 / Expected and actual behavior
+      description: 说明你希望发生什么，以及实际发生了什么。 / Explain what you expected and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: 版本信息 / Versions
+      description: 请填写 dsh-system1、DSH 和 Node.js 版本（如适用）。 / Include dsh-system1, DSH, and Node.js versions where applicable.
+      placeholder: dsh-system1 0.x, DSH 0.x, Node.js 22.x
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志或补充信息 / Logs or additional context
+      description: 粘贴最小相关片段，并确认已删除密钥、Token 和隐私数据。 / Share the smallest relevant excerpt after removing secrets and personal data.
+      render: text
+    validations:
+      required: false

@@ -3,6 +3,8 @@ export interface CloudflareOptions {
     apiKey?: string;
     accountId?: string;
     baseURL?: string;
+    timeoutMs?: number;
+    resolveTimeoutMs?: () => number | undefined;
     resolveApiKey?: () => string | undefined | Promise<string | undefined>;
     resolveAccountId?: () => string | undefined | Promise<string | undefined>;
     resolveBaseURL?: () => string | undefined;

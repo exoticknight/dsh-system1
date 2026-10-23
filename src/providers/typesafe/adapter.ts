@@ -4,9 +4,13 @@ import { findProviderModel } from '../models.js'
 import { TYPESAFE_MODELS } from './models.js'
 import { createSystemOneHttpProvider } from '../systemone.js'
 
+const DEFAULT_TIMEOUT_MS = 800
+
 export interface TypesafeOptions {
   apiKey: string
   baseURL?: string
+  timeoutMs?: number
+  resolveTimeoutMs?: () => number | undefined
   resolveApiKey?: () => string | undefined | Promise<string | undefined>
   resolveBaseURL?: () => string | undefined
   fetch?: typeof fetch
@@ -18,6 +22,7 @@ export function createTypesafeProvider(
   return createSystemOneHttpProvider({
     providerName: 'TypeSafe',
     defaultBaseURL: options.baseURL ?? 'https://api.typesafe.ai',
+    timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     resolveApiKey: options.resolveApiKey ?? (() => options.apiKey),
     ...(options.resolveBaseURL ? { resolveBaseURL: options.resolveBaseURL } : {}),
     apiKeyRequired: true,
@@ -29,10 +34,12 @@ export function createTypesafeProvider(
         'score',
         ...(model === 'jev-1.14.0' || model === 'jev-preview' ? ['box' as const] : []),
       ],
+      maxQuestions: null,
       maxChoiceOptions: 255,
       maxScoreLevels: 10,
       images: {
         formats: ['image/png', 'image/jpeg'],
+        maxCount: 4,
         maxBytesPerImage: 16 * 1024 * 1024,
         maxTotalBytes: 16 * 1024 * 1024,
       },

@@ -4,6 +4,7 @@
       "dsh-system1": ["./src/index.ts"],
       "dsh-system1/contracts": ["./src/contracts/index.ts"],
       "dsh-system1/providers": ["./src/providers/index.ts"],
+      "dsh-system1/providers/nace": ["./src/providers/nace/index.ts"],
       "dsh-system1/providers/typesafe": ["./src/providers/typesafe/index.ts"],
       "dsh-system1/providers/cloudflare": ["./src/providers/cloudflare/index.ts"]
     },

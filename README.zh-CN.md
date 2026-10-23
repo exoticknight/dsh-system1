@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**调用 System One 模型做是非、选择、评分和图片定位判断，并返回概率。** agent 可以直接调用内置的 `system1_decide` 工具，插件可以调用 `ctx.system1.decide()`。结果按题返回，不生成文本，下一步由调用方决定。
+**让 Agent 和插件把内容分类、筛选候选、按标准评分或图片定位交给决策模型，并拿到逐题结构化结果。** Provider 和模型支持时，请求可包含文本、图片、音频和视频；统一接口支持 TypeSafe/Jev、Laya、Cloudflare/Clef 和自定义 provider。后续动作由调用方决定。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -28,7 +28,8 @@
 
 - **TypeSafe**（`typesafe`）：托管的 Jev 模型，支持 PNG/JPEG 图片和可选的 262k 上下文；`box` 需要 `jev-1.14.0` 或 `jev-preview`。
 - **Laya**（`laya`）：自建的 [Laya 服务](https://github.com/NandhaKishorM/laya)，API Key 可选，仅支持文本。
-- **Cloudflare**（`cloudflare`）：`clef`、`clef-flash`、`clef-omni`，支持 PNG/JPEG/WebP 图片；也可以接本地 Clef 服务。
+- **Nace.AI Drex**（`nace`）：托管模型 `drex-v2.0`、`drex-v1.5`，以及支持图片的 `drex-max`。
+- **Cloudflare**（`cloudflare`）：`clef`、`clef-flash` 和 `clef-omni` 支持 PNG/JPEG/WebP 图片；Omni 还支持音频与视频。也可以接本地 Clef 服务。
 
 其他后端可实现公开的 provider 契约。
 
@@ -48,9 +49,9 @@ dsh plugin --profile <profile> add dsh-system1
 
 `dsh plugin` 命令必须指定 profile；安装到一个 profile 不会在其他 profile 中启用该插件。如需从 GitHub 仓库安装，在上述命令中把 `dsh-system1` 替换为 `github:exoticknight/dsh-system1`。
 
-随包提供的 patch 会挂载服务及内置 provider。默认模型为 `jev-latest`、provider id 为 `typesafe`，每次模型尝试的默认超时为 800 ms。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整 `timeoutMs`，本地 CPU 推理通常需要更长预算。
+随包提供的 patch 会挂载服务及内置 provider。服务默认使用 `typesafe` 的 `jev-latest`。每次尝试优先采用调用显式指定的 `timeoutMs`，否则使用该 provider 的配置值或自身默认值：TypeSafe、Laya、Cloudflare 为 800 ms，Nace 为 60,000 ms。请在对应 provider 的设置页配置超时。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整所选 provider 的 `timeoutMs`，本地 CPU 推理通常需要更长预算。
 
-Cloudflare 使用 `cloudflare` provider 的 `clef`、`clef-flash` 或 `clef-omni`。配置步骤见[模型服务配置](docs/providers.md)。
+各 provider 的模型能力、凭据、端点和图片限制见[模型服务配置](docs/providers.md)。
 
 ## 更新内容提示
 
@@ -112,7 +113,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-`pnpm test` 使用本地 fixture 运行插件和 provider 测试，与 CI 相同；`pnpm test <plugin|providers|provider 名>` 只运行其中一部分。真实模型探针 `pnpm probe <typesafe|cloudflare|laya|clef-local>` 读取 `.env.local` 中的凭据，本地 target 首次运行时自动准备服务，见[测试与真实模型验证](docs/testing.md)。
+`pnpm test` 使用本地 fixture 运行插件和 provider 测试，与 CI 相同；`pnpm test <plugin|providers|provider 名>` 只运行其中一部分。真实模型探针 `pnpm probe <typesafe|nace|cloudflare|laya|clef-local>` 读取 `.env.local` 中的凭据；托管 provider 探针会发送真实请求并使用账户额度，本地 target 首次运行时自动准备服务。详见[测试与真实模型验证](docs/testing.md)。
 
 更多内容见[贡献指南](CONTRIBUTING.zh-CN.md)和[发布流程](docs/releasing.md)。
 

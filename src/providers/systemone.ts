@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from 'node:util'
 import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js'
 import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js'
 import { System1ProviderError } from '../contracts/error.js'
+import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from './answers.js'
 
 const wireAnswer = z.discriminatedUnion('type', [
   z.object({ type: z.literal('noul'), noul: z.number() }),
@@ -15,7 +16,7 @@ const wireAnswer = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('score'),
     score: z.number(),
-    legend: z.record(z.string(), z.unknown()).optional(),
+    legend: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]).optional(),
     probabilities: z.record(z.string(), z.number()),
     confidence: z.number().optional(),
   }),
@@ -43,6 +44,7 @@ const wireResponse = z.object({
 export interface SystemOneHttpProviderOptions {
   readonly providerName: string
   readonly defaultBaseURL: string
+  readonly timeoutMs: () => number
   readonly resolveApiKey: () => string | undefined | Promise<string | undefined>
   readonly resolveBaseURL?: () => string | undefined
   readonly apiKeyRequired?: boolean
@@ -70,6 +72,7 @@ export function createSystemOneHttpProvider(
 ): System1Provider {
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
+    timeoutMs: options.timeoutMs,
     async describe(model) {
       const selectedModel = options.resolveModel(model)
       if (!selectedModel)
@@ -79,7 +82,12 @@ export function createSystemOneHttpProvider(
         })
       return typeof options.capabilities === 'function'
         ? options.capabilities(selectedModel.id)
-        : options.capabilities ?? { primitives: ['noul', 'choice', 'score'] }
+        : options.capabilities ?? {
+            primitives: ['noul', 'choice', 'score'],
+            maxQuestions: null,
+            maxChoiceOptions: null,
+            maxScoreLevels: null,
+          }
     },
     async evaluate(request, signal) {
       const selectedModel = options.resolveModel(request.model)
@@ -218,18 +226,9 @@ function normalizeAnswers(
         return [id, invalidAnswer()]
 
       const answer = parsed.data
-      if (answer.type === 'noul')
-        return [id, { status: 'ok', answer: { type: 'noul', probabilityTrue: answer.noul } }]
+      if (answer.type === 'noul') return [id, noulAnswer(answer.noul)]
       if (answer.type === 'choice')
-        return [id, {
-          status: 'ok',
-          answer: {
-            type: 'choice',
-            value: answer.choice,
-            probabilities: answer.probabilities,
-            ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
-          },
-        }]
+        return [id, choiceAnswer(answer.choice, answer.probabilities, answer.confidence)]
       if (answer.type === 'box')
         return [id, {
           status: 'ok',
@@ -245,12 +244,13 @@ function normalizeAnswers(
       if (question.type !== 'score') return [id, invalidAnswer()]
       if (
         answer.legend !== undefined &&
-        !isDeepStrictEqual(
-          answer.legend,
-          Object.fromEntries(
-            question.criteria.map((value, index) => [String(index), value]),
-          ),
-        )
+        (!answer.legend || Array.isArray(answer.legend) ||
+          !isDeepStrictEqual(
+            answer.legend,
+            Object.fromEntries(
+              question.criteria.map((value, index) => [String(index), value]),
+            ),
+          ))
       )
         return [id, invalidAnswer()]
       const probabilities = question.criteria.map((_, index) => {
@@ -259,29 +259,16 @@ function normalizeAnswers(
       })
       if (probabilities.some((probability) => probability === undefined))
         return [id, invalidAnswer()]
-      return [id, {
-        status: 'ok',
-        answer: {
-          type: 'score',
-          value: answer.score,
-          levels: question.criteria,
-          probabilities,
-          ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
-        },
-      }]
+      return [id, scoreAnswer(
+        answer.score,
+        question.criteria,
+        probabilities as number[],
+        answer.confidence,
+      )]
     }),
   )
 }
 
-function invalidAnswer() {
-  return {
-    status: 'error',
-    error: {
-      code: 'invalid_response',
-      message: 'Provider returned an invalid answer.',
-    },
-  }
-}
 
 function modelField(model: string | undefined): { model?: string } {
   return model ? { model } : {}

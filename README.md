@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Ask System One models for yes/no, choice, score, and image-box judgments with probabilities.** The agent can call the built-in `system1_decide` tool, and plugins can call `ctx.system1.decide()`. Results come back per question instead of as generated text; the caller decides what to do next.
+**Give agents and plugins structured, per-question results for classifying content, filtering candidates, scoring criteria, and locating objects in images.** Requests can include text, images, audio, and video where the provider and model support them; one interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers. Callers decide what happens next. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -28,7 +28,8 @@ Built-in providers:
 
 - **TypeSafe** (`typesafe`): hosted Jev models with PNG/JPEG input and optional 262k context; `box` requires `jev-1.14.0` or `jev-preview`.
 - **Laya** (`laya`): a self-hosted [Laya server](https://github.com/NandhaKishorM/laya); API key optional; text only.
-- **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, `clef-omni` with PNG/JPEG/WebP input; can also point at a local Clef service.
+- **Nace.AI Drex** (`nace`): hosted `drex-v2.0`, `drex-v1.5`, and image-capable `drex-max`.
+- **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, and `clef-omni` accept PNG/JPEG/WebP; Omni also accepts audio and video. Can also point at a local Clef service.
 
 Other backends can implement the public provider contract.
 
@@ -48,9 +49,9 @@ dsh plugin --profile <profile> add dsh-system1
 
 The dsh plugin command requires a profile; installing into one profile does not activate the bundle in other profiles. To use the GitHub repository as the package source, replace `dsh-system1` in that command with `github:exoticknight/dsh-system1`.
 
-The bundled patch mounts the service and built-in providers. Defaults are model `jev-latest`, provider id `typesafe`, and an 800 ms timeout per model attempt. Use the plugin settings to choose a default service and model, add fallback models in the order they should be tried, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust `timeoutMs` to fit backend latency, especially for local CPU inference.
+The bundled patch mounts the service and built-in providers. The service defaults to model `jev-latest` on provider `typesafe`. Each attempt uses a request-level `timeoutMs` when supplied, then that provider's configured timeout or its own default: 800 ms for TypeSafe, Laya, and Cloudflare; 60,000 ms for Nace. Set a provider timeout in that provider's settings page. Use plugin settings to choose the service and model, add fallbacks in order, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust the selected provider's `timeoutMs` for backend latency, especially local CPU inference.
 
-Cloudflare uses provider `cloudflare` with `clef`, `clef-flash`, or `clef-omni`. See [provider setup](docs/providers.en.md) for configuration.
+See [provider setup](docs/providers.en.md) for model capabilities, credentials, endpoints, and image limits.
 
 ## Update notices
 
@@ -115,7 +116,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; see [testing and live model validation](docs/testing.en.md).
+`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|nace|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; hosted probes send real requests and can use account quota. See [testing and live model validation](docs/testing.en.md).
 
 See the [contribution guide](CONTRIBUTING.md) and [release process](docs/releasing.en.md).
 

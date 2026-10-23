@@ -74,6 +74,8 @@ test('Cloudflare Clef sends the REST contract and normalizes the System One resu
   assert.deepEqual(await provider.describe('clef', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 64,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
     images: {
       formats: ['image/png', 'image/jpeg', 'image/webp'],
       maxCount: 4,
@@ -141,12 +143,29 @@ test('Cloudflare Clef family routes model IDs and reports model-specific context
       assert.deepEqual(await provider.describe(model, new AbortController().signal), {
         primitives: ['noul', 'choice', 'score'],
         maxQuestions: 64,
+        maxChoiceOptions: null,
+        maxScoreLevels: null,
         images: {
           formats: ['image/png', 'image/jpeg', 'image/webp'],
           maxCount: 4,
           maxBytesPerImage: 4 * 1024 * 1024,
           maxTotalBytes: 8 * 1024 * 1024,
         },
+        ...(name === 'clef-omni'
+          ? {
+              audio: {
+                formats: ['audio/wav', 'audio/mpeg'],
+                maxCount: 4,
+                maxBytesPerItem: 8 * 1024 * 1024,
+              },
+              videos: {
+                formats: ['video/mp4', 'video/webm'],
+                maxCount: 2,
+                maxBytesPerItem: 16 * 1024 * 1024,
+              },
+              audioVideo: { maxTotalBytes: 16 * 1024 * 1024 },
+            }
+          : {}),
         context: { maxTokens, includesQuestions: true },
       })
       const result = await provider.evaluate({
@@ -160,6 +179,98 @@ test('Cloudflare Clef family routes model IDs and reports model-specific context
       })
     }
   }
+})
+
+test('Cloudflare keeps strict score legends and rejects array or stringified criteria', async () => {
+  const questions = [
+    {
+      type: 'score' as const,
+      instructions: 'Rate the issue.',
+      criteria: ['low', 'high'],
+    },
+    {
+      type: 'score' as const,
+      instructions: 'Rate the issue.',
+      criteria: [{ label: 'low' }, 'high'],
+    },
+  ]
+  const legends = [
+    ['low', 'high'],
+    { 0: '{"label":"low"}', 1: 'high' },
+  ]
+  for (let index = 0; index < questions.length; index++) {
+    const provider = createCloudflareProvider({
+      apiKey: 'fixture-token',
+      accountId: 'fixture-account',
+      fetch: async () => Response.json({ success: true, result: {
+        model: 'clef',
+        answers: { q: {
+          type: 'score',
+          score: 0.25,
+          legend: legends[index],
+          probabilities: { 0: 0.75, 1: 0.25 },
+        } },
+      } }),
+    })
+    const result = await provider.evaluate({
+      requestId: 'fixture',
+      model: 'clef',
+      state: 'sample',
+      questions: { q: questions[index]! },
+    }, new AbortController().signal)
+    assert.deepEqual(result.answers.q, {
+      status: 'error',
+      error: { code: 'invalid_response', message: 'Provider returned an invalid answer.' },
+    })
+  }
+})
+
+test('Cloudflare Clef-omni sends all media as top-level base64 data URLs', async () => {
+  const request: ProviderRequest = {
+    requestId: 'fixture',
+    model: 'clef-omni',
+    state: 'Review all evidence.',
+    questions: { q: { type: 'noul', instructions: 'Is the scene safe?' } },
+    images: [{ mediaType: 'image/png', data: 'aW1hZ2U=' }],
+    audio: [
+      { mediaType: 'audio/wav', data: 'd2F2ZQ==' },
+      { mediaType: 'audio/mpeg', data: 'bXAz' },
+    ],
+    videos: [
+      { mediaType: 'video/mp4', data: 'bXA0' },
+      { mediaType: 'video/webm', data: 'd2VibQ==' },
+    ],
+  }
+  const provider = createCloudflareProvider({
+    apiKey: 'fixture-token',
+    accountId: 'fixture-account',
+    fetch: async (_input, init) => {
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        model: 'clef-omni',
+        state: request.state,
+        images: ['data:image/png;base64,aW1hZ2U='],
+        audio: [
+          'data:audio/wav;base64,d2F2ZQ==',
+          'data:audio/mpeg;base64,bXAz',
+        ],
+        videos: [
+          'data:video/mp4;base64,bXA0',
+          'data:video/webm;base64,d2VibQ==',
+        ],
+        questions: request.questions,
+      })
+      return Response.json({ success: true, result: {
+        model: 'clef-omni',
+        answers: { q: { type: 'noul', noul: 0.8 } },
+      } })
+    },
+  })
+
+  const result = await provider.evaluate(request, new AbortController().signal)
+  assert.deepEqual(result.answers.q, {
+    status: 'ok',
+    answer: { type: 'noul', probabilityTrue: 0.8 },
+  })
 })
 
 test('Cloudflare rejects incomplete credentials and unsuccessful REST envelopes safely', async () => {

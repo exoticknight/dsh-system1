@@ -6,7 +6,7 @@ export declare class System1Engine {
     private readonly resolveOptions;
     constructor(options?: System1Options | (() => System1Options));
     private validateOptions;
-    registerProvider(id: string, provider: System1Provider): () => void;
+    registerProvider(id: string, provider: System1Provider, warn?: (message: string) => void): () => void;
     dispose(): void;
     decide<const Q extends Questions>(input: DecideRequest<Q>): Promise<DecideResponse<Q>>;
     private attempt;

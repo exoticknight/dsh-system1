@@ -6,11 +6,11 @@
 
 | 层级 | 命令 | 覆盖范围 |
 | --- | --- | --- |
-| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、每次尝试的超时预算、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
-| Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载。使用本地 HTTP fixture 或替换的 `fetch` |
+| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、请求/Provider 超时优先级、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
+| Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载，以及四个内置 provider 的目录、能力、超时和各支持原语往返一致性。使用本地 HTTP fixture 或替换的 `fetch` |
 | 真实模型探针 | `pnpm probe <target>` | 通过公共服务和 provider 插件入口调用真实模型 |
 
-`pnpm test` 运行前两层；`pnpm test <provider>` 只运行某个 provider，例如 `pnpm test laya`，可同时指定多个。测试文件位于 `tests/plugin/` 与 `tests/providers/<provider>.test.ts`；新增 provider 时添加对应的 provider 测试文件。
+`pnpm test` 运行前两层；`pnpm test <provider>` 只运行某个 provider，例如 `pnpm test nace`，可同时指定多个。Provider 通用一致性套件位于 `tests/providers/conformance.test.ts`，可用 `pnpm test conformance` 单独运行；新增 provider 时在其中登记模型目录、能力和 fixture，再添加对应的 provider 协议测试文件。
 
 ## 真实模型探针
 
@@ -19,6 +19,7 @@
 | Target | 类型 | 需要 | 可选环境变量 |
 | --- | --- | --- | --- |
 | `typesafe` | 托管 API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`，默认 `jev-1.13.0` |
+| `nace` | 托管 API | `NACE_API_KEY` | `NACE_MODEL`，默认 `drex-v2.0`；`NACE_BASE_URL` |
 | `cloudflare` | 托管 API | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`，默认 `clef-flash` |
 | `laya` | 本地服务 | Python；首次运行自动准备 | `LAYA_BASE_URL`、`LAYA_MODEL`（默认 `auto`）、`LAYA_TIMEOUT_MS`、`LAYA_API_KEY` |
 | `clef-local` | 本地服务 | Python、Git LFS；首次运行自动准备 | `CLEF_LOCAL_PORT`（默认 `8765`）、`CLEF_DEVICE` |
@@ -27,11 +28,24 @@
 
 - `noul`、`choice`、`score` 三道题均为 `ok`，概率在 [0, 1] 内，分布之和为 1；
 - 服务报告实际执行的 provider 与模型；
-- 预取消返回 `cancelled`，未知模型在网络调用前返回 `unsupported`，1 ms 预算返回 `timeout`。`clef-local` 跳过超时检查，避免留下长时间运行的 CPU 推理。
+- 预取消返回 `cancelled`，未知模型在网络调用前返回 `unsupported`，1 ms 预算返回 `timeout`。`clef-local` 跳过超时检查以免留下长时间运行的 CPU 推理；`nace` 跳过此检查以避免额外消耗额度的推理请求，其超时和取消由本地 fixture 覆盖。
 
 本地服务还会检查 `/health`：`laya` 要求实际模型是服务已加载的 checkpoint，并输出 revision 与设备；`clef-local` 要求固定的权重 revision 并输出量化信息。
 
 退出码：`0` 通过，`1` 结果不符合契约或调用失败，`2` 缺少配置。单次响应只证明调用链路可用，不代表模型质量或延迟基准。
+
+## Nace 凭据与真实探针
+
+DSH 的 `nace` provider 将 API Key 存入 DSH credentials，引用名为 `NACE_API_KEY`；真实探针从仓库根目录的 `.env.local` 读取该变量。将密钥写入被 Git 忽略的 `.env.local`，不要提交。探针默认使用 `drex-v2.0`；可通过 `NACE_MODEL` 选择其他支持的模型，通过 `NACE_BASE_URL` 覆盖 API 根地址。
+
+运行推理前，可先检查 key 是否有效以及该账户可用的模型。Nace 的只读 `GET /v1/models` 在账户余额为零时也可用，且不计入速率限制（见[身份验证说明](https://console.nace.ai/docs/drex/guides/authentication)和[请求限制](https://console.nace.ai/docs/drex/reference/limits)）：
+
+```sh
+curl --fail-with-body https://console.nace.ai/v1/models \
+  -H "Authorization: Bearer $NACE_API_KEY"
+```
+
+运行 `pnpm build` 后，`pnpm probe nace` 会发送一次真实 `POST /v1/systemone`，包含三道题并可能消耗账户额度；确认可以使用额度后再运行。探针输出不会包含 key。成功响应只确认该 key 和模型的调用链路可用，不代表判断质量或延迟表现。
 
 ## 宿主 Loader 探针
 
@@ -42,7 +56,7 @@ pnpm build
 pnpm probe:host <绝对路径到测试宿主/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-它通过实际 Loader 加载 `cordis.patch.yml`，验证三个 provider 注册、`system1_decide` 工具在宿主真实工具注册表中注册和调用、各组件在插件页显示的中英文标题和描述、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
+它通过实际 Loader 加载 `cordis.patch.yml`，验证四个 provider 注册、`system1_decide` 工具在宿主真实工具注册表中注册和调用、各组件在插件页显示的中英文标题和描述、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null
@@ -50,14 +64,14 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.0-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.1-rc.2
 ```
 
 pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的原生构建脚本，应检查包是否已安装后单独运行探针。
 
 ## Cloudflare 凭据
 
-Workers AI 免费额度为每天 10,000 Neurons，Workers Free 与 Paid 计划都有，不需要绑定付款方式。`clef-flash` 约 8,182 Neurons / 百万输入 tokens，一次探针约几百 tokens。免费计划超出额度时请求失败而不扣费。价格见 [Workers AI 定价](https://developers.cloudflare.com/workers-ai/platform/pricing/)。
+实时探针会向 Cloudflare 发送实际推理请求。运行前确认账户权限、配额和费用设置适合本次验证。
 
 1. 打开 [Workers AI 控制台](https://dash.cloudflare.com/?to=/:account/ai/workers-ai)，选择 **Use REST API**。
 2. 选择 **Create a Workers AI API Token**，保留预填权限（`Workers AI - Read`、`Workers AI - Edit`），创建并复制 token。

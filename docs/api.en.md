@@ -4,9 +4,11 @@
 
 ## Requests and results
 
-`decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds and defaults to 800. Each model attempt gets the full budget, including capability checks and the backend call.
+`decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds. Its precedence is the per-call value, the selected provider's `timeoutMs` setting, then that provider's own default. TypeSafe, Laya, and Cloudflare default to 800 ms; Nace defaults to 60,000 ms. Each model attempt gets the full budget, including capability checks and the backend call.
 
-Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, and `dsh-system1/providers/cloudflare` entry points each export their provider plugin, the `createTypesafeProvider`, `createLayaProvider`, or `createCloudflareProvider` factory, and the `TYPESAFE_MODELS`, `LAYA_MODELS`, or `CLOUDFLARE_MODELS` model array. See [provider setup](providers.en.md) for connection details and model selection.
+0.4.0 migration: service-level `timeoutMs` has been removed, and residual values in older service configuration are ignored. Move custom timeouts to the matching provider settings page. Third-party `System1Provider` implementations must replace `defaultTimeoutMs` with `timeoutMs(): number`; `ModelCapabilities` now requires explicit question limits and count/byte limits for every supported attachment type.
+
+Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, `dsh-system1/providers/nace`, and `dsh-system1/providers/cloudflare` entry points each export their provider plugin, a `create…Provider` factory, and that provider's model array (`TYPESAFE_MODELS`, `LAYA_MODELS`, `NACE_MODELS`, or `CLOUDFLARE_MODELS`). See [provider setup](providers.en.md) for connection details and model selection.
 
 Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
 
@@ -37,22 +39,27 @@ if (result.answers.topic.status === 'ok') {
 
 `noul` returns `probabilityTrue`; `choice` returns the candidate key and full `probabilities`; `score` returns an expected zero-based level and a distribution ordered by `criteria`. A `box` question returns `{ type: 'box', box: { top, bottom, left, right }, confidence? }`, with edges as fractions from 0 to 1. Probabilities and coordinates are model outputs, so consumers choose their own action thresholds.
 
-`images` is an optional request-wide list of up to four attachments. Each item is `{ mediaType, data }`; `mediaType` can be `image/png`, `image/jpeg`, or `image/webp`, and `data` is standard padded Base64 without a data-URL prefix. Every question can use these images; a `box` question requires at least one image. Providers check format, count, and size against model capabilities, and fallback chains skip models that cannot accept the requested image input. Set `longContext: true` to request extended context. TypeSafe Jev currently supports up to 262k tokens; requests without this option use standard context limits.
+`images`, `audio`, and `videos` are optional request-wide attachment lists. Each item is `{ mediaType, data }`, where `data` is standard padded Base64 without a data-URL prefix. The shared layer checks structure and sets resource-safety ceilings: up to 16 items per type, 16 MiB per item, and 64 MiB total decoded across all attachments. These are not provider capabilities. Images support `image/png`, `image/jpeg`, and `image/webp`; every question can use them, and a `box` question requires at least one image. Providers check format, count, and size against model capabilities: Nace accepts images only on `drex-max` (up to eight), while TypeSafe and Cloudflare allow up to four. Audio supports `audio/wav` and `audio/mpeg`; video supports `video/mp4` and `video/webm`. Only Cloudflare `clef-omni` currently accepts audio and video: up to four audio clips (8 MiB and 300 seconds each) and two videos (16 MiB and 60 seconds each). Decoded audio and video share a 16 MiB limit; the image budget is separate. Cloudflare validates durations and samples video at 2 fps. Providers preflight format, count, and byte limits against model capabilities, and fallback chains skip models that cannot accept the requested attachments. Set `longContext: true` to request extended context. TypeSafe Jev currently supports up to 262k tokens; requests without this option use standard context limits.
+
+Cloudflare's public examples explicitly use MP3=`audio/mpeg` and MP4=`video/mp4`. This package maps WAV and WebM to `audio/wav` and `video/webm`, respectively, but those two MIME values have not been verified against an account schema or live request. Validate WAV or WebM with a small sample before relying on it.
 
 ```ts
 const result = await ctx.system1.decide({
-  state: 'Items on the kitchen counter.',
+  state: 'Review this device installation and operation.',
   images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
+  audio: [{ mediaType: 'audio/mpeg', data: audioBase64 }],
+  videos: [{ mediaType: 'video/mp4', data: videoBase64 }],
   questions: {
-    mug: { type: 'box', instructions: 'Locate the coffee mug in the image.' },
+    label_visible: { type: 'noul', instructions: 'Is the device label legible in the image?' },
+    runs_smoothly: { type: 'noul', instructions: 'Does the device run without unusual noise?' },
   },
-  model: { provider: 'typesafe', model: 'jev-1.14.0' },
+  model: { provider: 'cloudflare', model: 'clef-omni' },
 })
 ```
 
 The TypeSafe confidence value is preserved as received. Its provider and actual model are identified through `meta.executed`. TypeSafe computes confidence as a deterministic value from 0 to 1 based on its distribution, but the protocol does not fix the formula; see [TypeSafe Confidence](https://docs.typesafe.ai/confidence). Other providers must document their confidence semantics before consumers use thresholds from another provider.
 
-`state` supports JSON. The current TypeSafe state supports strings, objects, and arrays; other JSON scalar values return `unsupported`. Question instructions and criteria descriptions support strings, objects, or arrays; a choice description may also be `null`. Images use the top-level `images` field. Question and option identifiers must not be empty or equal to `__proto__`, `prototype`, or `constructor`.
+`state` supports JSON. The current TypeSafe state supports strings, objects, and arrays; other JSON scalar values return `unsupported`. Question instructions and criteria descriptions support strings, objects, or arrays; a choice description may also be `null`. Media uses the top-level `images`, `audio`, and `videos` fields. Question and option identifiers must not be empty or equal to `__proto__`, `prototype`, or `constructor`.
 
 Malformed call structures throw `System1InputError`. Runtime failures for a structurally valid request are returned per question with `status: 'error'`. Error codes include `unavailable`, `unsupported`, `limit_exceeded`, `timeout`, `cancelled`, `provider_error`, and `invalid_response`. A missing or invalid answer for one question does not discard other valid answers; unexpected question ids appear in `meta.warnings`.
 
@@ -75,10 +82,11 @@ Arguments:
 - `state`: the text or JSON value to judge.
 - `questions`: an array of questions. Each has an `id` (the unique result key), a `type` (`noul`, `choice`, `score`, or `box`), string `instructions`, and the same optional `criteria` as `decide()`. `choice` requires an object mapping candidate keys to descriptions; `score` requires an array of levels from lowest to highest; `box` requires an image attachment.
 - `images`: an optional list of image attachments in the same format as `decide()`.
+- `audio`, `videos`: optional audio and video attachment lists in the same format as `decide()`; currently supported only by Cloudflare `clef-omni`.
 - `longContext`: an optional boolean; when `true`, it requests extended context from TypeSafe Jev.
 - `model`: an optional `{ provider, model }`; the service default is used when omitted.
 
-The tool returns `{ answers, model?, fallbacks? }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`. When a provider succeeds, `model` identifies the provider and actual model that ran; it is omitted when none succeeds. `fallbacks`, when present, lists non-cancelled failed attempts as `{ provider, model, error: { code, message } }` in order. The tool forwards the call's cancellation signal to `decide()` and uses the service timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
+The tool returns `{ answers, model?, fallbacks? }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`. When a provider succeeds, `model` identifies the provider and actual model that ran; it is omitted when none succeeds. `fallbacks`, when present, lists non-cancelled failed attempts as `{ provider, model, error: { code, message } }` in order. The tool forwards the call's cancellation signal to `decide()` and uses the selected provider's configured or default timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
 
 The tool description tells models that probabilities range from 0 to 1, `score.value` is a zero-based expected criteria index, `box` edges are normalized image coordinates, confidence is backend-defined and not comparable across backends, and probabilities from different models are not calibrated against each other.
 
@@ -104,10 +112,16 @@ const selected = findProviderModel(MODELS, requestedModel)
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))
 ```
 
-Provider ids must be unique within a service. Registration returns an idempotent disposer. Unregistering cancels in-flight calls for that instance, and service disposal removes all registrations. Declare known capability limits per model and omit unknown limits; image formats, count, and byte limits use the `images` capability, while `longContext.maxTokens` declares extended context. Context token counts are informational; the backend enforces its actual token budget. `ProviderRequest` receives the shared image attachments and `longContext` option.
+Provider ids must be unique within a service. Registration returns an idempotent disposer. Unregistering cancels in-flight calls for that instance, and service disposal removes all registrations. `System1Provider` must implement `timeoutMs(): number`. Each attempt uses a request-level value when present; otherwise it calls the provider method, and rejects anything other than a positive integer as `invalid_response`. Providers must declare their count limits: `maxQuestions`, `maxChoiceOptions`, and `maxScoreLevels` are required as a positive integer or explicit `null` (delegate preflight to the upstream). If images are supported, declare `maxCount`, `maxBytesPerImage`, and `maxTotalBytes`; if audio or video is supported, declare `maxCount` and `maxBytesPerItem`. Attachment declarations must stay within shared resource-safety ceilings of 16 items per type, 16 MiB per item, and 64 MiB total. Missing runtime declarations fail the attempt as `invalid_response` and produce one provider-logger warning. Use `audioVideo` for any tighter shared audio/video byte limit. `longContext.maxTokens` declares extended context. Context token counts are informational; the backend enforces its actual token budget. `ProviderRequest` receives the shared media attachments and `longContext` option.
 
 ## TypeSafe capabilities and limits
 
 Supported models are `jev-1.13.0`, `jev-1.14.0`, `jev-latest`, and `jev-preview`. The versioned IDs are fixed; TypeSafe can move the `jev-latest` and `jev-preview` aliases over time. `choice` supports up to 255 candidates; `score` supports 2–10 levels. Jev 1.13 and 1.14 have default context limits of 64k tokens per request and 32k tokens for state plus the longest individual question; `longContext: true` opts into a 262k limit. Image input supports PNG/JPEG; `box` is available with Jev 1.14 and the current `jev-preview` alias. The provider sends TypeSafe's experimental request headers when needed. TypeSafe labels image and Box support experimental; the request format, limits, and accuracy may change. The backend enforces exact token limits. HTTP 422 responses remain `provider_error` with `httpStatus`; without a stable error code, the service does not infer that the response means a length limit was exceeded.
 
 The provider plugin accepts `id`, `apiKeyEnv`, and optional `baseURL`; the first two default to `typesafe` and `TYPESAFE_API_KEY`. `createTypesafeProvider` accepts an explicit API key, optional base URL, and fetch implementation for embedding and local fixtures.
+
+## Nace.AI Drex capabilities and limits
+
+The `dsh-system1/providers/nace` entry exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, and the `NACE_MODELS` array (`drex-v2.0`, `drex-v1.5`, `drex-max`). Nace accepts `noul`, `choice`, and `score`; it does not support `box`. Structured DSH descriptions are serialized as compact JSON text for Nace, and `choice` criteria set to `null` remain `null`. Score levels and returned probabilities retain their array order.
+
+`drex-v1.5` and `drex-v2.0` accept up to 512 questions and no images; `drex-max` accepts up to 16 questions and up to eight PNG/JPEG/WebP images (16 MiB per image, 32 MiB total, and 40 megapixels per image). Max permits 255 choice options or score levels per question. Model token limits are provider capability metadata; DSH does not tokenize Drex input, so Nace enforces them. The UTF-8 request body limit is 4 MiB over `state`, `questions`, and a non-empty `images` array, excluding top-level `model`. Max image payloads remain inline while the request fits; larger requests upload only enough images to account-level files. Nace errors for token or other request limits are returned safely as provider errors. See [Nace provider setup](providers.en.md#naceai-drex) for model token limits, upload behavior, and retention.

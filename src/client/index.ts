@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { CLOUDFLARE_MODELS } from '../providers/cloudflare/models.js'
 import { LAYA_MODELS } from '../providers/laya/models.js'
+import { NACE_MODELS } from '../providers/nace/models.js'
 import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
 import {
   Button,
@@ -59,10 +60,11 @@ const NS = 'dsh-system1'
 const PACKAGE = 'dsh-system1'
 
 const en = {
-  coreSummary: 'Choose a default model and ordered fallbacks, then set the shared request timeout.',
+  coreSummary: 'Choose a default model and ordered fallbacks, then configure each provider below.',
   provider: 'Default service',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
+  providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: 'Unsupported service',
   model: 'Default model',
@@ -76,10 +78,18 @@ const en = {
   fallbackUp: 'Move up',
   fallbackDown: 'Move down',
   fallbackRemove: 'Remove',
-  timeout: 'Request timeout (ms)',
+  timeout: 'Provider timeout (ms)',
   defaultHint: 'Used when a decision request does not specify a model.',
-  timeoutHint: 'Applies when a decision request does not provide its own timeout.',
+  timeoutTypesafeHint: 'Applies when a request has no timeout. Leave blank to use TypeSafe’s 800 ms default.',
+  timeoutLayaHint: 'Applies when a request has no timeout. Leave blank to use Laya’s 800 ms default.',
+  timeoutNaceHint: 'Applies when a request has no timeout. Leave blank to use Nace’s 60,000 ms default.',
+  timeoutCloudflareHint: 'Applies when a request has no timeout. Leave blank to use Cloudflare’s 800 ms default.',
   providerEnabledHint: 'Enable the matching service component in the list below.',
+  feedbackPrompt: 'Need help or a provider/model you would like to use?',
+  providerFeedbackPrompt: 'Having trouble configuring this provider?',
+  reportIssue: 'Report a problem',
+  requestProvider: 'Request a provider',
+  requestModel: 'Request a model',
   reset: 'Reset to package default',
   overridden: 'Overridden',
   save: 'Save settings',
@@ -100,10 +110,14 @@ const en = {
   keyUnavailable: 'The DSH credential service is unavailable.',
   typesafeSummary: 'Configure the TypeSafe endpoint and its API Key.',
   layaSummary: 'Configure the Laya endpoint and optional API Key.',
+  naceSummary: 'Configure Nace.AI Drex and its API Key.',
   typesafeEndpoint: 'TypeSafe API base URL',
   typesafeEndpointHint: 'The TypeSafe System One endpoint is appended automatically.',
   layaEndpoint: 'Laya server base URL',
   layaEndpointHint: 'Use the base URL of a Laya server exposing POST /v1/systemone.',
+  naceEndpoint: 'Nace API base URL',
+  naceEndpointHint: 'Use the Nace API root; POST /v1/systemone is appended automatically.',
+  naceImageRetentionHint: 'Drex Max images that exceed the 4 MiB request limit are uploaded as temporary files. DSH attempts deletion after each call; Nace keeps uploads for 24 hours by default, and backup removal can take up to 35 days.',
   cloudflareSummary: 'Configure the Cloudflare API endpoint, account, and API token.',
   cloudflareEndpoint: 'Cloudflare API base URL',
   cloudflareEndpointHint: 'Use the Cloudflare API v4 base URL.',
@@ -128,10 +142,11 @@ const en = {
 }
 
 const zh = {
-  coreSummary: '选择默认模型和按顺序尝试的备用模型，并设置通用请求超时。',
+  coreSummary: '选择默认模型和按顺序尝试的备用模型，再到下方配置各 provider。',
   provider: '默认服务',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
+  providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: '暂不支持的服务',
   model: '默认模型',
@@ -145,10 +160,18 @@ const zh = {
   fallbackUp: '上移',
   fallbackDown: '下移',
   fallbackRemove: '删除',
-  timeout: '请求超时（毫秒）',
+  timeout: 'Provider 超时（毫秒）',
   defaultHint: '决策请求未指定模型时使用。',
-  timeoutHint: '决策请求没有单独指定超时时使用。',
+  timeoutTypesafeHint: '请求未单独指定超时时使用。留空采用 TypeSafe 默认值 800 毫秒。',
+  timeoutLayaHint: '请求未单独指定超时时使用。留空采用 Laya 默认值 800 毫秒。',
+  timeoutNaceHint: '请求未单独指定超时时使用。留空采用 Nace 默认值 60,000 毫秒。',
+  timeoutCloudflareHint: '请求未单独指定超时时使用。留空采用 Cloudflare 默认值 800 毫秒。',
   providerEnabledHint: '请在下方组件列表中启用对应的服务组件。',
+  feedbackPrompt: '遇到问题，或缺少想用的提供商/模型？',
+  providerFeedbackPrompt: '配置此提供商时遇到问题？',
+  reportIssue: '反馈问题',
+  requestProvider: '请求接入提供商',
+  requestModel: '请求添加模型',
   reset: '恢复默认值',
   overridden: '已覆盖',
   save: '保存设置',
@@ -169,10 +192,14 @@ const zh = {
   keyUnavailable: 'DSH 凭据服务暂不可用。',
   typesafeSummary: '配置 TypeSafe 接口地址和 API Key。',
   layaSummary: '配置 Laya 接口地址和可选 API Key。',
+  naceSummary: '配置 Nace.AI Drex 服务和 API Key。',
   typesafeEndpoint: 'TypeSafe API 根地址',
   typesafeEndpointHint: '插件会自动在地址后拼接 TypeSafe System One 接口路径。',
   layaEndpoint: 'Laya 服务根地址',
   layaEndpointHint: '填写提供 POST /v1/systemone 接口的 Laya 服务根地址。',
+  naceEndpoint: 'Nace API 根地址',
+  naceEndpointHint: '填写 Nace API 根地址；插件会自动拼接 POST /v1/systemone。',
+  naceImageRetentionHint: 'Drex Max 图片请求超过 4 MiB 时会把部分图片作为临时文件上传。DSH 会在每次调用后尝试删除；Nace 默认保留上传文件 24 小时，备份中的数据最长可能需要 35 天清除。',
   cloudflareSummary: '配置 Cloudflare API 地址、账号和 API Token。',
   cloudflareEndpoint: 'Cloudflare API 根地址',
   cloudflareEndpointHint: '填写 Cloudflare API v4 根地址。',
@@ -206,7 +233,7 @@ type Copy = Translate<keyof typeof en>
 type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
-type ProviderId = 'typesafe' | 'laya' | 'cloudflare'
+type ProviderId = 'typesafe' | 'laya' | 'nace' | 'cloudflare'
 type ModelOption = { id: string; label?: keyof typeof en }
 type ProviderSettings = {
   id: ProviderId
@@ -217,8 +244,10 @@ type ProviderSettings = {
   keyHint: keyof typeof en
   endpointLabel: keyof typeof en
   endpointHint: keyof typeof en
+  timeoutHint: keyof typeof en
   baseURL: string
   models: ReadonlyArray<ModelOption>
+  note?: keyof typeof en
   accountId?: {
     path: 'accountId'
     label: keyof typeof en
@@ -245,6 +274,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'keyHint',
     endpointLabel: 'typesafeEndpoint',
     endpointHint: 'typesafeEndpointHint',
+    timeoutHint: 'timeoutTypesafeHint',
     baseURL: 'https://api.typesafe.ai',
     models: TYPESAFE_MODELS.map(({ id }) => ({ id })),
   },
@@ -257,8 +287,23 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'layaKeyHint',
     endpointLabel: 'layaEndpoint',
     endpointHint: 'layaEndpointHint',
+    timeoutHint: 'timeoutLayaHint',
     baseURL: 'http://127.0.0.1:8000',
     models: LAYA_MODELS.map(({ id }) => ({ id, label: LAYA_MODEL_LABELS[id] })),
+  },
+  {
+    id: 'nace',
+    rowId: 'system1-nace',
+    label: 'providerNace',
+    summary: 'naceSummary',
+    keyRef: 'NACE_API_KEY',
+    keyHint: 'keyHint',
+    endpointLabel: 'naceEndpoint',
+    endpointHint: 'naceEndpointHint',
+    timeoutHint: 'timeoutNaceHint',
+    baseURL: 'https://console.nace.ai',
+    models: NACE_MODELS.map(({ id }) => ({ id })),
+    note: 'naceImageRetentionHint',
   },
   {
     id: 'cloudflare',
@@ -269,6 +314,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'keyHint',
     endpointLabel: 'cloudflareEndpoint',
     endpointHint: 'cloudflareEndpointHint',
+    timeoutHint: 'timeoutCloudflareHint',
     baseURL: 'https://api.cloudflare.com/client/v4',
     models: CLOUDFLARE_MODELS.map(({ id }) => ({ id })),
     accountId: {
@@ -420,9 +466,23 @@ const timeoutSpec: SettingsFieldSpec = {
   },
 }
 
-const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec, timeoutSpec]
+const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec]
 const NO_SECRETS: SettingsSecretSpec[] = []
 const releaseSettingsPageStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }
+const settingsPageStyle = { display: 'flex', flexDirection: 'column', gap: 16 }
+
+const GITHUB_ISSUE_URLS = {
+  bug: 'https://github.com/exoticknight/dsh-system1/issues/new?template=bug_report.yml',
+  provider: 'https://github.com/exoticknight/dsh-system1/issues/new?template=provider_request.yml',
+  model: 'https://github.com/exoticknight/dsh-system1/issues/new?template=model_request.yml',
+} as const
+
+type IssueLinkKind = keyof typeof GITHUB_ISSUE_URLS
+const issueLinkLabels: Readonly<Record<IssueLinkKind, keyof typeof en>> = {
+  bug: 'reportIssue',
+  provider: 'requestProvider',
+  model: 'requestModel',
+}
 
 function BundleSettingsPage(props: BoundPageProps) {
   const { t } = props
@@ -435,7 +495,26 @@ function BundleSettingsPage(props: BoundPageProps) {
       icon: h(IconInfoOutlineRegular, { size: 14 }),
       onClick: requestManualReleaseNotes,
     }, t('releaseEntry')),
-    settingsState(t, status) ?? h(BundleSettingsForm, { t, scope }))
+    h('div', { style: settingsPageStyle },
+      settingsState(t, status) ?? h(BundleSettingsForm, { t, scope }),
+      h(IssueLinks, { t, kinds: ['bug', 'provider', 'model'], prompt: 'feedbackPrompt' })))
+}
+
+function IssueLinks(props: {
+  t: Copy
+  kinds: ReadonlyArray<IssueLinkKind>
+  prompt: 'feedbackPrompt' | 'providerFeedbackPrompt'
+}) {
+  return h('div', { style: issueLinksSectionStyle },
+    h('p', { style: settingsHintStyle }, props.t(props.prompt)),
+    h('nav', { 'aria-label': props.t(props.prompt), style: issueLinksStyle },
+      ...props.kinds.map((kind) => h('a', {
+        key: kind,
+        href: GITHUB_ISSUE_URLS[kind],
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        style: issueLinkStyle,
+      }, props.t(issueLinkLabels[kind]), h('span', { 'aria-hidden': true }, ' ↗')))))
 }
 
 function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigValues> }) {
@@ -446,7 +525,6 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
   const defaultRow = parseModelRow(defaultField.text) ?? { provider: '', model: '' }
   const fallbackField = view.fields.fallbackModels!
   const fallbacks = readFallbackModels(parseJson(fallbackField.text))
-  const timeoutField = view.fields.timeoutMs!
   const editFallbacks = (rows: FallbackModelDraft[]) =>
     actions.edit('fallbackModels', JSON.stringify(rows))
   const firstProvider = PROVIDERS[0]!
@@ -513,20 +591,6 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
           model: firstProvider.models[0]?.id ?? '',
         })),
       }, t('fallbackAdd')))),
-      h(SettingsValueField, {
-        key: 'timeout',
-        id: 'dsh-system1-timeout',
-        label: t('timeout'),
-        hint: t('timeoutHint'),
-        overriddenLabel: t('overridden'),
-        resetLabel: t('reset'),
-        invalidLabel: t('invalidTimeout'),
-        numeric: true,
-        disabled: !view.shell.writable,
-        ...timeoutField,
-        onEdit: (text: string) => actions.edit('timeoutMs', text),
-        onReset: () => actions.resetField('timeoutMs'),
-      }),
       h('p', { key: 'note', style: settingsHintStyle }, t('providerEnabledHint')),
     ],
   })
@@ -667,8 +731,10 @@ function ProviderSettingsPage(props: BoundPageProps & { provider: ProviderSettin
   const { t, provider } = props
   const { scope, status } = useConfigScope(props.ctx, provider.rowId)
   if (props.view === 'summary') return h('p', null, t(provider.summary))
-  return settingsState(t, status) ??
-    h(ProviderSettingsForm, { t, provider, scope, ctx: props.ctx })
+  return h('div', { style: settingsPageStyle },
+    settingsState(t, status) ??
+      h(ProviderSettingsForm, { t, provider, scope, ctx: props.ctx }),
+    h(IssueLinks, { t, kinds: ['bug'], prompt: 'providerFeedbackPrompt' }))
 }
 
 function ProviderSettingsForm(props: {
@@ -703,7 +769,9 @@ function ProviderSettingsForm(props: {
     })
   }, [ctx, provider.keyRef, refresh])
   const specs = useMemo(
-    () => provider.accountId ? [endpointSpec, accountIdSpec] : [endpointSpec],
+    () => provider.accountId
+      ? [endpointSpec, accountIdSpec, timeoutSpec]
+      : [endpointSpec, timeoutSpec],
     [provider],
   )
   const secrets = useMemo((): SettingsSecretSpec[] => [{
@@ -763,6 +831,21 @@ function ProviderSettingsForm(props: {
         onEdit: (text: string) => actions.edit(accountId.path, text),
         onReset: () => actions.resetField(accountId.path),
       }),
+      h(SettingsValueField, {
+        key: 'timeout',
+        id: `dsh-system1-${provider.id}-timeout`,
+        label: t('timeout'),
+        hint: t(provider.timeoutHint),
+        overriddenLabel: t('overridden'),
+        resetLabel: t('reset'),
+        invalidLabel: t('invalidTimeout'),
+        numeric: true,
+        disabled,
+        ...view.fields.timeoutMs!,
+        onEdit: (text: string) => actions.edit('timeoutMs', text),
+        onReset: () => actions.resetField('timeoutMs'),
+      }),
+      provider.note && h('p', { key: 'note', style: settingsHintStyle }, t(provider.note)),
     ],
   })
 }
@@ -909,4 +992,11 @@ const settingsHintStyle = {
   fontSize: 12,
   lineHeight: 1.5,
   color: 'var(--dsw-alias-label-tertiary)',
+}
+const issueLinksSectionStyle = { display: 'flex', flexDirection: 'column', gap: 8 }
+const issueLinksStyle = { display: 'flex', flexWrap: 'wrap', gap: '8px 16px', fontSize: 13, lineHeight: 1.5 }
+const issueLinkStyle = {
+  color: 'var(--dsw-alias-label-secondary)',
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
 }
