@@ -97,7 +97,8 @@
       "dshReleases": {
         "0.1.7-rc.1": "compatible",
         "0.1.7-rc.2": "compatible",
-        "0.2.0-rc.2": "compatible"
+        "0.2.0-rc.2": "compatible",
+        "0.2.1-rc.2": "compatible"
       },
       "profiles": [
         "headless",
