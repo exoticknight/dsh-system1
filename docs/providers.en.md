@@ -2,12 +2,13 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full `timeoutMs` budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
+Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full timeout budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Timeout precedence is per-call `timeoutMs`, explicitly configured service `timeoutMs`, provider default, then the legacy 800 ms fallback. Nace defaults to 60 seconds; the other built-in providers default to 800 ms. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
 
 | Provider | Models | Default base URL | Credential reference |
 | --- | --- | --- | --- |
 | `typesafe` | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
+| `nace` | `drex-v2.0`, `drex-v1.5`, `drex-max` | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`, `clef-flash`, `clef-omni` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` and `jev-1.13.0` are version-pinned IDs. `jev-latest` points to the newest stable release, while `jev-preview` points to the newest release; TypeSafe can move either alias over time. Choose a version ID when you need a fixed model. See TypeSafe's [model catalog](https://docs.typesafe.ai/models).
@@ -24,7 +25,48 @@ TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/qui
 
 ### Jev images, Box, and long context
 
-System One requests can include up to four PNG, JPEG, or WebP image attachments shared by every question. Jev currently supports PNG/JPEG; the provider encodes them as TypeSafe `assets` and automatically sends the `TypeSafe-Danger-Zone-Images` header. TypeSafe labels images and Box experimental; their format, limits, and accuracy may change between releases. Jev 1.14 (or `jev-preview` while it points to 1.14) supports `box`; its four edges are normalized coordinates from 0 to 1. Set `longContext: true` to opt into 262k tokens. The default remains 64k per request and 32k per question. See TypeSafe's [image guide](https://docs.typesafe.ai/images), [Box guide](https://docs.typesafe.ai/primitives/box), and [context limits](https://docs.typesafe.ai/models#long-context).
+The public request accepts up to eight PNG, JPEG, or WebP attachments shared by every question; a provider or model may impose a lower limit. Jev supports up to four PNG/JPEG images; the provider encodes them as TypeSafe `assets` and automatically sends the `TypeSafe-Danger-Zone-Images` header. TypeSafe labels images and Box experimental; their format, limits, and accuracy may change between releases. Jev 1.14 (or `jev-preview` while it points to 1.14) supports `box`; its four edges are normalized coordinates from 0 to 1. Set `longContext: true` to opt into 262k tokens. The default remains 64k per request and 32k per question. See TypeSafe's [image guide](https://docs.typesafe.ai/images), [Box guide](https://docs.typesafe.ai/primitives/box), and [context limits](https://docs.typesafe.ai/models#long-context).
+
+## Nace.AI Drex
+
+In DSH, save the key on the `nace` provider's settings page; it is stored in DSH credentials under `NACE_API_KEY`. The provider falls back to the `NACE_API_KEY` process environment variable. Keep the default API root `https://console.nace.ai`, or override it with `baseURL` for a compatible endpoint. The provider settings default to `drex-v2.0`; this does not change the service-wide default of TypeSafe `jev-latest`. See Nace's [authentication guide](https://console.nace.ai/docs/drex/guides/authentication) to create or rotate keys.
+
+| Model | Questions per request | State limit | State + longest question | Images |
+| --- | ---: | ---: | ---: | --- |
+| `drex-v1.5` | 512 | 131,072 tokens | 139,264 tokens | No |
+| `drex-v2.0` | 512 | 131,072 tokens | 262,144 tokens | No |
+| `drex-max` | 16 | 131,072 tokens | 262,144 tokens | Up to 8 |
+
+Use the versioned IDs for reproducible calls; the provider does not list the moving `drex-latest` alias. `box` is not supported. The DSH service exposes Nace's token limits as capability metadata but has no Drex tokenizer, so Nace enforces those token limits.
+
+Only `drex-max` accepts PNG, JPEG, and WebP images (up to 8 images, 16 MiB each, 32 MiB total, and 40 megapixels per image). It also allows up to 255 options per `choice` question and 255 levels per `score` question. Its state-plus-longest-question limit is 262,144 tokens; across questions whose token count exceeds 131,072, the request total is capped at 1,048,576 tokens, including image tokens. Nace limits the serialized UTF-8 JSON body to 4 MiB, counting `state`, `questions`, and non-empty `images`, but not the top-level `model`. Small images stay inline; when inline images would exceed the body limit, the adapter uploads only enough images to fit and sends account-level file references. The upload endpoint does not use a workspace. The adapter attempts to delete uploads after inference; if cleanup fails, Nace keeps account-level uploads for 24 hours by default. Removed files can take up to 35 days to disappear from backups. Avoid this provider path for images that policy does not allow to be temporarily uploaded. See Nace's [model catalog](https://console.nace.ai/docs/drex/reference/models), [request limits](https://console.nace.ai/docs/drex/reference/limits), [Drex Max image guide](https://console.nace.ai/docs/drex/guides/drex-max), and [data retention policy](https://console.nace.ai/docs/perception/data-retention).
+
+For example, choose Nace per call without changing the service default:
+
+```ts
+const result = await ctx.system1.decide({
+  model: { provider: 'nace', model: 'drex-v2.0' },
+  state: 'A customer says a refund has been pending for two weeks.',
+  questions: {
+    refund: { type: 'noul', instructions: 'Is the customer asking about a refund?' },
+  },
+})
+```
+
+For image input, select `drex-max` and use the shared request `images` field:
+
+```ts
+const result = await ctx.system1.decide({
+  model: { provider: 'nace', model: 'drex-max' },
+  state: 'Inspect Image 1.',
+  images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
+  questions: {
+    damaged: { type: 'noul', instructions: 'Does Image 1 show a damaged item?' },
+  },
+})
+```
+
+See [testing and live model validation](testing.en.md#nace-credentials-and-live-probe) before sending a real request.
 
 ## Cloudflare Clef
 

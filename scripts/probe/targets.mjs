@@ -103,6 +103,8 @@ export const targets = {
     requiredEnv: ['NACE_API_KEY'],
     model: () => process.env.NACE_MODEL || 'drex-v2.0',
     timeoutMs: 60_000,
+    // Avoid a second metered inference just to exercise the short-timeout path.
+    skipShortTimeout: true,
     sample: english,
     endpoint: () => process.env.NACE_BASE_URL || 'https://console.nace.ai',
     mount: (ctx, endpoint) =>

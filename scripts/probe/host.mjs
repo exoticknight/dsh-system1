@@ -87,7 +87,7 @@ try {
     cancelled.answers.q.status === 'error' ? cancelled.answers.q.error.code : undefined,
     'cancelled',
   )
-  for (const provider of ['typesafe', 'laya', 'cloudflare']) {
+  for (const provider of ['typesafe', 'laya', 'nace', 'cloudflare']) {
     const result = await ctx.system1.decide({
       state: 'fixture',
       questions: { q: { type: 'noul', instructions: 'yes?' } },

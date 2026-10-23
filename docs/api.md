@@ -4,9 +4,9 @@
 
 ## 请求与结果
 
-`decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，默认 800；每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
+`decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，优先级为：调用显式值、显式配置的服务级值、provider 默认值、原有 800 ms 回退值。Nace provider 默认 60,000 ms，其他内置 provider 默认 800 ms。每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
 
-公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出类型，包括 `ProviderModel`；`dsh-system1/providers` 导出 `findProviderModel`。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件、`createTypesafeProvider` / `createLayaProvider` / `createCloudflareProvider` 工厂，以及 `TYPESAFE_MODELS` / `LAYA_MODELS` / `CLOUDFLARE_MODELS` 模型数组。连接参数与模型选择见[模型服务配置](providers.md)。
+公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出类型，包括 `ProviderModel`；`dsh-system1/providers` 导出 `findProviderModel`。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya`、`dsh-system1/providers/nace` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件、`create…Provider` 工厂及各自模型数组（`TYPESAFE_MODELS`、`LAYA_MODELS`、`NACE_MODELS`、`CLOUDFLARE_MODELS`）。连接参数与模型选择见[模型服务配置](providers.md)。
 
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 
@@ -34,7 +34,7 @@ if (result.answers.topic.status === 'ok') {
 
 `noul` 返回 `probabilityTrue`；`choice` 返回候选键与完整 `probabilities`；`score` 返回从 0 开始的期望等级，以及按 `criteria` 顺序排列的分布。`box` 问题返回 `{ type: 'box', box: { top, bottom, left, right }, confidence? }`，边缘是 0 到 1 之间的图片比例。概率和坐标都是模型输出，消费插件自行确定动作阈值。
 
-`images` 是对整个请求共享的可选图片附件列表，最多 4 张；每项为 `{ mediaType, data }`，`mediaType` 支持 `image/png`、`image/jpeg` 和 `image/webp`，`data` 是标准补位 Base64，不带 data URL 前缀。每个问题都可以使用这些图片；`box` 需要至少一张图片。provider 会按模型能力检查格式、数量和大小；兜底链会跳过不支持当前图片输入的模型。`longContext: true` 请求模型启用扩展上下文，当前 TypeSafe Jev 支持至多 262k tokens；未设置时使用常规上下文限制。
+`images` 是对整个请求共享的可选图片附件列表，最多 8 张；每项为 `{ mediaType, data }`，`mediaType` 支持 `image/png`、`image/jpeg` 和 `image/webp`，`data` 是标准补位 Base64，不带 data URL 前缀。每个问题都可以使用这些图片；`box` 需要至少一张图片。provider 会按模型能力检查格式、数量和大小：Nace 只有 `drex-max` 接受图片（最多 8 张），TypeSafe 和 Cloudflare 的模型上限更低；兜底链会跳过不支持当前图片输入的模型。`longContext: true` 请求模型启用扩展上下文，当前 TypeSafe Jev 支持至多 262k tokens；未设置时使用常规上下文限制。
 
 ```ts
 const result = await ctx.system1.decide({
@@ -108,3 +108,9 @@ ctx.effect(() => ctx.system1.registerProvider('custom', backend))
 支持模型 `jev-1.13.0`、`jev-1.14.0`、`jev-latest` 和 `jev-preview`。两个版本 ID 固定指向对应版本；`jev-latest` 和 `jev-preview` 是由 TypeSafe 更新映射的动态别名。`choice` 最多支持 255 个候选；`score` 支持 2–10 个等级。Jev 1.13 和 1.14 的默认 context 上限均为每请求 64k tokens，以及 state 加最长单题 32k tokens；`longContext: true` 会启用 262k 上限。图片支持 PNG/JPEG；Jev 1.14 和当前指向 1.14 的 `jev-preview` 还支持 `box`。插件会按请求自动发送 TypeSafe 实验性请求头；TypeSafe 将图片和 Box 标为实验能力，协议、限制和准确性可能变化。精确 token 限制由后端执行。HTTP 422 保留为 `provider_error` 并附带 `httpStatus`；没有稳定错误码时，不推断它代表长度超限。
 
 provider 插件接受 `id`、`apiKeyEnv` 和可选的 `baseURL`；前两者默认值为 `typesafe` 和 `TYPESAFE_API_KEY`。`createTypesafeProvider` 接受显式 api key、可选 base URL 和 fetch 实现，便于嵌入调用与本地 fixture。
+
+## Nace.AI Drex 能力与限制
+
+`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions` 和 `NACE_MODELS` 模型数组（`drex-v2.0`、`drex-v1.5`、`drex-max`）。Nace 支持 `noul`、`choice`、`score`，不支持 `box`。DSH 的结构化描述会被紧凑 JSON 字符串化后交给 Nace；`choice` criterion 中的 `null` 会保留；score 等级与返回概率保持数组顺序。
+
+`drex-v1.5` 与 `drex-v2.0` 每次最多接受 512 道题，不支持图片；`drex-max` 最多接受 16 道题、8 张 PNG/JPEG/WebP 图片（单张最大 16 MiB、总计最大 32 MiB、单图分辨率不超过 40 megapixels），每道 choice 最多 255 个候选，每道 score 最多 255 个等级。模型 token 限制作为 provider 能力元数据公开；DSH 不对 Drex 输入分词，实际 token 校验由 Nace 执行。UTF-8 JSON 请求体上限为 4 MiB，计量 `state`、`questions` 和非空 `images`，不计顶层 `model`。Max 图片在请求未超限时以内联方式发送；大请求只上传足够数量的图片到账号级文件。Nace 返回的 token 或其他请求限制错误会安全映射为 provider error。模型 token 上限、上传行为与留存说明见 [Nace 模型服务配置](providers.md#naceai-drex)。
