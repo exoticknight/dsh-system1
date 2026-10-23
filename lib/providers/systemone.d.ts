@@ -31,7 +31,9 @@ export interface SystemOneHttpProviderOptions {
  */
 export declare function createSystemOneHttpProvider(options: SystemOneHttpProviderOptions): System1Provider;
 /** Shared response normalization for providers that return the System One payload. */
-export declare function normalizeSystemOneResponse(request: ProviderRequest, raw: unknown, providerName: string, selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined): ProviderResponse;
+export declare function normalizeSystemOneResponse(request: ProviderRequest, raw: unknown, providerName: string, selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined, options?: {
+    probabilityRoundingDigits?: number;
+}): ProviderResponse;
 /** Nace accepts only text descriptions; JSON descriptions retain their structure as compact text. */
 export declare function stringifyDescription(value: string | object | readonly unknown[]): string;
 export {};

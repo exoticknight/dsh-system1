@@ -151,6 +151,8 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           { ...request, model: selected.id },
           response,
           'Nace',
+          undefined,
+          { probabilityRoundingDigits: 4 },
         )
       } catch (error) {
         if (signal.aborted) signal.throwIfAborted()

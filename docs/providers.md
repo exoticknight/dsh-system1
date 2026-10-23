@@ -39,6 +39,8 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 
 版本号模型 ID 固定，便于复现；provider 不把会移动的 `drex-latest` 放入模型目录。Nace 不支持 `box`。服务会公开 token 限制供能力查询，但没有 Drex tokenizer，因此实际 token 上限由 Nace 校验。
 
+Drex 可能把 `choice` 或 `score` 分布中的每项概率舍入到四位小数，因此总和可能略高于或低于 1。DSH 仅在偏差不超过逐项舍入的最大误差时重新归一化；更大的偏差仍按常规答案校验规则处理。
+
 只有 `drex-max` 支持 PNG、JPEG、WebP 图片，最多 8 张、每张 16 MiB、合计 32 MiB，单图分辨率上限 40 megapixels；每道 `choice` 最多 255 个选项，每道 `score` 最多 255 个等级。Max 的 state 与最长单题合计上限为 262,144 tokens；超过 131,072 tokens 的题目合计不超过 1,048,576 tokens，且图像 tokens 计入这些上限。Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`questions` 和非空 `images`，但不计顶层 `model`。小图以内联方式发送；内联图像会超出请求体上限时，adapter 只上传足够数量的图片并传递账号级文件引用，不使用 workspace。推理结束后 adapter 会尝试删除上传文件；清理失败时，Nace 默认在 24 小时后清除账号级上传，已删除文件的备份最多还需 35 天清除。对不允许临时上传到第三方服务的图片，不要使用该路径。详见 Nace 的[模型目录](https://console.nace.ai/docs/drex/reference/models)、[请求限制](https://console.nace.ai/docs/drex/reference/limits)、[Drex Max 图片说明](https://console.nace.ai/docs/drex/guides/drex-max)和[数据留存政策](https://console.nace.ai/docs/perception/data-retention)。
 
 单次调用可指定 Nace，不改变服务默认模型：

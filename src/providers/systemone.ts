@@ -178,6 +178,7 @@ export function normalizeSystemOneResponse(
   selectResponseModel?: (
     response: z.infer<typeof wireResponse>,
   ) => string | undefined,
+  options: { probabilityRoundingDigits?: number } = {},
 ): ProviderResponse {
   const parsed = wireResponse.safeParse(raw)
   if (!parsed.success)
@@ -190,7 +191,11 @@ export function normalizeSystemOneResponse(
     selectResponseModel?.(parsed.data) ?? parsed.data.model ?? request.model
   return {
     model: answeredModel || request.model,
-    answers: normalizeAnswers(request, parsed.data.answers),
+    answers: normalizeAnswers(
+      request,
+      parsed.data.answers,
+      options.probabilityRoundingDigits,
+    ),
     ...(parsed.data.usage
       ? {
           usage: {
@@ -209,6 +214,7 @@ export function normalizeSystemOneResponse(
 function normalizeAnswers(
   request: ProviderRequest,
   answers: Record<string, unknown>,
+  probabilityRoundingDigits?: number,
 ) {
   return Object.fromEntries(
     Object.entries(answers).map(([id, raw]) => {
@@ -226,7 +232,10 @@ function normalizeAnswers(
           answer: {
             type: 'choice',
             value: answer.choice,
-            probabilities: answer.probabilities,
+            probabilities: normalizeRoundedDistributionRecord(
+              answer.probabilities,
+              probabilityRoundingDigits,
+            ),
             ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
           },
         }]
@@ -270,18 +279,58 @@ function normalizeAnswers(
       })
       if (probabilities.some((probability) => probability === undefined))
         return [id, invalidAnswer()]
+      const normalizedProbabilities = normalizeRoundedDistribution(
+        probabilities as number[],
+        probabilityRoundingDigits,
+      )
       return [id, {
         status: 'ok',
         answer: {
           type: 'score',
           value: answer.score,
           levels: question.criteria,
-          probabilities,
+          probabilities: normalizedProbabilities,
           ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
         },
       }]
     }),
   )
+}
+
+function normalizeRoundedDistributionRecord(
+  probabilities: Record<string, number>,
+  roundingDigits?: number,
+): Record<string, number> {
+  if (roundingDigits === undefined) return probabilities
+  const keys = Object.keys(probabilities)
+  const values = normalizeRoundedDistribution(
+    keys.map((key) => probabilities[key]!),
+    roundingDigits,
+  )
+  return Object.fromEntries(keys.map((key, index) => [key, values[index]!]))
+}
+
+function normalizeRoundedDistribution(
+  probabilities: readonly number[],
+  roundingDigits?: number,
+): readonly number[] {
+  if (roundingDigits === undefined || probabilities.length === 0) return probabilities
+  if (
+    !Number.isInteger(roundingDigits) ||
+    roundingDigits < 0 ||
+    probabilities.some((value) => !Number.isFinite(value) || value < 0 || value > 1)
+  )
+    return probabilities
+
+  const total = probabilities.reduce((sum, value) => sum + value, 0)
+  if (!(total > 0) || total === 1) return probabilities
+
+  // Drex can return probabilities rounded to four decimal places. The sum may
+  // therefore differ from one by at most half a unit per entry.
+  const roundingBound = probabilities.length * 0.5 * 10 ** -roundingDigits
+  if (Math.abs(total - 1) > roundingBound + Number.EPSILON * probabilities.length)
+    return probabilities
+  return probabilities.map((value) => value / total)
 }
 
 function invalidAnswer() {

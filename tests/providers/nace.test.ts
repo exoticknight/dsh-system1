@@ -253,6 +253,98 @@ test('Nace serializes structured descriptions, retains null criteria, and normal
   assert.deepEqual(result.usage, { inputTokens: 12, outputTokens: 4 })
 })
 
+test('Drex rounded choice and score probabilities remain valid DSH distributions', async () => {
+  const criteria = ['Routine', 'Soon', 'Urgent']
+  const fixture = createUploadFixture({
+    onSystemOne: () => systemOneResponse({
+      topic: {
+        type: 'choice',
+        choice: 'billing',
+        probabilities: { billing: 0.7000, technical: 0.3001 },
+      },
+      urgency: {
+        type: 'score',
+        score: 0.9061,
+        legend: criteria,
+        probabilities: { '0': 0.3639, '1': 0.3662, '2': 0.2700 },
+      },
+    }),
+  })
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
+  engine.registerProvider('nace', createNaceProvider({
+    apiKey: 'fixture-only',
+    fetch: fixture.fetch,
+  }))
+
+  const result = await engine.decide({
+    state: 'A refund has been pending for two weeks.',
+    questions: {
+      topic: {
+        type: 'choice',
+        instructions: 'Choose the team.',
+        criteria: { billing: 'Payments or refunds', technical: 'Product errors' },
+      },
+      urgency: {
+        type: 'score',
+        instructions: 'Rate the urgency.',
+        criteria,
+      },
+    },
+  })
+
+  const topic = result.answers.topic
+  assert.equal(topic.status, 'ok')
+  if (topic.status === 'ok')
+    assert.ok(Math.abs(Object.values(topic.answer.probabilities).reduce((sum, value) => sum + value, 0) - 1) < 1e-12)
+
+  const urgency = result.answers.urgency
+  assert.equal(urgency.status, 'ok')
+  if (urgency.status === 'ok') {
+    const { probabilities, value } = urgency.answer
+    assert.ok(Math.abs(probabilities.reduce((sum, probability) => sum + probability, 0) - 1) < 1e-12)
+    const expected = probabilities.reduce((sum, probability, index) => sum + probability * index, 0)
+    assert.ok(Math.abs(value - expected) <= 0.011)
+  }
+  engine.dispose()
+})
+
+test('Drex probability totals beyond the rounding bound remain invalid', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne: () => systemOneResponse({
+      urgency: {
+        type: 'score',
+        score: 0.301,
+        legend: ['Routine', 'Urgent'],
+        probabilities: { '0': 0.700, '1': 0.301 },
+      },
+    }),
+  })
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
+  engine.registerProvider('nace', createNaceProvider({
+    apiKey: 'fixture-only',
+    fetch: fixture.fetch,
+  }))
+
+  const result = await engine.decide({
+    state: 'A refund has been pending for two weeks.',
+    questions: {
+      urgency: {
+        type: 'score',
+        instructions: 'Rate the urgency.',
+        criteria: ['Routine', 'Urgent'],
+      },
+    },
+  })
+
+  assert.equal(
+    result.answers.urgency.status === 'error'
+      ? result.answers.urgency.error.code
+      : 'ok',
+    'invalid_response',
+  )
+  engine.dispose()
+})
+
 test('missing credentials and unsupported requests stop before Nace I/O', async () => {
   let calls = 0
   const provider = createNaceProvider({
