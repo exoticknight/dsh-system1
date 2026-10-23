@@ -18,6 +18,6 @@ export default class System1Service extends Service {
 interface System1Config {
     defaultModel: Volatile<ModelRef | undefined>;
     fallbackModels: Volatile<readonly ModelRef[]>;
-    timeoutMs: Volatile<number>;
+    timeoutMs: Volatile<number | undefined>;
 }
 //# sourceMappingURL=index.d.ts.map

@@ -38,7 +38,6 @@ export default class System1Service extends Service {
       .min(1)
       .max(2147483647)
       .step(1)
-      .default(800)
       .volatile(),
   }) as unknown as Schema<System1Options, System1Config>
   private readonly engine: System1Engine
@@ -57,8 +56,8 @@ export default class System1Service extends Service {
           | Volatile<readonly ModelRef[]>
           | undefined,
       )
-      const timeoutMs = readConfigValue<number>(
-        config.timeoutMs as number | Volatile<number> | undefined,
+      const timeoutMs = readConfigValue<number | undefined>(
+        config.timeoutMs as number | Volatile<number | undefined> | undefined,
       )
       return {
         ...(defaultModel !== undefined ? { defaultModel } : {}),
@@ -79,7 +78,7 @@ export default class System1Service extends Service {
 interface System1Config {
   defaultModel: Volatile<ModelRef | undefined>
   fallbackModels: Volatile<readonly ModelRef[]>
-  timeoutMs: Volatile<number>
+  timeoutMs: Volatile<number | undefined>
 }
 
 function readConfigValue<T>(value: T | Volatile<T> | undefined): T | undefined {

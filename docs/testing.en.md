@@ -10,7 +10,7 @@ Checks come in three layers. The first two need no credentials or model services
 | Provider tests | `pnpm test providers` | Each adapter's request shape, response normalization, error sanitization, missing credentials, and plugin mount/unmount. Uses local HTTP fixtures or an injected `fetch` |
 | Live model probes | `pnpm probe <target>` | Calls a real model through the public service and the provider plugin entry |
 
-`pnpm test` runs the first two layers; `pnpm test <provider>` runs a single provider, for example `pnpm test laya`, and accepts several names. Tests live in `tests/plugin/` and `tests/providers/<provider>.test.ts`; add a provider test file with each new provider.
+`pnpm test` runs the first two layers; `pnpm test <provider>` runs a single provider, for example `pnpm test nace`, and accepts several names. Tests live in `tests/plugin/` and `tests/providers/<provider>.test.ts`; add a provider test file with each new provider.
 
 ## Live model probes
 
@@ -19,6 +19,7 @@ Probes load the built `lib/`, so run `pnpm build` first, then `pnpm probe <targe
 | Target | Kind | Requires | Optional environment |
 | --- | --- | --- | --- |
 | `typesafe` | Hosted API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`, default `jev-1.13.0` |
+| `nace` | Hosted API | `NACE_API_KEY` | `NACE_MODEL`, default `drex-v2.0`; `NACE_BASE_URL` |
 | `cloudflare` | Hosted API | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`, default `clef-flash` |
 | `laya` | Local service | Python; prepared automatically on first run | `LAYA_BASE_URL`, `LAYA_MODEL` (default `auto`), `LAYA_TIMEOUT_MS`, `LAYA_API_KEY` |
 | `clef-local` | Local service | Python and Git LFS; prepared automatically on first run | `CLEF_LOCAL_PORT` (default `8765`), `CLEF_DEVICE` |
@@ -27,11 +28,24 @@ Every probe checks that:
 
 - the `noul`, `choice`, and `score` questions are all `ok`, with probabilities in [0, 1] and distributions summing to 1;
 - the service reports the provider and model that actually ran;
-- a pre-cancelled call returns `cancelled`, an unknown model returns `unsupported` before network I/O, and a 1 ms budget returns `timeout`. `clef-local` skips the timeout check to avoid leaving long CPU inference running.
+- a pre-cancelled call returns `cancelled`, an unknown model returns `unsupported` before network I/O, and a 1 ms budget returns `timeout`. `clef-local` skips the timeout check to avoid leaving long CPU inference running; `nace` skips it to avoid an extra metered inference, with timeout and cancellation covered by local fixtures.
 
 Local targets also check `/health`. `laya` requires the executed model to be a checkpoint loaded by the service and reports its revision and device; `clef-local` requires the pinned weight revision and reports quantization details.
 
 Exit codes: `0` verified, `1` the result failed the contract or the call failed, `2` configuration is missing. A single response proves the integration path, not model quality or a latency benchmark.
+
+## Nace credentials and live probe
+
+The DSH provider stores its API key in DSH credentials under `NACE_API_KEY`; the live probe instead reads `NACE_API_KEY` from the repository-root `.env.local`. Add the key there without committing the file. The probe defaults to `drex-v2.0`; set `NACE_MODEL` to another supported ID or `NACE_BASE_URL` to a compatible API root if needed.
+
+Check a key and the models enabled for it before spending credit on inference. Nace's read-only `GET /v1/models` works even when the account has no credit and does not count toward its rate limit ([authentication](https://console.nace.ai/docs/drex/guides/authentication), [limits](https://console.nace.ai/docs/drex/reference/limits)):
+
+```sh
+curl --fail-with-body https://console.nace.ai/v1/models \
+  -H "Authorization: Bearer $NACE_API_KEY"
+```
+
+After `pnpm build`, `pnpm probe nace` sends one real `POST /v1/systemone` with three questions and may spend account credit. Run it when that usage is acceptable. Probe output never includes the key. A successful response confirms the integration path for that key and model, not decision quality or latency.
 
 ## Host Loader probe
 
@@ -42,7 +56,7 @@ pnpm build
 pnpm probe:host <absolute-path-to-test-host/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-It loads `cordis.patch.yml` through the real Loader and checks the three provider registrations, registration and a call of `system1_decide` in the host's real tool registry, the English and Chinese titles and descriptions each component shows on the Plugins page, pre-cancellation, and unload without calling a model. When installing the test host inside the repository, use pnpm's `--ignore-workspace`:
+It loads `cordis.patch.yml` through the real Loader and checks the four provider registrations, registration and a call of `system1_decide` in the host's real tool registry, the English and Chinese titles and descriptions each component shows on the Plugins page, pre-cancellation, and unload without calling a model. When installing the test host inside the repository, use pnpm's `--ignore-workspace`:
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null

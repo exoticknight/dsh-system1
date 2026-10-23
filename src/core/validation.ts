@@ -71,7 +71,7 @@ export const timeoutSchema = z.number().int().positive().max(2_147_483_647)
 const requestSchema = z.strictObject({
   state: json,
   questions: z.record(id, question).refine((v) => Object.keys(v).length > 0),
-  images: z.array(imageInput).max(4).optional(),
+  images: z.array(imageInput).max(8).optional(),
   audio: z.array(audioInput).max(4).optional(),
   videos: z.array(videoInput).max(2).optional(),
   longContext: z.boolean().optional(),

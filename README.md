@@ -28,6 +28,7 @@ Built-in providers:
 
 - **TypeSafe** (`typesafe`): hosted Jev models with PNG/JPEG input and optional 262k context; `box` requires `jev-1.14.0` or `jev-preview`.
 - **Laya** (`laya`): a self-hosted [Laya server](https://github.com/NandhaKishorM/laya); API key optional; text only.
+- **Nace.AI Drex** (`nace`): hosted `drex-v2.0`, `drex-v1.5`, and image-capable `drex-max`.
 - **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, and `clef-omni` accept PNG/JPEG/WebP; Omni also accepts audio and video. Can also point at a local Clef service.
 
 Other backends can implement the public provider contract.
@@ -48,9 +49,9 @@ dsh plugin --profile <profile> add dsh-system1
 
 The dsh plugin command requires a profile; installing into one profile does not activate the bundle in other profiles. To use the GitHub repository as the package source, replace `dsh-system1` in that command with `github:exoticknight/dsh-system1`.
 
-The bundled patch mounts the service and built-in providers. Defaults are model `jev-latest`, provider id `typesafe`, and an 800 ms timeout per model attempt. Use the plugin settings to choose a default service and model, add fallback models in the order they should be tried, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust `timeoutMs` to fit backend latency, especially for local CPU inference.
+The bundled patch mounts the service and built-in providers. The service defaults to model `jev-latest` on provider `typesafe`. A model attempt uses the explicit request timeout first, then an explicitly configured service timeout, then the provider default; the legacy fallback is 800 ms. Nace defaults to 60 seconds and the other built-in providers to 800 ms. Use plugin settings to choose the service and model, add fallbacks in order, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust `timeoutMs` for backend latency, especially local CPU inference.
 
-Cloudflare uses provider `cloudflare` with `clef`, `clef-flash`, or `clef-omni`. See [provider setup](docs/providers.en.md) for configuration.
+See [provider setup](docs/providers.en.md) for model capabilities, credentials, endpoints, and image limits.
 
 ## Update notices
 
@@ -115,7 +116,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; see [testing and live model validation](docs/testing.en.md).
+`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|nace|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; hosted probes send real requests and can use account quota. See [testing and live model validation](docs/testing.en.md).
 
 See the [contribution guide](CONTRIBUTING.md) and [release process](docs/releasing.en.md).
 

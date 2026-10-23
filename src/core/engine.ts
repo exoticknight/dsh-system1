@@ -64,6 +64,11 @@ export class System1Engine {
       throw new System1InputError('Invalid fallback models.')
   }
   registerProvider(id: string, provider: System1Provider): () => void {
+    if (
+      provider.defaultTimeoutMs !== undefined &&
+      !timeoutSchema.safeParse(provider.defaultTimeoutMs).success
+    )
+      throw new System1InputError('Invalid provider default timeout.')
     return this.registry.register(id, provider)
   }
   dispose(): void {
@@ -124,7 +129,7 @@ export class System1Engine {
         req,
         model,
         meta.requestId,
-        req.timeoutMs ?? options.timeoutMs ?? 800,
+        options.timeoutMs,
       )
       if ('error' in outcome) {
         lastError = outcome.error
@@ -182,7 +187,7 @@ export class System1Engine {
     req: DecideRequest,
     model: ModelRef,
     requestId: string,
-    timeoutMs: number,
+    serviceTimeoutMs: number | undefined,
   ): Promise<AttemptOutcome> {
     const entry = this.registry.get(model.provider)
     if (!entry)
@@ -192,6 +197,8 @@ export class System1Engine {
           message: 'Requested provider is not registered.',
         },
       }
+    const timeoutMs =
+      req.timeoutMs ?? serviceTimeoutMs ?? entry.provider.defaultTimeoutMs ?? 800
     try {
       const result = await execute(
         [entry.controller.signal, ...(req.signal ? [req.signal] : [])],

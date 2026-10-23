@@ -4,12 +4,14 @@ export { findProviderModel } from './models.js';
 interface ConfigInput {
     typesafeBaseURL?: string | null;
     layaBaseURL?: string | null;
+    naceBaseURL?: string | null;
     cloudflareBaseURL?: string | null;
     cloudflareAccountId?: string | null;
 }
 interface RuntimeConfig {
     typesafeBaseURL: Volatile<string>;
     layaBaseURL: Volatile<string>;
+    naceBaseURL: Volatile<string>;
     cloudflareBaseURL: Volatile<string>;
     cloudflareAccountId: Volatile<string>;
 }

@@ -4,6 +4,7 @@ declare const en: {
     provider: string;
     providerTypesafe: string;
     providerLaya: string;
+    providerNace: string;
     providerCloudflare: string;
     providerUnknown: string;
     model: string;
@@ -46,10 +47,14 @@ declare const en: {
     keyUnavailable: string;
     typesafeSummary: string;
     layaSummary: string;
+    naceSummary: string;
     typesafeEndpoint: string;
     typesafeEndpointHint: string;
     layaEndpoint: string;
     layaEndpointHint: string;
+    naceEndpoint: string;
+    naceEndpointHint: string;
+    naceImageRetentionHint: string;
     cloudflareSummary: string;
     cloudflareEndpoint: string;
     cloudflareEndpointHint: string;
