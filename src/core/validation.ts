@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import type { Question } from '../contracts/question.js'
 import type { QuestionResult } from '../contracts/answer.js'
+import type { AudioMediaType, VideoMediaType } from '../contracts/request.js'
 import { System1InputError } from '../contracts/error.js'
 
 const json = z.json()
@@ -10,14 +11,22 @@ const description = z.union([
   z.record(z.string(), json),
   z.array(json),
 ])
-const imageData = z
+const base64Data = z
   .string()
   .min(4)
   .max(22_369_624)
   .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u)
 const imageInput = z.strictObject({
   mediaType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
-  data: imageData,
+  data: base64Data,
+})
+const audioInput = z.strictObject({
+  mediaType: z.enum(['audio/wav', 'audio/mpeg'] satisfies AudioMediaType[]),
+  data: base64Data,
+})
+const videoInput = z.strictObject({
+  mediaType: z.enum(['video/mp4', 'video/webm'] satisfies VideoMediaType[]),
+  data: base64Data,
 })
 const id = z
   .string()
@@ -63,6 +72,8 @@ const requestSchema = z.strictObject({
   state: json,
   questions: z.record(id, question).refine((v) => Object.keys(v).length > 0),
   images: z.array(imageInput).max(8).optional(),
+  audio: z.array(audioInput).max(4).optional(),
+  videos: z.array(videoInput).max(2).optional(),
   longContext: z.boolean().optional(),
   model: modelSchema.optional(),
   timeoutMs: timeoutSchema.optional(),
@@ -164,6 +175,19 @@ export const capabilitiesSchema = z.strictObject({
     formats: z.array(z.enum(['image/png', 'image/jpeg', 'image/webp'])).min(1),
     maxCount: z.number().int().positive().optional(),
     maxBytesPerImage: z.number().int().positive().optional(),
+    maxTotalBytes: z.number().int().positive().optional(),
+  }).optional(),
+  audio: z.strictObject({
+    formats: z.array(z.enum(['audio/wav', 'audio/mpeg'])).min(1),
+    maxCount: z.number().int().positive().optional(),
+    maxBytesPerItem: z.number().int().positive().optional(),
+  }).optional(),
+  videos: z.strictObject({
+    formats: z.array(z.enum(['video/mp4', 'video/webm'])).min(1),
+    maxCount: z.number().int().positive().optional(),
+    maxBytesPerItem: z.number().int().positive().optional(),
+  }).optional(),
+  audioVideo: z.strictObject({
     maxTotalBytes: z.number().int().positive().optional(),
   }).optional(),
   longContext: z.strictObject({ maxTokens: z.number().int().positive() }).optional(),

@@ -64,14 +64,14 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.0-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.1-rc.2
 ```
 
 pnpm may report `ERR_PNPM_IGNORED_BUILDS`. The Loader probe does not depend on the skipped native build scripts; confirm the packages are installed and run the probe separately.
 
 ## Cloudflare credentials
 
-Workers AI includes 10,000 free Neurons per day on both the Workers Free and Paid plans, with no payment method required. `clef-flash` costs about 8,182 Neurons per million input tokens, and one probe uses a few hundred tokens. On the Free plan, requests beyond the allocation fail rather than incur charges. See [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+The live probe sends a real inference request to Cloudflare. Before running it, confirm that the account's permissions, allocation, and billing settings are appropriate for the validation.
 
 1. Open the [Workers AI dashboard](https://dash.cloudflare.com/?to=/:account/ai/workers-ai) and choose **Use REST API**.
 2. Choose **Create a Workers AI API Token**, keep the prefilled permissions (`Workers AI - Read`, `Workers AI - Edit`), then create and copy the token.

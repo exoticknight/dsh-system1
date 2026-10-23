@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**调用 System One 模型做是非、选择、评分和图片定位判断，并返回概率。** agent 可以直接调用内置的 `system1_decide` 工具，插件可以调用 `ctx.system1.decide()`。结果按题返回，不生成文本，下一步由调用方决定。
+**让 Agent 和插件把内容分类、筛选候选、按标准评分或图片定位交给决策模型，并拿到逐题结构化结果。** Provider 和模型支持时，请求可包含文本、图片、音频和视频；统一接口支持 TypeSafe/Jev、Laya、Cloudflare/Clef 和自定义 provider。后续动作由调用方决定。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -29,7 +29,7 @@
 - **TypeSafe**（`typesafe`）：托管的 Jev 模型，支持 PNG/JPEG 图片和可选的 262k 上下文；`box` 需要 `jev-1.14.0` 或 `jev-preview`。
 - **Laya**（`laya`）：自建的 [Laya 服务](https://github.com/NandhaKishorM/laya)，API Key 可选，仅支持文本。
 - **Nace.AI Drex**（`nace`）：托管模型 `drex-v2.0`、`drex-v1.5`，以及支持图片的 `drex-max`。
-- **Cloudflare**（`cloudflare`）：`clef`、`clef-flash`、`clef-omni`，支持 PNG/JPEG/WebP 图片；也可以接本地 Clef 服务。
+- **Cloudflare**（`cloudflare`）：`clef`、`clef-flash` 和 `clef-omni` 支持 PNG/JPEG/WebP 图片；Omni 还支持音频与视频。也可以接本地 Clef 服务。
 
 其他后端可实现公开的 provider 契约。
 

@@ -110,6 +110,23 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   assert.match(definition.description, /confidence.*backend/i)
   assert.match(definition.description, /not.*calibrated/i)
   assert.match(definition.description, /every provider fails.*model is omitted/i)
+  assert.match(definition.description, /audio, and video attachments/i)
+  const inputProperties = definition.parameters.properties as Record<
+    string,
+    { type?: string; maxItems?: number; items?: { properties?: Record<string, unknown> } }
+  >
+  assert.equal(inputProperties.audio?.type, 'array')
+  assert.equal(inputProperties.audio?.maxItems, 4)
+  assert.equal(inputProperties.videos?.type, 'array')
+  assert.equal(inputProperties.videos?.maxItems, 2)
+  assert.deepEqual(
+    (inputProperties.audio?.items?.properties?.mediaType as { enum: string[] }).enum,
+    ['audio/wav', 'audio/mpeg'],
+  )
+  assert.deepEqual(
+    (inputProperties.videos?.items?.properties?.mediaType as { enum: string[] }).enum,
+    ['video/mp4', 'video/webm'],
+  )
   const outputProperties = definition.output.schema.properties as Record<
     string,
     { type?: string; items?: { properties?: Record<string, unknown> } }
@@ -119,6 +136,45 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   assert.ok(outputProperties.fallbacks?.items?.properties?.error)
   await fiber.dispose()
   assert.equal(tools.registered.has(tool.TOOL_NAME), false)
+})
+
+test('agent tool forwards audio and video attachments to decide', async (t) => {
+  const audio = [{ mediaType: 'audio/mpeg', data: 'bXAz' }] as const
+  const videos = [{ mediaType: 'video/mp4', data: 'bXA0' }] as const
+  const { tools } = await setup(t, {}, {
+    ...provider,
+    async describe() {
+      return {
+        primitives: ['noul', 'choice', 'score'],
+        audio: { formats: ['audio/mpeg'], maxCount: 4, maxBytesPerItem: 8 },
+        videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
+        audioVideo: { maxTotalBytes: 16 },
+      }
+    },
+    async evaluate(request) {
+      assert.deepEqual(request.audio, audio)
+      assert.deepEqual(request.videos, videos)
+      return {
+        model: 'actual',
+        answers: {
+          q: { status: 'ok', answer: { type: 'noul', probabilityTrue: 0.8 } },
+        },
+      }
+    },
+  })
+  const definition = tools.registered.get(tool.TOOL_NAME)!
+  const value = await definition.execute({
+    state: 'Review the recording and clip.',
+    audio,
+    videos,
+    questions: [{ id: 'q', type: 'noul', instructions: 'Does the audio match the video?' }],
+  }, { signal: new AbortController().signal }) as {
+    answers: Record<string, { status: string }>
+  }
+  assert.deepEqual(value.answers.q, {
+    status: 'ok',
+    answer: { type: 'noul', probabilityTrue: 0.8 },
+  })
 })
 
 test('bundle mounts the agent tool entry enabled by default', () => {

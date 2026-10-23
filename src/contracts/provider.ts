@@ -1,5 +1,13 @@
 import type { JsonValue, Primitive, Questions } from './question.js'
-import type { ImageInput, ImageMediaType, Usage } from './request.js'
+import type {
+  AudioInput,
+  AudioMediaType,
+  ImageInput,
+  ImageMediaType,
+  Usage,
+  VideoInput,
+  VideoMediaType,
+} from './request.js'
 
 /** A selectable model ID and provider-owned alternate IDs accepted at runtime. */
 export interface ProviderModel {
@@ -20,6 +28,10 @@ export interface ModelCapabilities {
         readonly maxTotalBytes?: number | undefined
       }
     | undefined
+  readonly audio?: MediaCapabilities<AudioMediaType> | undefined
+  readonly videos?: MediaCapabilities<VideoMediaType> | undefined
+  /** Aggregate decoded byte limit shared by the audio and video attachments. */
+  readonly audioVideo?: { readonly maxTotalBytes?: number | undefined } | undefined
   readonly longContext?: { readonly maxTokens: number } | undefined
   /** Informational: the provider must enforce its own tokenizer budget. */
   readonly context?:
@@ -30,11 +42,18 @@ export interface ModelCapabilities {
       }
     | undefined
 }
+export interface MediaCapabilities<TMediaType extends string> {
+  readonly formats: readonly TMediaType[]
+  readonly maxCount?: number | undefined
+  readonly maxBytesPerItem?: number | undefined
+}
 export interface ProviderRequest {
   readonly model: string
   readonly state: JsonValue
   readonly questions: Questions
   readonly images?: readonly ImageInput[] | undefined
+  readonly audio?: readonly AudioInput[] | undefined
+  readonly videos?: readonly VideoInput[] | undefined
   readonly longContext?: boolean | undefined
   readonly requestId: string
 }

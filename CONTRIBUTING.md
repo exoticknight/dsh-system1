@@ -50,7 +50,7 @@ pnpm verify
 
 `verify` runs type checking, plugin and provider tests, a build, and an isolated tarball installation plus consumer compilation. Tests use local responses and do not need backend credentials. CI runs the same command on Windows and Linux with Node 22.19 and 24.
 
-Host integration follows the dsh range `>=0.1.7-rc.1 <0.2.0`. Exact releases verified so far are listed as `compatible` in `dsh.compatibility.dshReleases`; run the Loader probe with one of those releases:
+Host integration follows the DSH range `>=0.1.7-rc.1 <0.3.0`. Exact releases verified so far, including `0.2.1-rc.2`, are listed as `compatible` in `dsh.compatibility.dshReleases`; run the Loader probe with one of those releases:
 
 ```sh
 pnpm build

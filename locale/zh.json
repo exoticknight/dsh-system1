@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "System One",
-    "description": "为 DSH 提供快速的概率判断：是否、选择和打分。"
+    "description": "让 Agent 和插件把内容分类、筛选候选、按标准评分或图片定位交给决策模型，并拿到可直接处理的结果。统一调用接口支持 TypeSafe/Jev、Laya、Cloudflare/Clef 和自定义 provider，方便按场景选择后端；后续动作由 Agent 或插件决定。"
   }
 }

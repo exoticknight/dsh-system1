@@ -13,6 +13,8 @@ Choose the default provider and model in DSH plugin settings, and add fallback m
 
 `jev-1.14.0` and `jev-1.13.0` are version-pinned IDs. `jev-latest` points to the newest stable release, while `jev-preview` points to the newest release; TypeSafe can move either alias over time. Choose a version ID when you need a fixed model. See TypeSafe's [model catalog](https://docs.typesafe.ai/models).
 
+This project maintains provider model catalogs and capabilities explicitly; it does not overwrite them at runtime. When following an upstream update, verify model IDs, input formats, and limits against the official changelog, model page, or schema, then update that provider's model catalog, capability declaration, transport fixtures, and bilingual docs. A dynamic alias follows a model name, not its newly added capabilities. Mutable upstream pricing is outside the product contract.
+
 Providers resolve keys through DSH credentials when available, otherwise through the process environment. Keys are never displayed. On a provider component's settings page, enter the API key and press Save with the connection details to store it in DSH credentials; saving with the field blank keeps the existing key. The page marks a setting as overridden only when it differs from the package default, and Reset writes the package default back. Independent provider plugins support custom registration and credential names through `id` and `apiKeyEnv`.
 
 ## Local deployment scope
@@ -85,7 +87,13 @@ const result = await ctx.system1.decide({
 })
 ```
 
-Cloudflare accepts up to 64 questions per request. Question IDs are at most 100 characters and use letters, digits, underscores, dots, or hyphens. The context limit is 65,536 tokens for `clef`, 24,576 for `clef-flash`, and 64,000 for `clef-omni`; the backend may truncate long inputs, so control input size in your application. The shared `images` field supports PNG, JPEG, and WebP, with up to four images, 4 MiB per image, and 8 MiB total; the provider converts them to Cloudflare's base64 data URLs. Clef-omni also accepts audio and video upstream, while the current public request contract exposes image input. See the [Clef API](https://developers.cloudflare.com/workers-ai/models/clef/), [Clef-omni API](https://developers.cloudflare.com/workers-ai/models/clef-omni/), and [Workers AI REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
+Cloudflare accepts up to 64 questions per request. Question IDs are at most 100 characters and use letters, digits, underscores, dots, or hyphens. The context limit is 65,536 tokens for `clef`, 24,576 for `clef-flash`, and 64,000 for `clef-omni`; the backend may truncate long inputs, so control input size in your application. The shared `images` field supports PNG, JPEG, and WebP, with up to four images, 4 MiB per image, and 8 MiB total; the provider converts them to Cloudflare's base64 data URLs.
+
+Only `clef-omni` accepts audio and video: audio uses `audio/wav` or `audio/mpeg`, up to four clips of 8 MiB each; video uses `video/mp4` or `video/webm`, up to two clips of 16 MiB each. Decoded audio and video share a 16 MiB limit. Cloudflare validates the 300-second audio and 60-second video duration limits; video is sampled at 2 fps. The image budget is separate. Pass each attachment as Base64 without a prefix; the provider adds the data URL prefix and sends top-level `audio` and `videos` fields. Other models are skipped before a request is sent, using the existing fallback chain. See the [Clef API](https://developers.cloudflare.com/workers-ai/models/clef/), [Clef-omni API](https://developers.cloudflare.com/workers-ai/models/clef-omni/), and [Workers AI REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
+
+Cloudflare's public examples explicitly show `audio/mpeg` and `video/mp4`. This package maps WAV and WebM to `audio/wav` and `video/webm`, respectively, but those exact MIME values have not yet been validated against an account schema or live request. Validate WAV or WebM with a small sample before relying on it; MP3 and MP4 have official request examples.
+
+The Omni capabilities above target Cloudflare's hosted API. A custom `baseURL` must implement the same model and media contract; the repository's local Clef test wrapper currently provides `clef-flash` only.
 
 For embedding, create the provider directly. An optional `fetch` implementation supports custom transport or local protocol fixtures:
 
@@ -99,4 +107,4 @@ const backend = createCloudflareProvider({
 ctx.effect(() => ctx.system1.registerProvider('cloudflare', backend))
 ```
 
-See [testing and live model validation](testing.en.md#cloudflare-credentials) for creating credentials, the free allocation, and the live probe.
+See [testing and live model validation](testing.en.md#cloudflare-credentials) for creating credentials and running the live probe.

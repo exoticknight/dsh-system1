@@ -13,6 +13,8 @@
 
 `jev-1.14.0` 和 `jev-1.13.0` 是固定版本。`jev-latest` 指向最新稳定版，`jev-preview` 指向最新发布版；别名映射会随 TypeSafe 更新。需要固定行为时选择版本 ID。详见 TypeSafe 的[模型目录](https://docs.typesafe.ai/models)。
 
+provider 模型目录与能力由本项目显式维护，不会在运行时自动覆盖。跟进上游更新时，先核对官方 changelog、模型页或 schema 的模型 ID、输入格式与限制，再更新对应 provider 的模型目录、能力声明、传输 fixture 和中英文文档；动态别名只跟随模型名称，不代表新能力已同步。价格等上游可变信息不纳入产品契约。
+
 密钥优先通过 DSH credentials 服务解析；宿主没有该服务时读取进程环境。密钥不会回显。在服务组件的设置页填写 API Key 后，与连接参数一起点「保存设置」写入 DSH 凭据存储；留空保存会保留已有密钥。设置页仅在当前值与包默认值不同时显示「已覆盖」，「恢复默认值」会写回包默认值。各独立 provider 插件可用 `id` 和 `apiKeyEnv` 自定义注册名及凭据引用。
 
 ## 本地部署范围
@@ -85,7 +87,13 @@ const result = await ctx.system1.decide({
 })
 ```
 
-Cloudflare 对每次请求最多接受 64 道题，题号最长 100 个字符，可使用字母、数字、下划线、点和连字符。上下文上限按模型分别为 `clef` 65,536、`clef-flash` 24,576、`clef-omni` 64,000 tokens；长输入可能由后端截断，应在业务侧控制输入长度。统一 `images` 附件支持 PNG、JPEG 和 WebP，每张最大 4 MiB、总计最大 8 MiB，最多 4 张；provider 会转换成 Cloudflare 所需的 base64 data URL。Clef-omni 上游也接受音频和视频，但当前公共请求契约只暴露图片输入。参见 [Clef 官方接口](https://developers.cloudflare.com/workers-ai/models/clef/)、[Clef-omni 官方接口](https://developers.cloudflare.com/workers-ai/models/clef-omni/)和 [Workers AI REST 入门](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)。
+Cloudflare 对每次请求最多接受 64 道题，题号最长 100 个字符，可使用字母、数字、下划线、点和连字符。上下文上限按模型分别为 `clef` 65,536、`clef-flash` 24,576、`clef-omni` 64,000 tokens；长输入可能由后端截断，应在业务侧控制输入长度。统一 `images` 附件支持 PNG、JPEG 和 WebP，每张最大 4 MiB、总计最大 8 MiB，最多 4 张；provider 会转换成 Cloudflare 所需的 base64 data URL。
+
+只有 `clef-omni` 接受音频和视频：音频可用 `audio/wav` 或 `audio/mpeg`，最多 4 段、每段不超过 8 MiB；视频可用 `video/mp4` 或 `video/webm`，最多 2 段、每段不超过 16 MiB。音频与视频解码后合计不超过 16 MiB；音频最长 300 秒、视频最长 60 秒，时长由 Cloudflare 校验，视频按 2 fps 采样。图片的 8 MiB 预算单独计算。附件以不带前缀的 Base64 传入，provider 会添加 data URL 前缀并写入顶层 `audio`、`videos` 字段；其他模型会在发出请求前因不支持媒体而被跳过，沿用现有备用模型链。参见 [Clef 官方接口](https://developers.cloudflare.com/workers-ai/models/clef/)、[Clef-omni 官方接口](https://developers.cloudflare.com/workers-ai/models/clef-omni/)和 [Workers AI REST 入门](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)。
+
+Cloudflare 的公开示例明确展示 `audio/mpeg` 与 `video/mp4`；本包把 WAV 与 WebM 分别映射为 `audio/wav`、`video/webm`，但尚未用账户级 schema 或真实请求验证这两个 MIME 值。首次使用 WAV 或 WebM 前，建议先以小样本验证；MP3 与 MP4 有官方请求示例可参考。
+
+上述 Omni 能力针对 Cloudflare 托管接口。自定义 `baseURL` 必须实现相同的模型和媒体契约；仓库中的本地 Clef 测试包装目前只提供 `clef-flash`。
 
 嵌入使用时可直接创建 provider；`fetch` 可选，用于替换传输或本地协议 fixture：
 
@@ -99,4 +107,4 @@ const backend = createCloudflareProvider({
 ctx.effect(() => ctx.system1.registerProvider('cloudflare', backend))
 ```
 
-凭据申请、免费额度和真实调用探针见[测试与真实模型验证](testing.md#cloudflare-凭据)。
+凭据申请和真实调用探针见[测试与真实模型验证](testing.md#cloudflare-凭据)。

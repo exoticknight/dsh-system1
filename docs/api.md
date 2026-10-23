@@ -4,7 +4,7 @@
 
 ## 请求与结果
 
-`decide({ state, questions, images?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，优先级为：调用显式值、显式配置的服务级值、provider 默认值、原有 800 ms 回退值。Nace provider 默认 60,000 ms，其他内置 provider 默认 800 ms。每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
+`decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，优先级为：调用显式值、显式配置的服务级值、provider 默认值、原有 800 ms 回退值。Nace provider 默认 60,000 ms，其他内置 provider 默认 800 ms。每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
 
 公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出类型，包括 `ProviderModel`；`dsh-system1/providers` 导出 `findProviderModel`。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya`、`dsh-system1/providers/nace` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件、`create…Provider` 工厂及各自模型数组（`TYPESAFE_MODELS`、`LAYA_MODELS`、`NACE_MODELS`、`CLOUDFLARE_MODELS`）。连接参数与模型选择见[模型服务配置](providers.md)。
 
@@ -34,22 +34,27 @@ if (result.answers.topic.status === 'ok') {
 
 `noul` 返回 `probabilityTrue`；`choice` 返回候选键与完整 `probabilities`；`score` 返回从 0 开始的期望等级，以及按 `criteria` 顺序排列的分布。`box` 问题返回 `{ type: 'box', box: { top, bottom, left, right }, confidence? }`，边缘是 0 到 1 之间的图片比例。概率和坐标都是模型输出，消费插件自行确定动作阈值。
 
-`images` 是对整个请求共享的可选图片附件列表，最多 8 张；每项为 `{ mediaType, data }`，`mediaType` 支持 `image/png`、`image/jpeg` 和 `image/webp`，`data` 是标准补位 Base64，不带 data URL 前缀。每个问题都可以使用这些图片；`box` 需要至少一张图片。provider 会按模型能力检查格式、数量和大小：Nace 只有 `drex-max` 接受图片（最多 8 张），TypeSafe 和 Cloudflare 的模型上限更低；兜底链会跳过不支持当前图片输入的模型。`longContext: true` 请求模型启用扩展上下文，当前 TypeSafe Jev 支持至多 262k tokens；未设置时使用常规上下文限制。
+`images`、`audio` 和 `videos` 是对整个请求共享的可选附件列表，每项为 `{ mediaType, data }`，`data` 是标准补位 Base64，不带 data URL 前缀。图片最多 8 张，支持 `image/png`、`image/jpeg` 和 `image/webp`；每个问题都可以使用这些图片，`box` 需要至少一张图片。provider 会按模型能力检查格式、数量和大小：Nace 只有 `drex-max` 接受图片（最多 8 张），TypeSafe 和 Cloudflare 的模型上限更低。音频支持 `audio/wav`、`audio/mpeg`，视频支持 `video/mp4`、`video/webm`；目前只有 Cloudflare `clef-omni` 接受音频和视频，最多 4 段音频（每段 8 MiB、300 秒）与 2 段视频（每段 16 MiB、60 秒）。音频和视频解码后合计最多 16 MiB，图片预算独立；时长由 Cloudflare 校验，视频按 2 fps 采样。provider 会按模型能力预检格式、数量和字节数，兜底链会跳过不支持这些附件的模型。`longContext: true` 请求模型启用扩展上下文，当前 TypeSafe Jev 支持至多 262k tokens；未设置时使用常规上下文限制。
+
+Cloudflare 的公开示例明确使用 MP3=`audio/mpeg` 和 MP4=`video/mp4`；本包将 WAV、WebM 分别映射为 `audio/wav`、`video/webm`，但这两个 MIME 值尚未通过账户级 schema 或真实请求验证。首次使用 WAV 或 WebM 前，请先用小样本验证。
 
 ```ts
 const result = await ctx.system1.decide({
-  state: '厨房台面上的物品。',
+  state: '检查这台设备的安装和运行状态。',
   images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
+  audio: [{ mediaType: 'audio/mpeg', data: audioBase64 }],
+  videos: [{ mediaType: 'video/mp4', data: videoBase64 }],
   questions: {
-    mug: { type: 'box', instructions: '定位图片中的咖啡杯。' },
+    label_visible: { type: 'noul', instructions: '铭牌在图片中是否清晰可见？' },
+    runs_smoothly: { type: 'noul', instructions: '设备运行时是否平稳，没有异响？' },
   },
-  model: { provider: 'typesafe', model: 'jev-1.14.0' },
+  model: { provider: 'cloudflare', model: 'clef-omni' },
 })
 ```
 
 TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider 和实际模型。TypeSafe 根据分布计算 0–1 的确定性统计量作为 confidence，但协议没有固定其公式，详见 [TypeSafe Confidence](https://docs.typesafe.ai/confidence)。其他 provider 必须先说明 confidence 的语义，消费插件才能判断是否能复用其他 provider 的阈值。
 
-`state` 支持 JSON。当前 TypeSafe state 支持字符串、对象和数组；其他 JSON 标量返回 `unsupported`。问题 instructions 和 criteria 描述支持字符串、对象或数组；choice 描述也可以为 `null`。图片通过顶层 `images` 字段传入。问题和选项标识不得为空，也不能为 `__proto__`、`prototype` 或 `constructor`。
+`state` 支持 JSON。当前 TypeSafe state 支持字符串、对象和数组；其他 JSON 标量返回 `unsupported`。问题 instructions 和 criteria 描述支持字符串、对象或数组；choice 描述也可以为 `null`。媒体通过顶层 `images`、`audio`、`videos` 字段传入。问题和选项标识不得为空，也不能为 `__proto__`、`prototype` 或 `constructor`。
 
 无效调用结构抛出 `System1InputError`。结构合法的请求发生运行故障时，通过逐题 `status: 'error'` 返回。错误代码包括 `unavailable`、`unsupported`、`limit_exceeded`、`timeout`、`cancelled`、`provider_error` 和 `invalid_response`。某题缺失或答案无效不会影响其他合法答案；额外题号会记入 `meta.warnings`。
 
@@ -72,6 +77,7 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 - `state`：要判断的文本或 JSON 值。
 - `questions`：问题数组。每项包含 `id`（结果键，不可重复）、`type`（`noul`、`choice`、`score` 或 `box`）、字符串 `instructions`，以及与 `decide()` 相同的可选 `criteria`。`choice` 需要候选键到描述的对象，`score` 需要从低到高的等级数组，`box` 需要图片附件。
 - `images`：可选图片附件列表，格式与 `decide()` 的 `images` 相同。
+- `audio`、`videos`：可选音频和视频附件列表，格式与 `decide()` 相同；目前仅 Cloudflare `clef-omni` 支持。
 - `longContext`：可选布尔值；为 `true` 时请求 TypeSafe Jev 使用扩展上下文。
 - `model`：可选的 `{ provider, model }`，省略时使用服务默认模型。
 
@@ -101,7 +107,7 @@ const selected = findProviderModel(MODELS, requestedModel)
 ctx.effect(() => ctx.system1.registerProvider('custom', backend))
 ```
 
-同一个服务中的 provider id 必须唯一。注册返回幂等 disposer。注销会取消该实例的在途调用，服务释放时会清理全部注册。按模型声明已知能力限制，未知限制省略；图片格式、数量和字节限制通过 `images` 能力声明，扩展上下文通过 `longContext.maxTokens` 声明。context token 数仅供参考；实际 token 预算由后端执行。`ProviderRequest` 会收到公共图片附件与 `longContext` 选项。
+同一个服务中的 provider id 必须唯一。注册返回幂等 disposer。注销会取消该实例的在途调用，服务释放时会清理全部注册。按模型声明已知能力限制，未知限制省略；图片、音频和视频的格式、数量和字节限制分别通过 `images`、`audio`、`videos` 与 `audioVideo` 能力声明，扩展上下文通过 `longContext.maxTokens` 声明。context token 数仅供参考；实际 token 预算由后端执行。`ProviderRequest` 会收到公共媒体附件与 `longContext` 选项。
 
 ## TypeSafe 能力与限制
 

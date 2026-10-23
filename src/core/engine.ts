@@ -221,6 +221,8 @@ export class System1Engine {
               state: req.state,
               questions: req.questions,
               ...(req.images ? { images: req.images } : {}),
+              ...(req.audio ? { audio: req.audio } : {}),
+              ...(req.videos ? { videos: req.videos } : {}),
               ...(req.longContext ? { longContext: true } : {}),
               requestId,
             }),
@@ -329,6 +331,30 @@ function checkCapabilities(
         message: 'Image attachments exceed this model’s size limit.',
       }
   }
+  const audioError = checkMediaCapabilities(
+    request.audio,
+    c.audio,
+    'audio',
+  )
+  if (audioError) return audioError
+  const videoError = checkMediaCapabilities(
+    request.videos,
+    c.videos,
+    'video',
+  )
+  if (videoError) return videoError
+  if (request.audio?.length || request.videos?.length) {
+    const maxTotalBytes = c.audioVideo?.maxTotalBytes
+    const totalBytes = [
+      ...(request.audio ?? []),
+      ...(request.videos ?? []),
+    ].reduce((sum, item) => sum + decodedBase64Length(item.data), 0)
+    if (maxTotalBytes !== undefined && totalBytes > maxTotalBytes)
+      return {
+        code: 'limit_exceeded',
+        message: 'Audio and video attachments exceed this model’s size limit.',
+      }
+  }
   if (c.maxQuestions !== undefined && all.length > c.maxQuestions)
     return {
       code: 'limit_exceeded',
@@ -359,6 +385,43 @@ function checkCapabilities(
         message: 'Too many score levels for this model.',
       }
   }
+}
+
+function checkMediaCapabilities<TMediaType extends string>(
+  inputs: readonly { readonly mediaType: TMediaType; readonly data: string }[] | undefined,
+  capabilities: {
+    readonly formats: readonly TMediaType[]
+    readonly maxCount?: number | undefined
+    readonly maxBytesPerItem?: number | undefined
+  } | undefined,
+  modality: 'audio' | 'video',
+): DecisionError | undefined {
+  if (!inputs?.length) return undefined
+  const label = modality === 'audio' ? 'Audio' : 'Video'
+  if (!capabilities)
+    return {
+      code: 'unsupported',
+      message: `Model does not support ${modality} input.`,
+    }
+  if (capabilities.maxCount !== undefined && inputs.length > capabilities.maxCount)
+    return {
+      code: 'limit_exceeded',
+      message: `Too many ${modality} attachments for this model.`,
+    }
+  if (inputs.some(({ mediaType }) => !capabilities.formats.includes(mediaType)))
+    return {
+      code: 'unsupported',
+      message: `${label} format is not supported by this model.`,
+    }
+  const maxBytesPerItem = capabilities.maxBytesPerItem
+  if (
+    maxBytesPerItem !== undefined &&
+    inputs.some(({ data }) => decodedBase64Length(data) > maxBytesPerItem)
+  )
+    return {
+      code: 'limit_exceeded',
+      message: `A ${modality} attachment exceeds this model’s size limit.`,
+    }
 }
 
 function decodedBase64Length(data: string): number {
