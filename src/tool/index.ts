@@ -9,6 +9,11 @@ import type {
   Questions,
   VideoInput,
 } from '../contracts/index.js'
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_COUNT_PER_TYPE,
+  MAX_TOTAL_ATTACHMENT_BYTES,
+} from '../core/validation.js'
 
 export const TOOL_NAME = 'system1_decide'
 // The bundle mounts this entry enabled; its row switch in DSH turns the tool off.
@@ -24,6 +29,10 @@ const ERROR_CODES = [
   'provider_error',
   'invalid_response',
 ] as const
+const MIB = 1024 * 1024
+const ATTACHMENT_RESOURCE_LIMITS =
+  `up to ${MAX_ATTACHMENT_COUNT_PER_TYPE} items, ${MAX_ATTACHMENT_BYTES / MIB} MiB per item, ` +
+  `${MAX_TOTAL_ATTACHMENT_BYTES / MIB} MiB total decoded across all attachment types`
 
 const DESCRIPTION =
   'Ask System One for probabilistic judgments about shared text or JSON state, with optional image, audio, and video attachments. ' +
@@ -48,9 +57,9 @@ const PARAMETERS = {
     },
     images: {
       type: 'array',
-      maxItems: 4,
+      maxItems: MAX_ATTACHMENT_COUNT_PER_TYPE,
       description:
-        'Optional image attachments visible to every question. Each data value is padded base64 without a data-URL prefix. PNG and JPEG are supported across TypeSafe and Cloudflare; WebP requires Cloudflare.',
+        `Optional image attachments visible to every question (${ATTACHMENT_RESOURCE_LIMITS}). Each data value is padded base64 without a data-URL prefix. Provider limits may be lower. TypeSafe supports PNG and JPEG; Cloudflare and Nace drex-max also support WebP.`,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -66,9 +75,9 @@ const PARAMETERS = {
     },
     audio: {
       type: 'array',
-      maxItems: 4,
+      maxItems: MAX_ATTACHMENT_COUNT_PER_TYPE,
       description:
-        'Optional audio clips for Cloudflare Clef-omni (up to 4, 8 MiB each, 300 seconds each; audio and video share a 16 MiB decoded-size limit). Each data value is padded base64 without a data-URL prefix.',
+        `Optional audio clips (${ATTACHMENT_RESOURCE_LIMITS}). Cloudflare Clef-omni allows up to 4, 8 MiB each, 300 seconds each; audio and video share a 16 MiB decoded-size limit. Provider limits may be lower. Each data value is padded base64 without a data-URL prefix.`,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -81,9 +90,9 @@ const PARAMETERS = {
     },
     videos: {
       type: 'array',
-      maxItems: 2,
+      maxItems: MAX_ATTACHMENT_COUNT_PER_TYPE,
       description:
-        'Optional videos for Cloudflare Clef-omni (up to 2, 16 MiB each, 60 seconds each; sampled at 2 fps; audio and video share a 16 MiB decoded-size limit). Each data value is padded base64 without a data-URL prefix.',
+        `Optional videos (${ATTACHMENT_RESOURCE_LIMITS}). Cloudflare Clef-omni allows up to 2, 16 MiB each, 60 seconds each, sampled at 2 fps; audio and video share a 16 MiB decoded-size limit. Provider limits may be lower. Each data value is padded base64 without a data-URL prefix.`,
       items: {
         type: 'object',
         additionalProperties: false,

@@ -2,14 +2,14 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details and credentials in the matching component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full timeout budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Timeout precedence is per-call `timeoutMs`, explicitly configured service `timeoutMs`, provider default, then the legacy 800 ms fallback. Nace defaults to 60 seconds; the other built-in providers default to 800 ms. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
+Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details, credentials, and an optional `timeoutMs` on the matching provider component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full timeout budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Timeout precedence is per-call `timeoutMs`, the selected provider's settings-page `timeoutMs`, then that provider's own default. Leave the field blank to use the default. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
 
-| Provider | Models | Default base URL | Credential reference |
-| --- | --- | --- | --- |
-| `typesafe` | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
-| `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
-| `nace` | `drex-v2.0`, `drex-v1.5`, `drex-max` | `https://console.nace.ai` | `NACE_API_KEY` |
-| `cloudflare` | `clef`, `clef-flash`, `clef-omni` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
+| Provider | Models | Default timeout | Default base URL | Credential reference |
+| --- | --- | ---: | --- | --- |
+| `typesafe` | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | 800 ms | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
+| `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | 800 ms | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
+| `nace` | `drex-v2.0`, `drex-v1.5`, `drex-max` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `cloudflare` | `clef`, `clef-flash`, `clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` and `jev-1.13.0` are version-pinned IDs. `jev-latest` points to the newest stable release, while `jev-preview` points to the newest release; TypeSafe can move either alias over time. Choose a version ID when you need a fixed model. See TypeSafe's [model catalog](https://docs.typesafe.ai/models).
 
@@ -27,7 +27,7 @@ TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/qui
 
 ### Jev images, Box, and long context
 
-The public request accepts up to eight PNG, JPEG, or WebP attachments shared by every question; a provider or model may impose a lower limit. Jev supports up to four PNG/JPEG images; the provider encodes them as TypeSafe `assets` and automatically sends the `TypeSafe-Danger-Zone-Images` header. TypeSafe labels images and Box experimental; their format, limits, and accuracy may change between releases. Jev 1.14 (or `jev-preview` while it points to 1.14) supports `box`; its four edges are normalized coordinates from 0 to 1. Set `longContext: true` to opt into 262k tokens. The default remains 64k per request and 32k per question. See TypeSafe's [image guide](https://docs.typesafe.ai/images), [Box guide](https://docs.typesafe.ai/primitives/box), and [context limits](https://docs.typesafe.ai/models#long-context).
+The public request has resource-safety ceilings of 16 items per attachment type, 16 MiB per item, and 64 MiB total decoded across all attachments; model capabilities may be stricter. Jev supports up to four PNG/JPEG images, 16 MiB each and 16 MiB total; the provider encodes them as TypeSafe `assets` and automatically sends the `TypeSafe-Danger-Zone-Images` header. TypeSafe labels images and Box experimental; their format, limits, and accuracy may change between releases. Jev 1.14 (or `jev-preview` while it points to 1.14) supports `box`; its four edges are normalized coordinates from 0 to 1. Set `longContext: true` to opt into 262k tokens. The default remains 64k per request and 32k per question. See TypeSafe's [image guide](https://docs.typesafe.ai/images), [Box guide](https://docs.typesafe.ai/primitives/box), and [context limits](https://docs.typesafe.ai/models#long-context).
 
 ## Nace.AI Drex
 

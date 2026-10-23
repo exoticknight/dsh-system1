@@ -17,15 +17,15 @@ export interface ProviderModel {
 
 export interface ModelCapabilities {
   readonly primitives: readonly Primitive[]
-  readonly maxQuestions?: number | undefined
-  readonly maxChoiceOptions?: number | undefined
-  readonly maxScoreLevels?: number | undefined
+  readonly maxQuestions: number | null
+  readonly maxChoiceOptions: number | null
+  readonly maxScoreLevels: number | null
   readonly images?:
     | {
         readonly formats: readonly ImageMediaType[]
-        readonly maxCount?: number | undefined
-        readonly maxBytesPerImage?: number | undefined
-        readonly maxTotalBytes?: number | undefined
+        readonly maxCount: number
+        readonly maxBytesPerImage: number
+        readonly maxTotalBytes: number
       }
     | undefined
   readonly audio?: MediaCapabilities<AudioMediaType> | undefined
@@ -44,8 +44,8 @@ export interface ModelCapabilities {
 }
 export interface MediaCapabilities<TMediaType extends string> {
   readonly formats: readonly TMediaType[]
-  readonly maxCount?: number | undefined
-  readonly maxBytesPerItem?: number | undefined
+  readonly maxCount: number
+  readonly maxBytesPerItem: number
 }
 export interface ProviderRequest {
   readonly model: string
@@ -67,8 +67,8 @@ export interface ProviderResponse {
   readonly degraded?: boolean | undefined
 }
 export interface System1Provider {
-  /** Fallback timeout for this provider when the caller and service set none. */
-  readonly defaultTimeoutMs?: number | undefined
+  /** Timeout for this provider when the caller does not set one. */
+  timeoutMs(): number
   describe(model: string, signal: AbortSignal): Promise<ModelCapabilities>
   evaluate(
     request: ProviderRequest,

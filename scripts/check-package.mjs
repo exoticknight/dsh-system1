@@ -65,7 +65,7 @@ import { CLOUDFLARE_MODELS } from 'dsh-system1/providers/cloudflare'
 import * as tool from 'dsh-system1/tool'
 const ctx=new Context()
 const service=await ctx.plugin(Service,{defaultModel:{provider:'test',model:'fixture'}})
-const provider:System1Provider={async describe(){return {primitives:['choice']}},async evaluate(){return {model:'fixture',answers:{topic:{status:'ok',answer:{type:'choice',value:'a',probabilities:{a:1,b:0}}}}}}}
+const provider:System1Provider={timeoutMs(){return 800},async describe(){return {primitives:['choice'],maxQuestions:null,maxChoiceOptions:null,maxScoreLevels:null}},async evaluate(){return {model:'fixture',answers:{topic:{status:'ok',answer:{type:'choice',value:'a',probabilities:{a:1,b:0}}}}}}}
 ctx.system1.registerProvider('test',provider)
 const questions={topic:{type:'choice',instructions:'?',criteria:{a:'A',b:'B'}}} as const satisfies Questions
 const result=await ctx.system1.decide({state:'fixture',questions})

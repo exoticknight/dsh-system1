@@ -9,6 +9,8 @@ export interface CloudflareOptions {
   apiKey?: string
   accountId?: string
   baseURL?: string
+  timeoutMs?: number
+  resolveTimeoutMs?: () => number | undefined
   resolveApiKey?: () => string | undefined | Promise<string | undefined>
   resolveAccountId?: () => string | undefined | Promise<string | undefined>
   resolveBaseURL?: () => string | undefined
@@ -16,6 +18,7 @@ export interface CloudflareOptions {
 }
 
 type CloudflareModelId = (typeof CLOUDFLARE_MODELS)[number]['id']
+const DEFAULT_TIMEOUT_MS = 800
 
 const MAX_TOKENS_BY_MODEL: Readonly<Record<CloudflareModelId, number>> = {
   clef: 65_536,
@@ -32,6 +35,8 @@ function resolveCloudflareModel(model: string) {
 const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
   primitives: ['noul', 'choice', 'score'],
   maxQuestions: 64,
+  maxChoiceOptions: null,
+  maxScoreLevels: null,
   images: {
     formats: ['image/png', 'image/jpeg', 'image/webp'],
     maxCount: 4,
@@ -59,6 +64,7 @@ export function createCloudflareProvider(
 ): System1Provider {
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
+    timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     async describe(model) {
       const selectedModel = resolveCloudflareModel(model)
       if (!selectedModel)

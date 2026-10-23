@@ -6,11 +6,11 @@
 
 | 层级 | 命令 | 覆盖范围 |
 | --- | --- | --- |
-| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、每次尝试的超时预算、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
-| Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载。使用本地 HTTP fixture 或替换的 `fetch` |
+| 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、请求/Provider 超时优先级、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
+| Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载，以及四个内置 provider 的目录、能力、超时和各支持原语往返一致性。使用本地 HTTP fixture 或替换的 `fetch` |
 | 真实模型探针 | `pnpm probe <target>` | 通过公共服务和 provider 插件入口调用真实模型 |
 
-`pnpm test` 运行前两层；`pnpm test <provider>` 只运行某个 provider，例如 `pnpm test nace`，可同时指定多个。测试文件位于 `tests/plugin/` 与 `tests/providers/<provider>.test.ts`；新增 provider 时添加对应的 provider 测试文件。
+`pnpm test` 运行前两层；`pnpm test <provider>` 只运行某个 provider，例如 `pnpm test nace`，可同时指定多个。Provider 通用一致性套件位于 `tests/providers/conformance.test.ts`，可用 `pnpm test conformance` 单独运行；新增 provider 时在其中登记模型目录、能力和 fixture，再添加对应的 provider 协议测试文件。
 
 ## 真实模型探针
 

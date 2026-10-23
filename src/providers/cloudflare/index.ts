@@ -14,18 +14,21 @@ export interface Config {
   apiKeyEnv: string
   accountId: string | Volatile<string>
   baseURL: string | Volatile<string>
+  timeoutMs?: Volatile<number | undefined>
 }
 interface ConfigInput {
   id?: string | null
   apiKeyEnv?: string | null
   accountId?: string | null
   baseURL?: string | null
+  timeoutMs?: number | null
 }
 interface RuntimeConfig {
   id: string
   apiKeyEnv: string
   accountId: Volatile<string>
   baseURL: Volatile<string>
+  timeoutMs: Volatile<number | undefined>
 }
 
 export const inject = ['system1']
@@ -39,6 +42,7 @@ export const Config: Schema<ConfigInput, RuntimeConfig> = Schema.object({
   baseURL: Schema.string()
     .default('https://api.cloudflare.com/client/v4')
     .volatile(),
+  timeoutMs: Schema.number().min(1).max(2147483647).step(1).volatile(),
 })
 
 export function apply(ctx: Context, config: Config | RuntimeConfig) {
@@ -53,6 +57,7 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
     },
     resolveAccountId: () => readConfigValue<string>(config.accountId)?.trim() || process.env.CLOUDFLARE_ACCOUNT_ID,
     resolveBaseURL: () => readConfigValue<string>(config.baseURL),
+    resolveTimeoutMs: () => readConfigValue(config.timeoutMs),
   })
   ctx.effect(() => ctx.system1.registerProvider(config.id, provider))
 }

@@ -20,7 +20,10 @@ declare const en: {
     fallbackRemove: string;
     timeout: string;
     defaultHint: string;
-    timeoutHint: string;
+    timeoutTypesafeHint: string;
+    timeoutLayaHint: string;
+    timeoutNaceHint: string;
+    timeoutCloudflareHint: string;
     providerEnabledHint: string;
     feedbackPrompt: string;
     providerFeedbackPrompt: string;

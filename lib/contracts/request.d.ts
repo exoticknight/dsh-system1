@@ -73,6 +73,5 @@ export interface DecideResponse<Q extends Questions = Questions> {
 export interface System1Options {
     readonly defaultModel?: ModelRef | undefined;
     readonly fallbackModels?: readonly ModelRef[];
-    readonly timeoutMs?: number;
 }
 //# sourceMappingURL=request.d.ts.map

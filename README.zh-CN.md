@@ -49,7 +49,7 @@ dsh plugin --profile <profile> add dsh-system1
 
 `dsh plugin` 命令必须指定 profile；安装到一个 profile 不会在其他 profile 中启用该插件。如需从 GitHub 仓库安装，在上述命令中把 `dsh-system1` 替换为 `github:exoticknight/dsh-system1`。
 
-随包提供的 patch 会挂载服务及内置 provider。服务默认使用 `typesafe` 的 `jev-latest`。单次模型尝试依次采用调用显式超时、显式配置的服务超时、provider 默认超时；若均未设置，回退到原有的 800 ms。Nace 默认 60 秒，其他内置 provider 默认 800 ms。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整 `timeoutMs`，本地 CPU 推理通常需要更长预算。
+随包提供的 patch 会挂载服务及内置 provider。服务默认使用 `typesafe` 的 `jev-latest`。每次尝试优先采用调用显式指定的 `timeoutMs`，否则使用该 provider 的配置值或自身默认值：TypeSafe、Laya、Cloudflare 为 800 ms，Nace 为 60,000 ms。请在对应 provider 的设置页配置超时。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整所选 provider 的 `timeoutMs`，本地 CPU 推理通常需要更长预算。
 
 各 provider 的模型能力、凭据、端点和图片限制见[模型服务配置](docs/providers.md)。
 

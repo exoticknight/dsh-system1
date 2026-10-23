@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from 'node:util'
 import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js'
 import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js'
 import { System1ProviderError } from '../contracts/error.js'
+import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from './answers.js'
 
 const wireAnswer = z.discriminatedUnion('type', [
   z.object({ type: z.literal('noul'), noul: z.number() }),
@@ -43,6 +44,7 @@ const wireResponse = z.object({
 export interface SystemOneHttpProviderOptions {
   readonly providerName: string
   readonly defaultBaseURL: string
+  readonly timeoutMs: () => number
   readonly resolveApiKey: () => string | undefined | Promise<string | undefined>
   readonly resolveBaseURL?: () => string | undefined
   readonly apiKeyRequired?: boolean
@@ -70,6 +72,7 @@ export function createSystemOneHttpProvider(
 ): System1Provider {
   const fetchFn = options.fetch ?? globalThis.fetch
   return {
+    timeoutMs: options.timeoutMs,
     async describe(model) {
       const selectedModel = options.resolveModel(model)
       if (!selectedModel)
@@ -79,7 +82,12 @@ export function createSystemOneHttpProvider(
         })
       return typeof options.capabilities === 'function'
         ? options.capabilities(selectedModel.id)
-        : options.capabilities ?? { primitives: ['noul', 'choice', 'score'] }
+        : options.capabilities ?? {
+            primitives: ['noul', 'choice', 'score'],
+            maxQuestions: null,
+            maxChoiceOptions: null,
+            maxScoreLevels: null,
+          }
     },
     async evaluate(request, signal) {
       const selectedModel = options.resolveModel(request.model)
@@ -178,7 +186,6 @@ export function normalizeSystemOneResponse(
   selectResponseModel?: (
     response: z.infer<typeof wireResponse>,
   ) => string | undefined,
-  options: { probabilityRoundingDigits?: number } = {},
 ): ProviderResponse {
   const parsed = wireResponse.safeParse(raw)
   if (!parsed.success)
@@ -191,11 +198,7 @@ export function normalizeSystemOneResponse(
     selectResponseModel?.(parsed.data) ?? parsed.data.model ?? request.model
   return {
     model: answeredModel || request.model,
-    answers: normalizeAnswers(
-      request,
-      parsed.data.answers,
-      options.probabilityRoundingDigits,
-    ),
+    answers: normalizeAnswers(request, parsed.data.answers),
     ...(parsed.data.usage
       ? {
           usage: {
@@ -214,7 +217,6 @@ export function normalizeSystemOneResponse(
 function normalizeAnswers(
   request: ProviderRequest,
   answers: Record<string, unknown>,
-  probabilityRoundingDigits?: number,
 ) {
   return Object.fromEntries(
     Object.entries(answers).map(([id, raw]) => {
@@ -224,21 +226,9 @@ function normalizeAnswers(
         return [id, invalidAnswer()]
 
       const answer = parsed.data
-      if (answer.type === 'noul')
-        return [id, { status: 'ok', answer: { type: 'noul', probabilityTrue: answer.noul } }]
+      if (answer.type === 'noul') return [id, noulAnswer(answer.noul)]
       if (answer.type === 'choice')
-        return [id, {
-          status: 'ok',
-          answer: {
-            type: 'choice',
-            value: answer.choice,
-            probabilities: normalizeRoundedDistributionRecord(
-              answer.probabilities,
-              probabilityRoundingDigits,
-            ),
-            ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
-          },
-        }]
+        return [id, choiceAnswer(answer.choice, answer.probabilities, answer.confidence)]
       if (answer.type === 'box')
         return [id, {
           status: 'ok',
@@ -252,102 +242,33 @@ function normalizeAnswers(
         }]
 
       if (question.type !== 'score') return [id, invalidAnswer()]
-      if (answer.legend !== undefined) {
-        const normalizedLegend = Array.isArray(answer.legend)
-          ? Object.fromEntries(
-              answer.legend.map((value, index) => [String(index), value]),
-            )
-          : answer.legend
-        const expectedLegend = Object.fromEntries(
-          question.criteria.map((value, index) => [String(index), value]),
-        )
-        const expectedTextLegend = Object.fromEntries(
-          question.criteria.map((value, index) => [
-            String(index),
-            stringifyDescription(value),
-          ]),
-        )
-        if (
-          !isDeepStrictEqual(normalizedLegend, expectedLegend) &&
-          !isDeepStrictEqual(normalizedLegend, expectedTextLegend)
-        )
-          return [id, invalidAnswer()]
-      }
+      if (
+        answer.legend !== undefined &&
+        (!answer.legend || Array.isArray(answer.legend) ||
+          !isDeepStrictEqual(
+            answer.legend,
+            Object.fromEntries(
+              question.criteria.map((value, index) => [String(index), value]),
+            ),
+          ))
+      )
+        return [id, invalidAnswer()]
       const probabilities = question.criteria.map((_, index) => {
         const probability = answer.probabilities[String(index)]
         return probability
       })
       if (probabilities.some((probability) => probability === undefined))
         return [id, invalidAnswer()]
-      const normalizedProbabilities = normalizeRoundedDistribution(
+      return [id, scoreAnswer(
+        answer.score,
+        question.criteria,
         probabilities as number[],
-        probabilityRoundingDigits,
-      )
-      return [id, {
-        status: 'ok',
-        answer: {
-          type: 'score',
-          value: answer.score,
-          levels: question.criteria,
-          probabilities: normalizedProbabilities,
-          ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
-        },
-      }]
+        answer.confidence,
+      )]
     }),
   )
 }
 
-function normalizeRoundedDistributionRecord(
-  probabilities: Record<string, number>,
-  roundingDigits?: number,
-): Record<string, number> {
-  if (roundingDigits === undefined) return probabilities
-  const keys = Object.keys(probabilities)
-  const values = normalizeRoundedDistribution(
-    keys.map((key) => probabilities[key]!),
-    roundingDigits,
-  )
-  return Object.fromEntries(keys.map((key, index) => [key, values[index]!]))
-}
-
-function normalizeRoundedDistribution(
-  probabilities: readonly number[],
-  roundingDigits?: number,
-): readonly number[] {
-  if (roundingDigits === undefined || probabilities.length === 0) return probabilities
-  if (
-    !Number.isInteger(roundingDigits) ||
-    roundingDigits < 0 ||
-    probabilities.some((value) => !Number.isFinite(value) || value < 0 || value > 1)
-  )
-    return probabilities
-
-  const total = probabilities.reduce((sum, value) => sum + value, 0)
-  if (!(total > 0) || total === 1) return probabilities
-
-  // Drex can return probabilities rounded to four decimal places. The sum may
-  // therefore differ from one by at most half a unit per entry.
-  const roundingBound = probabilities.length * 0.5 * 10 ** -roundingDigits
-  if (Math.abs(total - 1) > roundingBound + Number.EPSILON * probabilities.length)
-    return probabilities
-  return probabilities.map((value) => value / total)
-}
-
-function invalidAnswer() {
-  return {
-    status: 'error',
-    error: {
-      code: 'invalid_response',
-      message: 'Provider returned an invalid answer.',
-    },
-  }
-}
-
-/** Nace accepts only text descriptions; JSON descriptions retain their structure as compact text. */
-export function stringifyDescription(value: string | object | readonly unknown[]): string {
-  if (typeof value === 'string') return value
-  return JSON.stringify(value)!
-}
 
 function modelField(model: string | undefined): { model?: string } {
   return model ? { model } : {}

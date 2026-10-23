@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import type { ModelCapabilities } from '../../src/contracts/provider.js'
 import { System1Engine } from '../../src/core/engine.js'
+import { capabilitiesSchema } from '../../src/core/validation.js'
 import System1Service, {
   System1InputError,
   System1ProviderError,
@@ -17,9 +18,22 @@ const ok = {
     q: { status: 'ok', answer: { type: 'noul', probabilityTrue: 0.8 } },
   },
 }
+function capabilitiesFor(
+  primitives: ModelCapabilities['primitives'],
+  overrides: Partial<ModelCapabilities> = {},
+): ModelCapabilities {
+  return {
+    primitives,
+    maxQuestions: null,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
+    ...overrides,
+  }
+}
 const provider: System1Provider = {
+  timeoutMs: () => 800,
   async describe() {
-    return { primitives: ['noul'] }
+    return capabilitiesFor(['noul'])
   },
   async evaluate() {
     return ok
@@ -67,24 +81,112 @@ test('public service returns provider metadata and validates caller input', asyn
   )
 })
 
-test('timeout precedence is request, service, provider, then the legacy 800 ms fallback', async () => {
+test('public attachment structure keeps provider policy separate from resource-safety ceilings', async (t) => {
+  const { ctx } = await setup(t)
+  const tinyImage = { mediaType: 'image/png' as const, data: 'AAAA' }
+  await assert.rejects(
+    ctx.system1.decide({ state: null, questions, images: Array.from({ length: 17 }, () => tinyImage) }),
+    System1InputError,
+  )
+
+  const sixteenMiBBase64 = `${'A'.repeat(22_369_622)}==`
+  await assert.rejects(
+    ctx.system1.decide({
+      state: null,
+      questions,
+      images: Array.from({ length: 5 }, () => ({
+        mediaType: 'image/png' as const,
+        data: sixteenMiBBase64,
+      })),
+    }),
+    System1InputError,
+  )
+  await assert.rejects(
+    ctx.system1.decide({
+      state: null,
+      questions,
+      images: [{ mediaType: 'image/png', data: `${sixteenMiBBase64}AAAA` }],
+    }),
+    System1InputError,
+  )
+})
+
+test('runtime capability declarations require all count and attachment limits and warn once', async () => {
+  const valid = capabilitiesFor(['noul'])
+  assert.equal(capabilitiesSchema.safeParse(valid).success, true)
+  assert.equal(capabilitiesSchema.safeParse({ primitives: ['noul'] }).success, false)
+  assert.equal(capabilitiesSchema.safeParse({
+    ...valid,
+    images: { formats: ['image/png'], maxCount: 4, maxBytesPerImage: 16 * 1024 * 1024 },
+  }).success, false)
+
+  const warnings: string[] = []
+  let evaluations = 0
+  const engine = new System1Engine({
+    defaultModel: { provider: 'invalid', model: 'one' },
+    fallbackModels: [{ provider: 'invalid', model: 'two' }],
+  })
+  engine.registerProvider('invalid', {
+    timeoutMs: () => 800,
+    async describe() {
+      return { primitives: ['noul'] } as unknown as ModelCapabilities
+    },
+    async evaluate() {
+      evaluations++
+      return ok
+    },
+  }, (message) => warnings.push(message))
+  try {
+    const result = await engine.decide({ state: null, questions })
+    assert.equal(
+      result.answers.q.status === 'error' && result.answers.q.error.code,
+      'invalid_response',
+    )
+    assert.equal(evaluations, 0)
+    assert.equal(warnings.length, 1)
+  } finally {
+    engine.dispose()
+  }
+})
+
+test('invalid provider timeout fails as invalid_response, while a request override wins', async () => {
+  let timeoutReads = 0
+  let evaluations = 0
+  const engine = new System1Engine({ defaultModel: { provider: 'timed', model: 'fixture' } })
+  engine.registerProvider('timed', {
+    timeoutMs() {
+      timeoutReads++
+      return 0
+    },
+    async describe() { return capabilitiesFor(['noul']) },
+    async evaluate() { evaluations++; return ok },
+  })
+  try {
+    const invalid = await engine.decide({ state: null, questions })
+    assert.equal(invalid.answers.q.status === 'error' && invalid.answers.q.error.code, 'invalid_response')
+    assert.equal(evaluations, 0)
+
+    const overridden = await engine.decide({ state: null, questions, timeoutMs: 500 })
+    assert.equal(overridden.answers.q.status, 'ok')
+    assert.equal(timeoutReads, 1)
+    assert.equal(evaluations, 1)
+  } finally {
+    engine.dispose()
+  }
+})
+
+test('request timeout overrides provider timeout; residual service timeout is ignored', async (t) => {
   async function decide(options: {
-    serviceTimeoutMs?: number
     providerTimeoutMs?: number
     requestTimeoutMs?: number
     delayMs?: number
   }) {
     const engine = new System1Engine({
       defaultModel: { provider: 'timed', model: 'fixture' },
-      ...(options.serviceTimeoutMs !== undefined
-        ? { timeoutMs: options.serviceTimeoutMs }
-        : {}),
     })
     engine.registerProvider('timed', {
       ...provider,
-      ...(options.providerTimeoutMs !== undefined
-        ? { defaultTimeoutMs: options.providerTimeoutMs }
-        : {}),
+      timeoutMs: () => options.providerTimeoutMs ?? 800,
       evaluate(_request, signal) {
         return new Promise((resolve, reject) => {
           const timer = setTimeout(() => resolve(ok), options.delayMs ?? 35)
@@ -113,29 +215,33 @@ test('timeout precedence is request, service, provider, then the legacy 800 ms f
     providerDefault.answers.q.status === 'error' && providerDefault.answers.q.error.code,
     'timeout',
   )
-  assert.equal((await decide({ providerTimeoutMs: 10, serviceTimeoutMs: 100 })).answers.q.status, 'ok')
-  assert.equal((await decide({ providerTimeoutMs: 10, serviceTimeoutMs: 10, requestTimeoutMs: 100 })).answers.q.status, 'ok')
-  assert.equal((await decide({ providerTimeoutMs: 10, serviceTimeoutMs: 800 })).answers.q.status, 'ok')
+  assert.equal((await decide({ providerTimeoutMs: 10, requestTimeoutMs: 100 })).answers.q.status, 'ok')
+  assert.equal((await decide({ providerTimeoutMs: 100, requestTimeoutMs: 10 })).answers.q.status === 'error', true)
   assert.equal((await decide({})).answers.q.status, 'ok')
 
-  const unconfigured = System1Service.Config({}) as unknown as { timeoutMs?: unknown }
-  const explicitlyConfigured = System1Service.Config({ timeoutMs: 800 }) as unknown as { timeoutMs?: unknown }
-  const read = (value: unknown) =>
-    value && typeof value === 'object' && 'get' in value && typeof value.get === 'function'
-      ? value.get()
-      : value
-  assert.equal(read(unconfigured.timeoutMs), undefined)
-  assert.equal(read(explicitlyConfigured.timeoutMs), 800)
-
-  const invalidProviderDefault = new System1Engine()
-  assert.throws(
-    () => invalidProviderDefault.registerProvider('bad', {
-      ...provider,
-      defaultTimeoutMs: 0,
-    }),
-    System1InputError,
-  )
-  invalidProviderDefault.dispose()
+  const schemaOutput = System1Service.Config({}) as unknown as Record<string, unknown>
+  assert.equal(Object.hasOwn(schemaOutput, 'timeoutMs'), false)
+  const ctx = new Context()
+  const fiber = await ctx.plugin(System1Service, {
+    defaultModel: { provider: 'legacy', model: 'fixture' },
+    timeoutMs: 1,
+  } as unknown as System1Options)
+  t.after(async () => { await fiber.dispose() })
+  ctx.system1.registerProvider('legacy', {
+    timeoutMs: () => 100,
+    async describe() { return capabilitiesFor(['noul']) },
+    async evaluate(_request, signal) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(ok), 20)
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer)
+          reject(signal.reason)
+        }, { once: true })
+      })
+    },
+  })
+  const legacyCall = await ctx.system1.decide({ state: null, questions })
+  assert.equal(legacyCall.answers.q.status, 'ok')
 })
 
 test('unavailable preferred model falls back and records the failed attempt', async (t) => {
@@ -372,16 +478,18 @@ test('unsupported preferred model falls back to a capable model', async (t) => {
     fallbackModels: [{ provider: 'backup', model: 'capable' }],
   })
   ctx.system1.registerProvider('test', {
+    timeoutMs: () => 800,
     async describe() {
-      return { primitives: ['noul'] }
+      return capabilitiesFor(['noul'])
     },
     async evaluate() {
       throw new Error('unsupported model must not be evaluated')
     },
   })
   ctx.system1.registerProvider('backup', {
+    timeoutMs: () => 800,
     async describe() {
-      return { primitives: ['score'] }
+      return capabilitiesFor(['score'])
     },
     async evaluate() {
       return {
@@ -431,13 +539,13 @@ test('audio/video requests fall back past models that do not declare those capab
   const videos = [{ mediaType: 'video/mp4', data: 'REVG' }] as const
   let backupCalls = 0
   ctx.system1.registerProvider('backup', {
+    timeoutMs: () => 800,
     async describe() {
-      return {
-        primitives: ['noul'],
+      return capabilitiesFor(['noul'], {
         audio: { formats: ['audio/mpeg'], maxCount: 4, maxBytesPerItem: 8 },
         videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
         audioVideo: { maxTotalBytes: 16 },
-      }
+      })
     },
     async evaluate(request) {
       backupCalls++
@@ -466,13 +574,15 @@ test('audio/video requests fall back past models that do not declare those capab
 test('audio/video capability preflight checks format, count, item size, and shared size', async (t) => {
   const { ctx } = await setup(t)
   let capabilities: ModelCapabilities = {
-    primitives: ['noul'],
-    audio: { formats: ['audio/mpeg'], maxCount: 1, maxBytesPerItem: 2 },
-    videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
-    audioVideo: { maxTotalBytes: 5 },
+    ...capabilitiesFor(['noul'], {
+      audio: { formats: ['audio/mpeg'], maxCount: 1, maxBytesPerItem: 2 },
+      videos: { formats: ['video/mp4'], maxCount: 2, maxBytesPerItem: 8 },
+      audioVideo: { maxTotalBytes: 5 },
+    }),
   }
   let evaluateCalls = 0
   ctx.system1.registerProvider('test', {
+    timeoutMs: () => 800,
     async describe() {
       return capabilities
     },
@@ -526,16 +636,18 @@ test('model question limit falls back to a model with sufficient capacity', asyn
     fallbackModels: [{ provider: 'backup', model: 'high-capacity' }],
   })
   ctx.system1.registerProvider('test', {
+    timeoutMs: () => 800,
     async describe() {
-      return { primitives: ['noul'], maxQuestions: 1 }
+      return capabilitiesFor(['noul'], { maxQuestions: 1 })
     },
     async evaluate() {
       throw new Error('limited model must not be evaluated')
     },
   })
   ctx.system1.registerProvider('backup', {
+    timeoutMs: () => 800,
     async describe() {
-      return { primitives: ['noul'] }
+      return capabilitiesFor(['noul'])
     },
     async evaluate() {
       return {

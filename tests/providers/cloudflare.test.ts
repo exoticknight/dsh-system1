@@ -74,6 +74,8 @@ test('Cloudflare Clef sends the REST contract and normalizes the System One resu
   assert.deepEqual(await provider.describe('clef', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 64,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
     images: {
       formats: ['image/png', 'image/jpeg', 'image/webp'],
       maxCount: 4,
@@ -141,6 +143,8 @@ test('Cloudflare Clef family routes model IDs and reports model-specific context
       assert.deepEqual(await provider.describe(model, new AbortController().signal), {
         primitives: ['noul', 'choice', 'score'],
         maxQuestions: 64,
+        maxChoiceOptions: null,
+        maxScoreLevels: null,
         images: {
           formats: ['image/png', 'image/jpeg', 'image/webp'],
           maxCount: 4,
@@ -174,6 +178,50 @@ test('Cloudflare Clef family routes model IDs and reports model-specific context
         status: 'ok', answer: { type: 'noul', probabilityTrue: 0.8 },
       })
     }
+  }
+})
+
+test('Cloudflare keeps strict score legends and rejects array or stringified criteria', async () => {
+  const questions = [
+    {
+      type: 'score' as const,
+      instructions: 'Rate the issue.',
+      criteria: ['low', 'high'],
+    },
+    {
+      type: 'score' as const,
+      instructions: 'Rate the issue.',
+      criteria: [{ label: 'low' }, 'high'],
+    },
+  ]
+  const legends = [
+    ['low', 'high'],
+    { 0: '{"label":"low"}', 1: 'high' },
+  ]
+  for (let index = 0; index < questions.length; index++) {
+    const provider = createCloudflareProvider({
+      apiKey: 'fixture-token',
+      accountId: 'fixture-account',
+      fetch: async () => Response.json({ success: true, result: {
+        model: 'clef',
+        answers: { q: {
+          type: 'score',
+          score: 0.25,
+          legend: legends[index],
+          probabilities: { 0: 0.75, 1: 0.25 },
+        } },
+      } }),
+    })
+    const result = await provider.evaluate({
+      requestId: 'fixture',
+      model: 'clef',
+      state: 'sample',
+      questions: { q: questions[index]! },
+    }, new AbortController().signal)
+    assert.deepEqual(result.answers.q, {
+      status: 'error',
+      error: { code: 'invalid_response', message: 'Provider returned an invalid answer.' },
+    })
   }
 })
 

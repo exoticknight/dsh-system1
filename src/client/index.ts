@@ -60,7 +60,7 @@ const NS = 'dsh-system1'
 const PACKAGE = 'dsh-system1'
 
 const en = {
-  coreSummary: 'Choose a default model and ordered fallbacks, then set the shared request timeout.',
+  coreSummary: 'Choose a default model and ordered fallbacks, then configure each provider below.',
   provider: 'Default service',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
@@ -78,9 +78,12 @@ const en = {
   fallbackUp: 'Move up',
   fallbackDown: 'Move down',
   fallbackRemove: 'Remove',
-  timeout: 'Request timeout (ms)',
+  timeout: 'Provider timeout (ms)',
   defaultHint: 'Used when a decision request does not specify a model.',
-  timeoutHint: 'Applies when a request has no timeout. Leave blank to use provider defaults (800 ms unless specified; Nace uses 60,000 ms).',
+  timeoutTypesafeHint: 'Applies when a request has no timeout. Leave blank to use TypeSafe’s 800 ms default.',
+  timeoutLayaHint: 'Applies when a request has no timeout. Leave blank to use Laya’s 800 ms default.',
+  timeoutNaceHint: 'Applies when a request has no timeout. Leave blank to use Nace’s 60,000 ms default.',
+  timeoutCloudflareHint: 'Applies when a request has no timeout. Leave blank to use Cloudflare’s 800 ms default.',
   providerEnabledHint: 'Enable the matching service component in the list below.',
   feedbackPrompt: 'Need help or a provider/model you would like to use?',
   providerFeedbackPrompt: 'Having trouble configuring this provider?',
@@ -139,7 +142,7 @@ const en = {
 }
 
 const zh = {
-  coreSummary: '选择默认模型和按顺序尝试的备用模型，并设置通用请求超时。',
+  coreSummary: '选择默认模型和按顺序尝试的备用模型，再到下方配置各 provider。',
   provider: '默认服务',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
@@ -157,9 +160,12 @@ const zh = {
   fallbackUp: '上移',
   fallbackDown: '下移',
   fallbackRemove: '删除',
-  timeout: '请求超时（毫秒）',
+  timeout: 'Provider 超时（毫秒）',
   defaultHint: '决策请求未指定模型时使用。',
-  timeoutHint: '请求未单独指定超时时使用。留空会采用服务默认值（通常为 800 毫秒；Nace 为 60,000 毫秒）。',
+  timeoutTypesafeHint: '请求未单独指定超时时使用。留空采用 TypeSafe 默认值 800 毫秒。',
+  timeoutLayaHint: '请求未单独指定超时时使用。留空采用 Laya 默认值 800 毫秒。',
+  timeoutNaceHint: '请求未单独指定超时时使用。留空采用 Nace 默认值 60,000 毫秒。',
+  timeoutCloudflareHint: '请求未单独指定超时时使用。留空采用 Cloudflare 默认值 800 毫秒。',
   providerEnabledHint: '请在下方组件列表中启用对应的服务组件。',
   feedbackPrompt: '遇到问题，或缺少想用的提供商/模型？',
   providerFeedbackPrompt: '配置此提供商时遇到问题？',
@@ -238,6 +244,7 @@ type ProviderSettings = {
   keyHint: keyof typeof en
   endpointLabel: keyof typeof en
   endpointHint: keyof typeof en
+  timeoutHint: keyof typeof en
   baseURL: string
   models: ReadonlyArray<ModelOption>
   note?: keyof typeof en
@@ -267,6 +274,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'keyHint',
     endpointLabel: 'typesafeEndpoint',
     endpointHint: 'typesafeEndpointHint',
+    timeoutHint: 'timeoutTypesafeHint',
     baseURL: 'https://api.typesafe.ai',
     models: TYPESAFE_MODELS.map(({ id }) => ({ id })),
   },
@@ -279,6 +287,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'layaKeyHint',
     endpointLabel: 'layaEndpoint',
     endpointHint: 'layaEndpointHint',
+    timeoutHint: 'timeoutLayaHint',
     baseURL: 'http://127.0.0.1:8000',
     models: LAYA_MODELS.map(({ id }) => ({ id, label: LAYA_MODEL_LABELS[id] })),
   },
@@ -291,6 +300,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'keyHint',
     endpointLabel: 'naceEndpoint',
     endpointHint: 'naceEndpointHint',
+    timeoutHint: 'timeoutNaceHint',
     baseURL: 'https://console.nace.ai',
     models: NACE_MODELS.map(({ id }) => ({ id })),
     note: 'naceImageRetentionHint',
@@ -304,6 +314,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     keyHint: 'keyHint',
     endpointLabel: 'cloudflareEndpoint',
     endpointHint: 'cloudflareEndpointHint',
+    timeoutHint: 'timeoutCloudflareHint',
     baseURL: 'https://api.cloudflare.com/client/v4',
     models: CLOUDFLARE_MODELS.map(({ id }) => ({ id })),
     accountId: {
@@ -455,7 +466,7 @@ const timeoutSpec: SettingsFieldSpec = {
   },
 }
 
-const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec, timeoutSpec]
+const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec]
 const NO_SECRETS: SettingsSecretSpec[] = []
 const releaseSettingsPageStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }
 const settingsPageStyle = { display: 'flex', flexDirection: 'column', gap: 16 }
@@ -514,7 +525,6 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
   const defaultRow = parseModelRow(defaultField.text) ?? { provider: '', model: '' }
   const fallbackField = view.fields.fallbackModels!
   const fallbacks = readFallbackModels(parseJson(fallbackField.text))
-  const timeoutField = view.fields.timeoutMs!
   const editFallbacks = (rows: FallbackModelDraft[]) =>
     actions.edit('fallbackModels', JSON.stringify(rows))
   const firstProvider = PROVIDERS[0]!
@@ -581,20 +591,6 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
           model: firstProvider.models[0]?.id ?? '',
         })),
       }, t('fallbackAdd')))),
-      h(SettingsValueField, {
-        key: 'timeout',
-        id: 'dsh-system1-timeout',
-        label: t('timeout'),
-        hint: t('timeoutHint'),
-        overriddenLabel: t('overridden'),
-        resetLabel: t('reset'),
-        invalidLabel: t('invalidTimeout'),
-        numeric: true,
-        disabled: !view.shell.writable,
-        ...timeoutField,
-        onEdit: (text: string) => actions.edit('timeoutMs', text),
-        onReset: () => actions.resetField('timeoutMs'),
-      }),
       h('p', { key: 'note', style: settingsHintStyle }, t('providerEnabledHint')),
     ],
   })
@@ -773,7 +769,9 @@ function ProviderSettingsForm(props: {
     })
   }, [ctx, provider.keyRef, refresh])
   const specs = useMemo(
-    () => provider.accountId ? [endpointSpec, accountIdSpec] : [endpointSpec],
+    () => provider.accountId
+      ? [endpointSpec, accountIdSpec, timeoutSpec]
+      : [endpointSpec, timeoutSpec],
     [provider],
   )
   const secrets = useMemo((): SettingsSecretSpec[] => [{
@@ -832,6 +830,20 @@ function ProviderSettingsForm(props: {
         ...view.fields[accountId.path]!,
         onEdit: (text: string) => actions.edit(accountId.path, text),
         onReset: () => actions.resetField(accountId.path),
+      }),
+      h(SettingsValueField, {
+        key: 'timeout',
+        id: `dsh-system1-${provider.id}-timeout`,
+        label: t('timeout'),
+        hint: t(provider.timeoutHint),
+        overriddenLabel: t('overridden'),
+        resetLabel: t('reset'),
+        invalidLabel: t('invalidTimeout'),
+        numeric: true,
+        disabled,
+        ...view.fields.timeoutMs!,
+        onEdit: (text: string) => actions.edit('timeoutMs', text),
+        onReset: () => actions.resetField('timeoutMs'),
       }),
       provider.note && h('p', { key: 'note', style: settingsHintStyle }, t(provider.note)),
     ],

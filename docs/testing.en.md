@@ -6,11 +6,11 @@ Checks come in three layers. The first two need no credentials or model services
 
 | Layer | Command | Coverage |
 | --- | --- | --- |
-| Plugin tests | `pnpm test plugin` | Service contract, input and result validation, per-attempt timeout budgets, cancellation, provider registration and unload. Uses fake providers and no backend protocol |
-| Provider tests | `pnpm test providers` | Each adapter's request shape, response normalization, error sanitization, missing credentials, and plugin mount/unmount. Uses local HTTP fixtures or an injected `fetch` |
+| Plugin tests | `pnpm test plugin` | Service contract, input and result validation, request/provider timeout precedence, cancellation, provider registration and unload. Uses fake providers and no backend protocol |
+| Provider tests | `pnpm test providers` | Adapter request shapes, response normalization, error sanitization, missing credentials, plugin mount/unmount, and model-catalog/capability/timeout/primitive round trips for all four built-in providers. Uses local HTTP fixtures or an injected `fetch` |
 | Live model probes | `pnpm probe <target>` | Calls a real model through the public service and the provider plugin entry |
 
-`pnpm test` runs the first two layers; `pnpm test <provider>` runs a single provider, for example `pnpm test nace`, and accepts several names. Tests live in `tests/plugin/` and `tests/providers/<provider>.test.ts`; add a provider test file with each new provider.
+`pnpm test` runs the first two layers; `pnpm test <provider>` runs a single provider, for example `pnpm test nace`, and accepts several names. The shared provider conformance suite is `tests/providers/conformance.test.ts` and can run alone with `pnpm test conformance`. Add each new provider's model catalog, capabilities, and response fixtures to that suite, then add its protocol tests in `tests/providers/<provider>.test.ts`.
 
 ## Live model probes
 

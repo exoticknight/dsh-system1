@@ -1,6 +1,6 @@
 {
   "name": "dsh-system1",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Structured, per-question results for agents and plugins: classify, filter, score, and locate objects in images, with text, image, audio, and video inputs where supported",
   "icon": "./icon.png",
   "license": "Apache-2.0",

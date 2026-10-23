@@ -123,10 +123,12 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
     'drex-max',
   ])
   const provider = createNaceProvider({ apiKey: '' })
-  assert.equal(provider.defaultTimeoutMs, 60_000)
+  assert.equal(provider.timeoutMs(), 60_000)
   assert.deepEqual(await provider.describe('drex-v1.5', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
     context: {
       maxTokens: 131_072,
       includesQuestions: false,
@@ -136,6 +138,8 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
   assert.deepEqual(await provider.describe('drex-v2.0', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
     context: {
       maxTokens: 131_072,
       includesQuestions: false,
@@ -251,6 +255,124 @@ test('Nace serializes structured descriptions, retains null criteria, and normal
     },
   })
   assert.deepEqual(result.usage, { inputTokens: 12, outputTokens: 4 })
+})
+
+test('Nace accepts a score answer when the optional legend is absent', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne: () => Response.json({
+      model: 'drex-v2.0',
+      usage: { input_tokens: 12, output_tokens: 4 },
+      answers: {
+        level: {
+          type: 'score',
+          score: 0.4,
+          probabilities: { '0': 0.6, '1': 0.4 },
+        },
+      },
+    }),
+  })
+  const provider = createNaceProvider({ apiKey: 'fixture-only', fetch: fixture.fetch })
+  const result = await provider.evaluate({
+    ...request,
+    questions: {
+      level: { type: 'score', instructions: 'Rate it.', criteria: ['low', 'high'] },
+    },
+  }, new AbortController().signal)
+
+  assert.equal(statusOf(result.answers.level), 'ok')
+})
+
+test('Nace accepts a response without optional usage metadata', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne: () => Response.json({
+      model: 'drex-v2.0',
+      answers: { q: { type: 'noul', noul: 0.8 } },
+    }),
+  })
+  const provider = createNaceProvider({ apiKey: 'fixture-only', fetch: fixture.fetch })
+  const result = await provider.evaluate(request, new AbortController().signal)
+
+  assert.equal(statusOf(result.answers.q), 'ok')
+  assert.equal('usage' in result, false)
+})
+
+test('Nace invalidates only malformed answers and preserves valid siblings', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne: () => Response.json({
+      model: 'drex-v2.0',
+      usage: { input_tokens: 12, output_tokens: 4 },
+      answers: {
+        malformed: {
+          type: 'score',
+          score: 0.4,
+          legend: ['low', 'high'],
+          // A score answer without probabilities used to throw in the mapper.
+        },
+        typeMismatch: { type: 'noul', noul: 0.8 },
+        legendWrongType: {
+          type: 'score', score: 0.4, legend: 'low,high',
+          probabilities: { '0': 0.6, '1': 0.4 },
+        },
+        legendMismatch: {
+          type: 'score', score: 0.4, legend: ['low', 'other'],
+          probabilities: { '0': 0.6, '1': 0.4 },
+        },
+        badProbabilityKeys: {
+          type: 'score', score: 0.4, legend: ['low', 'high'],
+          probabilities: { '0': 0.6, '2': 0.4 },
+        },
+        valid: { type: 'noul', noul: 0.8 },
+      },
+    }),
+  })
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
+  engine.registerProvider('nace', createNaceProvider({
+    apiKey: 'fixture-only',
+    fetch: fixture.fetch,
+  }))
+
+  const result = await engine.decide({
+    state: 'fixture',
+    questions: {
+      malformed: { type: 'score', instructions: 'Rate it.', criteria: ['low', 'high'] },
+      typeMismatch: { type: 'score', instructions: 'Rate it.', criteria: ['low', 'high'] },
+      legendWrongType: { type: 'score', instructions: 'Rate it.', criteria: ['low', 'high'] },
+      legendMismatch: { type: 'score', instructions: 'Rate it.', criteria: ['low', 'high'] },
+      badProbabilityKeys: { type: 'score', instructions: 'Rate it.', criteria: ['low', 'high'] },
+      valid: { type: 'noul', instructions: 'Is this valid?' },
+    },
+  })
+
+  for (const id of ['malformed', 'typeMismatch', 'legendWrongType', 'legendMismatch', 'badProbabilityKeys'] as const) {
+    const answer = result.answers[id]
+    assert.equal(answer?.status, 'error', `${id} should be invalid`)
+    if (answer?.status === 'error') assert.equal(answer.error.code, 'invalid_response')
+  }
+  assert.equal(result.answers.valid?.status, 'ok')
+})
+
+test('Nace rejects a response whose top-level answers is not an object', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne: () => Response.json({
+      model: 'drex-v2.0',
+      usage: { input_tokens: 12, output_tokens: 4 },
+      answers: [],
+    }),
+  })
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
+  engine.registerProvider('nace', createNaceProvider({
+    apiKey: 'fixture-only',
+    fetch: fixture.fetch,
+  }))
+
+  const result = await engine.decide({
+    state: 'fixture',
+    questions: { q: { type: 'noul', instructions: 'Is this valid?' } },
+  })
+
+  assert.equal(result.answers.q?.status, 'error')
+  if (result.answers.q?.status === 'error')
+    assert.equal(result.answers.q.error.code, 'invalid_response')
 })
 
 test('Drex rounded choice and score probabilities remain valid DSH distributions', async () => {

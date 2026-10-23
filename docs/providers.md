@@ -2,14 +2,14 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-在 DSH 插件设置中选择默认服务与模型，并按顺序添加备用模型；在对应服务组件中保存连接参数和密钥。调用方也可通过 `model: { provider, model }` 逐次选择。每次模型尝试都会获得完整超时预算（包括能力检查与 HTTP 调用），因此兜底链总时长可达到模型数乘以预算。超时优先级为：调用显式 `timeoutMs`、显式配置的服务级 `timeoutMs`、provider 默认值、原有 800 ms 回退值。Nace 默认 60 秒，其他内置 provider 默认 800 ms。本地模型首次加载和 CPU 推理应使用更长的预算。详见 [备用模型](api.md#备用模型)。
+在 DSH 插件设置中选择默认服务与模型，并按顺序添加备用模型；在对应服务组件中保存连接参数、密钥和可选的 `timeoutMs`。调用方也可通过 `model: { provider, model }` 逐次选择。每次模型尝试都会获得完整超时预算（包括能力检查与 HTTP 调用），因此兜底链总时长可达到模型数乘以预算。超时优先级为：调用显式 `timeoutMs`、所选 provider 设置页中的 `timeoutMs`、provider 自身默认值。留空使用 provider 默认值。本地模型首次加载和 CPU 推理应使用更长的预算。详见 [备用模型](api.md#备用模型)。
 
-| Provider | 模型 | 默认服务地址 | 凭据引用 |
-| --- | --- | --- | --- |
-| `typesafe` | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
-| `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
-| `nace` | `drex-v2.0`、`drex-v1.5`、`drex-max` | `https://console.nace.ai` | `NACE_API_KEY` |
-| `cloudflare` | `clef`、`clef-flash`、`clef-omni` | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
+| Provider | 模型 | 默认超时 | 默认服务地址 | 凭据引用 |
+| --- | --- | ---: | --- | --- |
+| `typesafe` | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 800 ms | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
+| `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | 800 ms | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
+| `nace` | `drex-v2.0`、`drex-v1.5`、`drex-max` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `cloudflare` | `clef`、`clef-flash`、`clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` 和 `jev-1.13.0` 是固定版本。`jev-latest` 指向最新稳定版，`jev-preview` 指向最新发布版；别名映射会随 TypeSafe 更新。需要固定行为时选择版本 ID。详见 TypeSafe 的[模型目录](https://docs.typesafe.ai/models)。
 
@@ -27,7 +27,7 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 
 ### Jev 图片、Box 与长上下文
 
-公共请求最多接受 8 张 PNG、JPEG 或 WebP 图片，附件对所有问题共享；各 provider 和模型可以有更低上限。Jev 最多支持 4 张 PNG/JPEG 图片；图片会被编码为 TypeSafe `assets` 并自动发送 `TypeSafe-Danger-Zone-Images` 请求头。TypeSafe 将图片和 Box 标为实验能力，格式、限制和准确性可能随版本变化。Jev 1.14（或当前映射到 1.14 的 `jev-preview`）支持 `box`，结果中的四条边是 0–1 之间的归一化坐标。通过 `longContext: true` 可显式请求 262k tokens；默认仍按每请求 64k、每题 32k 的常规上限执行。详见[TypeSafe 图片说明](https://docs.typesafe.ai/images)、[Box 说明](https://docs.typesafe.ai/primitives/box)和[上下文限制](https://docs.typesafe.ai/models#long-context)。
+公共请求结构设有资源安全上限：每种附件最多 16 项，单项最多 16 MiB，所有附件解码后合计最多 64 MiB；模型能力可以更严格。Jev 最多支持 4 张 PNG/JPEG 图片，每张最多 16 MiB、总计最多 16 MiB；图片会被编码为 TypeSafe `assets` 并自动发送 `TypeSafe-Danger-Zone-Images` 请求头。TypeSafe 将图片和 Box 标为实验能力，格式、限制和准确性可能随版本变化。Jev 1.14（或当前映射到 1.14 的 `jev-preview`）支持 `box`，结果中的四条边是 0–1 之间的归一化坐标。通过 `longContext: true` 可显式请求 262k tokens；默认仍按每请求 64k、每题 32k 的常规上限执行。详见[TypeSafe 图片说明](https://docs.typesafe.ai/images)、[Box 说明](https://docs.typesafe.ai/primitives/box)和[上下文限制](https://docs.typesafe.ai/models#long-context)。
 
 ## Nace.AI Drex
 

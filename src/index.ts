@@ -34,11 +34,6 @@ export default class System1Service extends Service {
         model: Schema.string().required(),
       }),
     ).default([]).volatile(),
-    timeoutMs: Schema.number()
-      .min(1)
-      .max(2147483647)
-      .step(1)
-      .volatile(),
   }) as unknown as Schema<System1Options, System1Config>
   private readonly engine: System1Engine
   constructor(ctx: Context, config: System1Config | System1Options = {}) {
@@ -56,13 +51,9 @@ export default class System1Service extends Service {
           | Volatile<readonly ModelRef[]>
           | undefined,
       )
-      const timeoutMs = readConfigValue<number | undefined>(
-        config.timeoutMs as number | Volatile<number | undefined> | undefined,
-      )
       return {
         ...(defaultModel !== undefined ? { defaultModel } : {}),
         ...(fallbackModels !== undefined ? { fallbackModels } : {}),
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       }
     })
     ctx.effect(() => () => this.engine.dispose())
@@ -71,14 +62,15 @@ export default class System1Service extends Service {
     return this.engine.decide(request)
   }
   registerProvider(id: string, provider: System1Provider) {
-    return this.engine.registerProvider(id, provider)
+    return this.engine.registerProvider(id, provider, (message) => {
+      this.ctx.logger(`dsh-system1 ${id} provider`).warn(message)
+    })
   }
 }
 
 interface System1Config {
   defaultModel: Volatile<ModelRef | undefined>
   fallbackModels: Volatile<readonly ModelRef[]>
-  timeoutMs: Volatile<number | undefined>
 }
 
 function readConfigValue<T>(value: T | Volatile<T> | undefined): T | undefined {

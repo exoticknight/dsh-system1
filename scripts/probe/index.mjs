@@ -36,7 +36,7 @@ let stopLocal = async () => {}
 
 try {
   if (target.kind === 'local') stopLocal = await ensureService(name, endpoint)
-  service = await ctx.plugin(System1Service, { timeoutMs: target.timeoutMs })
+  service = await ctx.plugin(System1Service)
   provider = await target.mount(ctx, endpoint)
   const health = await target.health?.(endpoint)
   const probe = { q: { type: 'noul', instructions: questions.refund.instructions } }
@@ -51,7 +51,7 @@ try {
   assertError(unsupported, 'unsupported')
 
   const started = performance.now()
-  const result = await ctx.system1.decide({ state, questions, model })
+  const result = await ctx.system1.decide({ state, questions, model, timeoutMs: target.timeoutMs })
   const latencyMs = Math.round(performance.now() - started)
   assert.equal(result.meta.executed?.provider, name)
   assert.ok(result.meta.executed?.model, 'the service must report the executed model')

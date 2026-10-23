@@ -20,7 +20,7 @@ pnpm verify
 | ------------------------- | -------------------------------------------------- |
 | `src/index.ts`            | Cordis 服务、配置和 Context 声明                   |
 | `src/contracts/`          | 消费者与 provider 共用的公开类型                   |
-| `src/core/`               | 请求校验、分发、结果校验、超时和 provider 生命周期 |
+| `src/core/`               | 请求校验、分发、结果校验、超时执行和 provider 生命周期 |
 | `src/providers/`          | 各 provider 插件（`typesafe`、`laya`、`cloudflare`）及共用的 System One HTTP 传输 |
 | `examples/`               | 消费者与第三方 provider 示例                       |
 | `tests/plugin/`           | 使用假 provider 的服务契约与生命周期测试           |
@@ -36,6 +36,7 @@ pnpm verify
 ## 实现约定
 
 - 保持改动小而完整。新增行为先确定属于基础服务、provider 还是消费插件。
+- 新增或修改 provider 的变更不得改动 `src/core/**`、公共契约类型或公共 schema 的数值。如有新共享语义需求，应单独记录为 Evolve 契约变更。
 - 通用能力优先复用成熟依赖。若编写自有基础设施，应说明现有库无法满足的具体契约或生命周期保证。
 - 使用 strict TypeScript、ESM 和 `.js` 相对导入后缀。示例通过公开包导出入口导入。
 - provider 将请求视为只读，遵守 `AbortSignal`，归一化结果并保留实际模型及可用用量。
@@ -49,6 +50,8 @@ pnpm verify
 ```
 
 `verify` 会执行类型检查、插件与 provider 测试、构建，以及独立目录中的 tarball 安装和消费者编译。测试使用本地响应，不需要后端凭据。CI 在 Windows/Linux 和 Node 22.19/24 上执行同一命令。
+
+审查清单：确认 provider 专属改动没有修改 `src/core/**`、公共契约类型或公共 schema 的数值。若确需调整其中一项，应作为独立的 Evolve 契约变更审查。
 
 宿主接入支持 DSH `>=0.1.7-rc.1 <0.3.0`。已验证的具体版本（包括 `0.2.1-rc.2`）记录在 `dsh.compatibility.dshReleases`；使用其中任一版本的已安装包运行 Loader 探针：
 

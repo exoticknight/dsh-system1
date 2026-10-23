@@ -25,6 +25,7 @@ import {
   responseSchema,
   errorSchema,
   validateAnswer,
+  decodedBase64Length,
 } from './validation.js'
 
 export class System1Engine {
@@ -49,11 +50,6 @@ export class System1Engine {
     )
       throw new System1InputError('Invalid default model.')
     if (
-      options.timeoutMs !== undefined &&
-      !timeoutSchema.safeParse(options.timeoutMs).success
-    )
-      throw new System1InputError('Invalid default timeout.')
-    if (
       validateFallbackModels &&
       options.fallbackModels !== undefined &&
       (!Array.isArray(options.fallbackModels) ||
@@ -63,13 +59,12 @@ export class System1Engine {
     )
       throw new System1InputError('Invalid fallback models.')
   }
-  registerProvider(id: string, provider: System1Provider): () => void {
-    if (
-      provider.defaultTimeoutMs !== undefined &&
-      !timeoutSchema.safeParse(provider.defaultTimeoutMs).success
-    )
-      throw new System1InputError('Invalid provider default timeout.')
-    return this.registry.register(id, provider)
+  registerProvider(
+    id: string,
+    provider: System1Provider,
+    warn?: (message: string) => void,
+  ): () => void {
+    return this.registry.register(id, provider, warn)
   }
   dispose(): void {
     this.registry.dispose()
@@ -129,7 +124,6 @@ export class System1Engine {
         req,
         model,
         meta.requestId,
-        options.timeoutMs,
       )
       if ('error' in outcome) {
         lastError = outcome.error
@@ -187,7 +181,6 @@ export class System1Engine {
     req: DecideRequest,
     model: ModelRef,
     requestId: string,
-    serviceTimeoutMs: number | undefined,
   ): Promise<AttemptOutcome> {
     const entry = this.registry.get(model.provider)
     if (!entry)
@@ -197,9 +190,15 @@ export class System1Engine {
           message: 'Requested provider is not registered.',
         },
       }
-    const timeoutMs =
-      req.timeoutMs ?? serviceTimeoutMs ?? entry.provider.defaultTimeoutMs ?? 800
     try {
+      const timeoutMs = req.timeoutMs ?? entry.provider.timeoutMs()
+      if (!timeoutSchema.safeParse(timeoutMs).success)
+        return {
+          error: {
+            code: 'invalid_response',
+            message: 'Provider returned an invalid timeout.',
+          },
+        }
       const result = await execute(
         [entry.controller.signal, ...(req.signal ? [req.signal] : [])],
         timeoutMs,
@@ -207,11 +206,22 @@ export class System1Engine {
           const described = capabilitiesSchema.safeParse(
             await entry.provider.describe(model.model, signal),
           )
-          if (!described.success)
+          if (!described.success) {
+            if (!entry.warnedInvalidCapabilities) {
+              entry.warnedInvalidCapabilities = true
+              try {
+                entry.warn?.(
+                  'Provider returned invalid model capabilities; check required attachment and question limits.',
+                )
+              } catch {
+                // Diagnostics must not change the result of a provider attempt.
+              }
+            }
             throw new System1ProviderError({
               code: 'invalid_response',
               message: 'Provider returned invalid model capabilities.',
             })
+          }
           const limitation = checkCapabilities(described.data, req)
           if (limitation) throw new System1ProviderError(limitation)
           signal.throwIfAborted()
@@ -253,7 +263,6 @@ export class System1Engine {
     }
   }
 }
-
 type ParsedResponse = ReturnType<typeof responseSchema.parse>
 
 type AttemptOutcome =
@@ -295,10 +304,7 @@ function checkCapabilities(
         code: 'unsupported',
         message: 'Model does not support image input.',
       }
-    if (
-      imageCapabilities.maxCount !== undefined &&
-      request.images.length > imageCapabilities.maxCount
-    )
+    if (request.images.length > imageCapabilities.maxCount)
       return {
         code: 'limit_exceeded',
         message: 'Too many images for this model.',
@@ -313,18 +319,14 @@ function checkCapabilities(
         message: 'Image format is not supported by this model.',
       }
     const imageBytes = request.images.map((image) => decodedBase64Length(image.data))
-    const maxBytesPerImage = imageCapabilities.maxBytesPerImage
-    if (
-      maxBytesPerImage !== undefined &&
-      imageBytes.some((size) => size > maxBytesPerImage)
-    )
+    if (imageBytes.some((size) => size > imageCapabilities.maxBytesPerImage))
       return {
         code: 'limit_exceeded',
         message: 'An image exceeds this model’s per-image size limit.',
       }
     if (
-      imageCapabilities.maxTotalBytes !== undefined &&
-      imageBytes.reduce((sum, size) => sum + size, 0) > imageCapabilities.maxTotalBytes
+      imageBytes.reduce((sum, size) => sum + size, 0) >
+      imageCapabilities.maxTotalBytes
     )
       return {
         code: 'limit_exceeded',
@@ -355,7 +357,7 @@ function checkCapabilities(
         message: 'Audio and video attachments exceed this model’s size limit.',
       }
   }
-  if (c.maxQuestions !== undefined && all.length > c.maxQuestions)
+  if (c.maxQuestions !== null && all.length > c.maxQuestions)
     return {
       code: 'limit_exceeded',
       message: 'Too many questions for this model.',
@@ -368,7 +370,7 @@ function checkCapabilities(
       }
     if (
       q.type === 'choice' &&
-      c.maxChoiceOptions !== undefined &&
+      c.maxChoiceOptions !== null &&
       Object.keys(q.criteria).length > c.maxChoiceOptions
     )
       return {
@@ -377,7 +379,7 @@ function checkCapabilities(
       }
     if (
       q.type === 'score' &&
-      c.maxScoreLevels !== undefined &&
+      c.maxScoreLevels !== null &&
       q.criteria.length > c.maxScoreLevels
     )
       return {
@@ -391,8 +393,8 @@ function checkMediaCapabilities<TMediaType extends string>(
   inputs: readonly { readonly mediaType: TMediaType; readonly data: string }[] | undefined,
   capabilities: {
     readonly formats: readonly TMediaType[]
-    readonly maxCount?: number | undefined
-    readonly maxBytesPerItem?: number | undefined
+    readonly maxCount: number
+    readonly maxBytesPerItem: number
   } | undefined,
   modality: 'audio' | 'video',
 ): DecisionError | undefined {
@@ -403,7 +405,7 @@ function checkMediaCapabilities<TMediaType extends string>(
       code: 'unsupported',
       message: `Model does not support ${modality} input.`,
     }
-  if (capabilities.maxCount !== undefined && inputs.length > capabilities.maxCount)
+  if (inputs.length > capabilities.maxCount)
     return {
       code: 'limit_exceeded',
       message: `Too many ${modality} attachments for this model.`,
@@ -413,18 +415,11 @@ function checkMediaCapabilities<TMediaType extends string>(
       code: 'unsupported',
       message: `${label} format is not supported by this model.`,
     }
-  const maxBytesPerItem = capabilities.maxBytesPerItem
   if (
-    maxBytesPerItem !== undefined &&
-    inputs.some(({ data }) => decodedBase64Length(data) > maxBytesPerItem)
+    inputs.some(({ data }) => decodedBase64Length(data) > capabilities.maxBytesPerItem)
   )
     return {
       code: 'limit_exceeded',
       message: `A ${modality} attachment exceeds this model’s size limit.`,
     }
-}
-
-function decodedBase64Length(data: string): number {
-  const padding = data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0
-  return (data.length * 3) / 4 - padding
 }

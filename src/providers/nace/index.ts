@@ -14,16 +14,19 @@ export interface Config {
   id: string
   apiKeyEnv: string
   baseURL?: string | Volatile<string | undefined>
+  timeoutMs?: Volatile<number | undefined>
 }
 interface ConfigInput {
   id?: string | null
   apiKeyEnv?: string | null
   baseURL?: string | null
+  timeoutMs?: number | null
 }
 interface RuntimeConfig {
   id: string
   apiKeyEnv: string
   baseURL: Volatile<string | undefined>
+  timeoutMs: Volatile<number | undefined>
 }
 
 export const inject = ['system1']
@@ -34,6 +37,7 @@ export const Config: Schema<ConfigInput, RuntimeConfig> = Schema.object({
     .pattern(/^[A-Za-z_][A-Za-z0-9_]*$/u)
     .default('NACE_API_KEY'),
   baseURL: Schema.string().default('https://console.nace.ai').volatile(),
+  timeoutMs: Schema.number().min(1).max(2147483647).step(1).volatile(),
 })
 
 export function apply(ctx: Context, config: Config | RuntimeConfig) {
@@ -49,6 +53,7 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
       return process.env[ref]
     },
     resolveBaseURL: () => readConfigValue(config.baseURL),
+    resolveTimeoutMs: () => readConfigValue(config.timeoutMs),
     warn: (message) => logger.warn(message),
   })
   ctx.effect(() => ctx.system1.registerProvider(config.id, provider))

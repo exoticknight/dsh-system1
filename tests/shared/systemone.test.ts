@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { ProviderRequest } from '../../src/contracts/index.js'
+import type { ModelCapabilities } from '../../src/contracts/provider.js'
 import { System1ProviderError } from '../../src/contracts/error.js'
 import { createSystemOneHttpProvider } from '../../src/providers/systemone.js'
 
@@ -23,11 +24,12 @@ test('shared transport canonicalizes aliases before capabilities, serialization 
   const provider = createSystemOneHttpProvider({
     providerName: 'fixture',
     defaultBaseURL: 'https://system-one.test',
+    timeoutMs: () => 800,
     resolveApiKey: () => 'fixture-key',
     resolveModel: (model) => models.get(model),
     capabilities: (model) => {
       described.push(model)
-      return { primitives: ['noul'] }
+      return capabilitiesFor(['noul'])
     },
     serializeRequest: (canonicalRequest) => {
       serialized.push(canonicalRequest.model)
@@ -47,6 +49,9 @@ test('shared transport canonicalizes aliases before capabilities, serialization 
 
   assert.deepEqual(await provider.describe(request.model, new AbortController().signal), {
     primitives: ['noul'],
+    maxQuestions: null,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
   })
   const response = await provider.evaluate(request, new AbortController().signal)
 
@@ -67,6 +72,7 @@ test('shared transport reports an unknown model before resolving missing credent
   const provider = createSystemOneHttpProvider({
     providerName: 'fixture',
     defaultBaseURL: 'https://system-one.test',
+    timeoutMs: () => 800,
     resolveApiKey: () => {
       keyLookups++
       return undefined
@@ -86,3 +92,16 @@ test('shared transport reports an unknown model before resolving missing credent
   assert.equal(keyLookups, 0)
   assert.equal(fetchCalls, 0)
 })
+
+function capabilitiesFor(
+  primitives: ModelCapabilities['primitives'],
+  overrides: Partial<ModelCapabilities> = {},
+): ModelCapabilities {
+  return {
+    primitives,
+    maxQuestions: null,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
+    ...overrides,
+  }
+}

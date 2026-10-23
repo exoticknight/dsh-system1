@@ -12,11 +12,13 @@ import type {
   Question as NaceQuestion,
   UploadedFile,
 } from 'nace-sdk'
+import { isDeepStrictEqual } from 'node:util'
+import { z } from 'zod'
 import type { System1Provider } from '../../contracts/index.js'
 import type { ImageInput, ModelCapabilities, ProviderRequest } from '../../contracts/index.js'
 import { System1ProviderError } from '../../contracts/error.js'
 import { findProviderModel } from '../models.js'
-import { normalizeSystemOneResponse, stringifyDescription } from '../systemone.js'
+import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from '../answers.js'
 import { NACE_MODELS } from './models.js'
 
 const DEFAULT_BASE_URL = 'https://console.nace.ai'
@@ -25,10 +27,40 @@ const SDK_TIMEOUT_MS = 2_147_483_647
 const CLEANUP_TIMEOUT_MS = 5_000
 const DEFAULT_TIMEOUT_MS = 60_000
 
+const responseUsageSchema = z.object({
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
+}).passthrough()
+const responseEnvelopeSchema = z.object({
+  model: z.string().optional(),
+  usage: responseUsageSchema.optional(),
+  answers: z.record(z.string(), z.unknown()),
+}).passthrough()
+const answerProbability = z.number().finite()
+const answerConfidence = z.number().finite().optional()
+const naceAnswerSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('noul'), noul: answerProbability }),
+  z.object({
+    type: z.literal('choice'),
+    choice: z.string(),
+    probabilities: z.record(z.string(), answerProbability),
+    confidence: answerConfidence,
+  }),
+  z.object({
+    type: z.literal('score'),
+    score: answerProbability,
+    legend: z.array(z.string()).optional(),
+    probabilities: z.record(z.string(), answerProbability),
+    confidence: answerConfidence,
+  }),
+])
+
 const MODEL_CAPABILITIES = {
   'drex-v1.5': {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
     context: {
       maxTokens: 131_072,
       includesQuestions: false,
@@ -38,6 +70,8 @@ const MODEL_CAPABILITIES = {
   'drex-v2.0': {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
+    maxChoiceOptions: null,
+    maxScoreLevels: null,
     context: {
       maxTokens: 131_072,
       includesQuestions: false,
@@ -66,6 +100,8 @@ const MODEL_CAPABILITIES = {
 export interface NaceOptions {
   apiKey: string
   baseURL?: string
+  timeoutMs?: number
+  resolveTimeoutMs?: () => number | undefined
   resolveApiKey?: () => string | undefined | Promise<string | undefined>
   resolveBaseURL?: () => string | undefined
   fetch?: typeof fetch
@@ -75,7 +111,7 @@ export interface NaceOptions {
 /** Nace Drex adapter: the official SDK owns API and temporary-file transport. */
 export function createNaceProvider(options: NaceOptions): System1Provider {
   return {
-    defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
+    timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     async describe(model) {
       const selected = findProviderModel(NACE_MODELS, model)
       if (!selected)
@@ -147,12 +183,9 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           },
         )
         signal.throwIfAborted()
-        return normalizeSystemOneResponse(
+        return normalizeNaceResponse(
           { ...request, model: selected.id },
           response,
-          'Nace',
-          undefined,
-          { probabilityRoundingDigits: 4 },
         )
       } catch (error) {
         if (signal.aborted) signal.throwIfAborted()
@@ -164,6 +197,100 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
       }
     },
   }
+}
+
+function normalizeNaceResponse(
+  request: ProviderRequest,
+  response: unknown,
+) {
+  const parsedResponse = responseEnvelopeSchema.safeParse(response)
+  if (!parsedResponse.success)
+    throw new System1ProviderError({
+      code: 'invalid_response',
+      message: 'Nace returned an invalid response.',
+    })
+  const { answers: rawAnswers, usage } = parsedResponse.data
+  const answers = Object.fromEntries(
+    Object.entries(rawAnswers).map(([id, raw]) => {
+      const question = request.questions[id]
+      if (!question) return [id, invalidAnswer()]
+      const parsedAnswer = naceAnswerSchema.safeParse(raw)
+      if (!parsedAnswer.success || parsedAnswer.data.type !== question.type)
+        return [id, invalidAnswer()]
+      const answer = parsedAnswer.data
+      if (answer.type === 'noul' && question.type === 'noul')
+        return [id, noulAnswer(answer.noul)]
+      if (answer.type === 'choice' && question.type === 'choice')
+        return [id, choiceAnswer(
+          answer.choice,
+          normalizeRoundedDistributionRecord(answer.probabilities),
+          answer.confidence,
+        )]
+      if (answer.type === 'score' && question.type === 'score') {
+        const expectedLegend = Object.fromEntries(
+          question.criteria.map((value, index) => [
+            String(index),
+            stringifyDescription(value),
+          ]),
+        )
+        const expectedKeys = question.criteria.map((_, index) => String(index)).sort()
+        if (
+          (answer.legend !== undefined &&
+            !isDeepStrictEqual(
+              Object.fromEntries(answer.legend.map((value, index) => [String(index), value])),
+              expectedLegend,
+            )) ||
+          !isDeepStrictEqual(Object.keys(answer.probabilities).sort(), expectedKeys)
+        )
+          return [id, invalidAnswer()]
+        const probabilities = question.criteria.map(
+          (_, index) => answer.probabilities[String(index)]!,
+        )
+        return [id, scoreAnswer(
+          answer.score,
+          question.criteria,
+          normalizeRoundedDistribution(probabilities),
+          answer.confidence,
+        )]
+      }
+      return [id, invalidAnswer()]
+    }),
+  )
+  return {
+    model: parsedResponse.data.model || request.model,
+    answers,
+    ...(usage
+      ? { usage: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens } }
+      : {}),
+  }
+}
+
+function normalizeRoundedDistributionRecord(
+  probabilities: Readonly<Record<string, number>>,
+): Readonly<Record<string, number>> {
+  const keys = Object.keys(probabilities)
+  const values = normalizeRoundedDistribution(keys.map((key) => probabilities[key]!))
+  return Object.fromEntries(keys.map((key, index) => [key, values[index]!]))
+}
+
+function normalizeRoundedDistribution(
+  probabilities: readonly number[],
+): readonly number[] {
+  if (probabilities.length === 0 || probabilities.some(
+    (value) => !Number.isFinite(value) || value < 0 || value > 1,
+  )) return probabilities
+  const total = probabilities.reduce((sum, value) => sum + value, 0)
+  const roundingBound = probabilities.length * 0.5e-4
+  if (
+    !(total > 0) || total === 1 ||
+    Math.abs(total - 1) > roundingBound + Number.EPSILON * probabilities.length
+  ) return probabilities
+  return probabilities.map((value) => value / total)
+}
+
+function stringifyDescription(value: string | object | readonly unknown[]): string {
+  if (typeof value === 'string') return value
+  return JSON.stringify(value)!
 }
 
 async function prepareImages(
