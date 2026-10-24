@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.4.0",
-  "description": "Structured, per-question results for agents and plugins: classify, filter, score, and locate objects in images, with text, image, audio, and video inputs where supported",
+  "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows.",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [

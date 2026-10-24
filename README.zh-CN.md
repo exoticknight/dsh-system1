@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**让 Agent 和插件把内容分类、筛选候选、按标准评分或图片定位交给决策模型，并拿到逐题结构化结果。** Provider 和模型支持时，请求可包含文本、图片、音频和视频；统一接口支持 TypeSafe/Jev、Laya、Cloudflare/Clef 和自定义 provider。后续动作由调用方决定。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
+**用同一接口接入多种决策提供商与模型：在线可选 TypeSafe 提供的 Jev、Cloudflare 提供的 Clef、Nace 提供的 Drex；本地可连接 Laya，也支持兼容的自定义 provider。** Agent 和插件可用它进行内容分类、候选筛选、按标准评分或图片定位，再用结构化结果继续自己的流程。Provider 和模型支持时，请求也可包含文本、图片、音频和视频。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -12,6 +12,20 @@
 简体中文 | [English](README.md)
 
 </div>
+
+## 提供商与模型
+
+可直接选择内置 provider，也可以按公开契约接入其他后端。可选模型和输入能力会因 provider 与模型而异。
+
+| 提供商 | 可选模型 | 部署方式与主要能力 |
+| --- | --- | --- |
+| TypeSafe（`typesafe`） | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 托管 Jev；支持 PNG/JPEG；`box` 需要 `jev-1.14.0` 或 `jev-preview`；可选 262k 上下文。 |
+| Cloudflare（`cloudflare`） | `clef`、`clef-flash`、`clef-omni` | Workers AI 或兼容的本地 Clef 服务；支持 PNG/JPEG/WebP；`clef-omni` 还支持音频和视频。 |
+| Nace.AI（`nace`） | `drex-v2.0`、`drex-v1.5`、`drex-max` | 托管 Drex；只有 `drex-max` 支持图片。 |
+| Laya（`laya`） | `auto`、`english`、`multilingual`、`typed-decisions` | 自建 [Laya 服务](https://github.com/NandhaKishorM/laya)；仅支持文本；API Key 可选。 |
+| 自定义 | — | 实现公开的 provider 契约即可接入。 |
+
+凭据、端点和完整能力限制见[模型服务配置](docs/providers.md)。
 
 [System One 模型](https://systemonemodels.org/guides/what-is-a-system-one-model/)是一类决策模型，返回带类型的答案和概率，而不是生成文本。名字借用了 Kahneman 的“快思考”：它们负责门控、路由、评分这类范围明确的判断，写作和推理交给主模型。
 
@@ -23,15 +37,6 @@
 | `box`    | 对象在图片中的归一化边界坐标（取决于模型）    |
 
 服务提供请求与响应校验和逐题结果，支持取消、按次超时和备选模型回退，并返回执行元数据。
-
-内置 provider：
-
-- **TypeSafe**（`typesafe`）：托管的 Jev 模型，支持 PNG/JPEG 图片和可选的 262k 上下文；`box` 需要 `jev-1.14.0` 或 `jev-preview`。
-- **Laya**（`laya`）：自建的 [Laya 服务](https://github.com/NandhaKishorM/laya)，API Key 可选，仅支持文本。
-- **Nace.AI Drex**（`nace`）：托管模型 `drex-v2.0`、`drex-v1.5`，以及支持图片的 `drex-max`。
-- **Cloudflare**（`cloudflare`）：`clef`、`clef-flash` 和 `clef-omni` 支持 PNG/JPEG/WebP 图片；Omni 还支持音频与视频。也可以接本地 Clef 服务。
-
-其他后端可实现公开的 provider 契约。
 
 ## 从 npm 安装
 
@@ -50,8 +55,6 @@ dsh plugin --profile <profile> add dsh-system1
 `dsh plugin` 命令必须指定 profile；安装到一个 profile 不会在其他 profile 中启用该插件。如需从 GitHub 仓库安装，在上述命令中把 `dsh-system1` 替换为 `github:exoticknight/dsh-system1`。
 
 随包提供的 patch 会挂载服务及内置 provider。服务默认使用 `typesafe` 的 `jev-latest`。每次尝试优先采用调用显式指定的 `timeoutMs`，否则使用该 provider 的配置值或自身默认值：TypeSafe、Laya、Cloudflare 为 800 ms，Nace 为 60,000 ms。请在对应 provider 的设置页配置超时。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整所选 provider 的 `timeoutMs`，本地 CPU 推理通常需要更长预算。
-
-各 provider 的模型能力、凭据、端点和图片限制见[模型服务配置](docs/providers.md)。
 
 ## 更新内容提示
 
