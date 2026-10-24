@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "System One",
-    "description": "Structured results for agents and plugins: classify content, filter candidates, score against criteria, and locate objects in images. One interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers; callers choose what happens next."
+    "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows."
   }
 }
