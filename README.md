@@ -13,6 +13,20 @@ English | [简体中文](README.zh-CN.md)
 
 </div>
 
+## Providers and models
+
+Choose a built-in provider or add one that implements the public provider contract. Model options and supported inputs vary by provider and model.
+
+| Provider | Model options | Deployment and notable support |
+| --- | --- | --- |
+| TypeSafe (`typesafe`) | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | Hosted Jev; PNG/JPEG; `box` requires `jev-1.14.0` or `jev-preview`; optional 262k context. |
+| Cloudflare (`cloudflare`) | `clef`, `clef-flash`, `clef-omni` | Workers AI or a compatible local Clef service; PNG/JPEG/WebP; `clef-omni` also accepts audio and video. |
+| Nace.AI (`nace`) | `drex-v2.0`, `drex-v1.5`, `drex-max` | Hosted Drex; only `drex-max` accepts images. |
+| Laya (`laya`) | `auto`, `english`, `multilingual`, `typed-decisions` | Self-hosted [Laya server](https://github.com/NandhaKishorM/laya); text only; API key optional. |
+| Custom | — | Any backend implementing the public provider contract. |
+
+See [provider setup](docs/providers.en.md) for credentials, endpoints, and full capability limits.
+
 [System One models](https://systemonemodels.org/guides/what-is-a-system-one-model/) are decision models that return typed answers with probabilities instead of generated text. The name borrows Kahneman's "fast thinking": they handle narrow judgments such as gating, routing, and scoring, while the main LLM writes and reasons.
 
 | Primitive | Result                                                               |
@@ -23,15 +37,6 @@ English | [简体中文](README.zh-CN.md)
 | `box`     | Normalized image coordinates for a located object (model-dependent)  |
 
 Requests and responses are validated, and each question gets its own result. Calls support cancellation, per-attempt timeouts, and fallback models, and return execution metadata.
-
-Built-in providers:
-
-- **TypeSafe** (`typesafe`): hosted Jev models with PNG/JPEG input and optional 262k context; `box` requires `jev-1.14.0` or `jev-preview`.
-- **Laya** (`laya`): a self-hosted [Laya server](https://github.com/NandhaKishorM/laya); API key optional; text only.
-- **Nace.AI Drex** (`nace`): hosted `drex-v2.0`, `drex-v1.5`, and image-capable `drex-max`.
-- **Cloudflare** (`cloudflare`): `clef`, `clef-flash`, and `clef-omni` accept PNG/JPEG/WebP; Omni also accepts audio and video. Can also point at a local Clef service.
-
-Other backends can implement the public provider contract.
 
 ## Install from npm
 
@@ -50,8 +55,6 @@ dsh plugin --profile <profile> add dsh-system1
 The dsh plugin command requires a profile; installing into one profile does not activate the bundle in other profiles. To use the GitHub repository as the package source, replace `dsh-system1` in that command with `github:exoticknight/dsh-system1`.
 
 The bundled patch mounts the service and built-in providers. The service defaults to model `jev-latest` on provider `typesafe`. Each attempt uses a request-level `timeoutMs` when supplied, then that provider's configured timeout or its own default: 800 ms for TypeSafe, Laya, and Cloudflare; 60,000 ms for Nace. Set a provider timeout in that provider's settings page. Use plugin settings to choose the service and model, add fallbacks in order, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust the selected provider's `timeoutMs` for backend latency, especially local CPU inference.
-
-See [provider setup](docs/providers.en.md) for model capabilities, credentials, endpoints, and image limits.
 
 ## Update notices
 
