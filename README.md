@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Give agents and plugins structured, per-question results for classifying content, filtering candidates, scoring criteria, and locating objects in images.** Requests can include text, images, audio, and video where the provider and model support them; one interface supports TypeSafe/Jev, Laya, Cloudflare/Clef, and custom providers. Callers decide what happens next. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
+**Connect to multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, self-hosted Laya, and compatible custom providers.** Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their own workflows. Requests can include text, images, audio, and video where the provider and model support them. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
