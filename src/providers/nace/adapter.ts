@@ -55,6 +55,26 @@ const naceAnswerSchema = z.discriminatedUnion('type', [
   }),
 ])
 
+const maxImageCapabilities = {
+  formats: ['image/png', 'image/jpeg', 'image/webp'],
+  maxCount: 8,
+  maxBytesPerImage: 16 * 1024 * 1024,
+  maxTotalBytes: 32 * 1024 * 1024,
+} as const
+
+type ModelContext = NonNullable<ModelCapabilities['context']>
+
+function maxCapabilities(context: ModelContext): ModelCapabilities {
+  return {
+    primitives: ['noul', 'choice', 'score'],
+    maxQuestions: 512,
+    maxChoiceOptions: 255,
+    maxScoreLevels: 255,
+    images: maxImageCapabilities,
+    context,
+  }
+}
+
 const MODEL_CAPABILITIES = {
   'drex-v1.5': {
     primitives: ['noul', 'choice', 'score'],
@@ -78,23 +98,15 @@ const MODEL_CAPABILITIES = {
       maxStatePlusQuestionTokens: 262_144,
     },
   },
-  'drex-max': {
-    primitives: ['noul', 'choice', 'score'],
-    maxQuestions: 16,
-    maxChoiceOptions: 255,
-    maxScoreLevels: 255,
-    images: {
-      formats: ['image/png', 'image/jpeg', 'image/webp'],
-      maxCount: 8,
-      maxBytesPerImage: 16 * 1024 * 1024,
-      maxTotalBytes: 32 * 1024 * 1024,
-    },
-    context: {
-      maxTokens: 131_072,
-      includesQuestions: false,
-      maxStatePlusQuestionTokens: 262_144,
-    },
-  },
+  'drex-max': maxCapabilities({
+    maxTokens: 524_288,
+    includesQuestions: false,
+    maxStatePlusQuestionTokens: 262_144,
+  }),
+  'drex-max-v1.1': maxCapabilities({
+    maxTokens: 262_144,
+    includesQuestions: true,
+  }),
 } as const satisfies Record<(typeof NACE_MODELS)[number]['id'], ModelCapabilities>
 
 export interface NaceOptions {
@@ -128,10 +140,10 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           code: 'unsupported',
           message: 'Nace model is not supported.',
         })
-      if (request.images?.length && selected.id !== 'drex-max')
+      if (request.images?.length && !isDrexMaxModel(selected.id))
         throw new System1ProviderError({
           code: 'unsupported',
-          message: 'Nace images require drex-max.',
+          message: 'Nace images require drex-max or drex-max-v1.1.',
         })
 
       let apiKey: string | undefined
@@ -197,6 +209,10 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
       }
     },
   }
+}
+
+function isDrexMaxModel(model: string): model is 'drex-max' | 'drex-max-v1.1' {
+  return model === 'drex-max' || model === 'drex-max-v1.1'
 }
 
 function normalizeNaceResponse(
