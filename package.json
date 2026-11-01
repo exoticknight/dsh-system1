@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.4.0",
-  "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows.",
+  "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider via meraGPT, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows.",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [
@@ -15,6 +15,8 @@
     "jev",
     "laya",
     "nace",
+    "meragpt",
+    "decider",
     "llm",
     "classification",
     "probability",
@@ -58,6 +60,12 @@
     },
     "./providers/laya/locale/*.json": "./locale/providers/laya/*.json",
     "./providers/laya/icon": "./assets/provider-icons/laya.png",
+    "./providers/meragpt": {
+      "types": "./lib/providers/meragpt/index.d.ts",
+      "import": "./lib/providers/meragpt/index.js"
+    },
+    "./providers/meragpt/locale/*.json": "./locale/providers/meragpt/*.json",
+    "./providers/meragpt/icon": "./assets/provider-icons/meragpt.svg",
     "./providers/cloudflare": {
       "types": "./lib/providers/cloudflare/index.d.ts",
       "import": "./lib/providers/cloudflare/index.js"
@@ -85,6 +93,7 @@
     "assets/provider-icons/typesafe.png",
     "assets/provider-icons/nace.svg",
     "assets/provider-icons/laya.png",
+    "assets/provider-icons/meragpt.svg",
     "assets/provider-icons/cloudflare-clef.svg",
     "LICENSE",
     "cordis.patch.yml",

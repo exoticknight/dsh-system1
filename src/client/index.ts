@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { CLOUDFLARE_MODELS } from '../providers/cloudflare/models.js'
 import { LAYA_MODELS } from '../providers/laya/models.js'
+import { MERAGPT_MODELS } from '../providers/meragpt/models.js'
 import { NACE_MODELS } from '../providers/nace/models.js'
 import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
 import {
@@ -64,6 +65,7 @@ const en = {
   provider: 'Default service',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
+  providerMeraGpt: 'meraGPT',
   providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: 'Unsupported service',
@@ -82,6 +84,7 @@ const en = {
   defaultHint: 'Used when a decision request does not specify a model.',
   timeoutTypesafeHint: 'Applies when a request has no timeout. Leave blank to use TypeSafe’s 800 ms default.',
   timeoutLayaHint: 'Applies when a request has no timeout. Leave blank to use Laya’s 800 ms default.',
+  timeoutMeraGptHint: 'Applies when a request has no timeout. Leave blank to use meraGPT’s 10,000 ms default.',
   timeoutNaceHint: 'Applies when a request has no timeout. Leave blank to use Nace’s 60,000 ms default.',
   timeoutCloudflareHint: 'Applies when a request has no timeout. Leave blank to use Cloudflare’s 800 ms default.',
   providerEnabledHint: 'Enable the matching service component in the list below.',
@@ -110,11 +113,14 @@ const en = {
   keyUnavailable: 'The DSH credential service is unavailable.',
   typesafeSummary: 'Configure the TypeSafe endpoint and its API Key.',
   layaSummary: 'Configure the Laya endpoint and optional API Key.',
+  meragptSummary: 'Configure meraGPT and its API Key.',
   naceSummary: 'Configure Nace.AI Drex and its API Key.',
   typesafeEndpoint: 'TypeSafe API base URL',
   typesafeEndpointHint: 'The TypeSafe System One endpoint is appended automatically.',
   layaEndpoint: 'Laya server base URL',
   layaEndpointHint: 'Use the base URL of a Laya server exposing POST /v1/systemone.',
+  meragptEndpoint: 'meraGPT API base URL',
+  meragptEndpointHint: 'Use the meraGPT API root; POST /v1/systemone is appended automatically.',
   naceEndpoint: 'Nace API base URL',
   naceEndpointHint: 'Use the Nace API root; POST /v1/systemone is appended automatically.',
   naceImageRetentionHint: 'Drex Max images that exceed the 4 MiB request limit are uploaded as temporary files. DSH attempts deletion after each call; Nace keeps uploads for 24 hours by default, and backup removal can take up to 35 days.',
@@ -146,6 +152,7 @@ const zh = {
   provider: '默认服务',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
+  providerMeraGpt: 'meraGPT',
   providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: '暂不支持的服务',
@@ -164,6 +171,7 @@ const zh = {
   defaultHint: '决策请求未指定模型时使用。',
   timeoutTypesafeHint: '请求未单独指定超时时使用。留空采用 TypeSafe 默认值 800 毫秒。',
   timeoutLayaHint: '请求未单独指定超时时使用。留空采用 Laya 默认值 800 毫秒。',
+  timeoutMeraGptHint: '请求未单独指定超时时使用。留空采用 meraGPT 默认值 10,000 毫秒。',
   timeoutNaceHint: '请求未单独指定超时时使用。留空采用 Nace 默认值 60,000 毫秒。',
   timeoutCloudflareHint: '请求未单独指定超时时使用。留空采用 Cloudflare 默认值 800 毫秒。',
   providerEnabledHint: '请在下方组件列表中启用对应的服务组件。',
@@ -192,11 +200,14 @@ const zh = {
   keyUnavailable: 'DSH 凭据服务暂不可用。',
   typesafeSummary: '配置 TypeSafe 接口地址和 API Key。',
   layaSummary: '配置 Laya 接口地址和可选 API Key。',
+  meragptSummary: '配置 meraGPT 服务和 API Key。',
   naceSummary: '配置 Nace.AI Drex 服务和 API Key。',
   typesafeEndpoint: 'TypeSafe API 根地址',
   typesafeEndpointHint: '插件会自动在地址后拼接 TypeSafe System One 接口路径。',
   layaEndpoint: 'Laya 服务根地址',
   layaEndpointHint: '填写提供 POST /v1/systemone 接口的 Laya 服务根地址。',
+  meragptEndpoint: 'meraGPT API 根地址',
+  meragptEndpointHint: '填写 meraGPT API 根地址；插件会自动拼接 POST /v1/systemone。',
   naceEndpoint: 'Nace API 根地址',
   naceEndpointHint: '填写 Nace API 根地址；插件会自动拼接 POST /v1/systemone。',
   naceImageRetentionHint: 'Drex Max 图片请求超过 4 MiB 时会把部分图片作为临时文件上传。DSH 会在每次调用后尝试删除；Nace 默认保留上传文件 24 小时，备份中的数据最长可能需要 35 天清除。',
@@ -233,7 +244,7 @@ type Copy = Translate<keyof typeof en>
 type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
-type ProviderId = 'typesafe' | 'laya' | 'nace' | 'cloudflare'
+type ProviderId = 'typesafe' | 'laya' | 'meragpt' | 'nace' | 'cloudflare'
 type ModelOption = { id: string; label?: keyof typeof en }
 type ProviderSettings = {
   id: ProviderId
@@ -304,6 +315,19 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     baseURL: 'https://console.nace.ai',
     models: NACE_MODELS.map(({ id }) => ({ id })),
     note: 'naceImageRetentionHint',
+  },
+  {
+    id: 'meragpt',
+    rowId: 'system1-meragpt',
+    label: 'providerMeraGpt',
+    summary: 'meragptSummary',
+    keyRef: 'MERAGPT_API_KEY',
+    keyHint: 'keyHint',
+    endpointLabel: 'meragptEndpoint',
+    endpointHint: 'meragptEndpointHint',
+    timeoutHint: 'timeoutMeraGptHint',
+    baseURL: 'https://meragpt.com',
+    models: MERAGPT_MODELS.map(({ id }) => ({ id })),
   },
   {
     id: 'cloudflare',

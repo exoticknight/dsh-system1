@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Connect to multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, self-hosted Laya, and compatible custom providers.** Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their own workflows. Requests can include text, images, audio, and video where the provider and model support them. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
+**Connect to multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider 1 via meraGPT, self-hosted Laya, and compatible custom providers.** Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their own workflows. Requests can include text, images, audio, and video where the provider and model support them. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -21,7 +21,8 @@ Choose a built-in provider or add one that implements the public provider contra
 | --- | --- | --- |
 | TypeSafe (`typesafe`) | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | Hosted Jev; PNG/JPEG; `box` requires `jev-1.14.0` or `jev-preview`; optional 262k context. |
 | Cloudflare (`cloudflare`) | `clef`, `clef-flash`, `clef-omni` | Workers AI or a compatible local Clef service; PNG/JPEG/WebP; `clef-omni` also accepts audio and video. |
-| Nace.AI (`nace`) | `drex-v2.0`, `drex-v1.5`, `drex-max` | Hosted Drex; only `drex-max` accepts images. |
+| Nace.AI (`nace`) | `drex-v2.0`, `drex-v1.5`, `drex-max`, `drex-max-v1.1` | Hosted Drex; both Max versions accept images, up to 512 questions and 255 choice/score options. Original Max selects from state up to 524k tokens, allows 262k per question and caps combined long questions at 1,048,576; v1.1 caps the whole request at 262k. |
+| meraGPT (`meragpt`) | `decider-1` (`sd-1`, `state-decider-1`) | Hosted Decider 1; 4k-token whole-request context, up to 64 questions and 10 choice/score options. Uses prepaid API credit. |
 | Laya (`laya`) | `auto`, `english`, `multilingual`, `typed-decisions` | Self-hosted [Laya server](https://github.com/NandhaKishorM/laya); text only; API key optional. |
 | Custom | — | Any backend implementing the public provider contract. |
 
@@ -119,7 +120,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|nace|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; hosted probes send real requests and can use account quota. See [testing and live model validation](docs/testing.en.md).
+`pnpm test` runs the plugin and provider tests with local fixtures, as CI does; `pnpm test <plugin|providers|provider name>` runs a subset. Live model probes, `pnpm probe <typesafe|nace|meragpt|cloudflare|laya|clef-local>`, read credentials from `.env.local`, and local targets set up their own service on first use; hosted probes send real requests and can use account quota or prepaid credit. See [testing and live model validation](docs/testing.en.md).
 
 See the [contribution guide](CONTRIBUTING.md) and [release process](docs/releasing.en.md).
 

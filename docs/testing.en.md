@@ -7,7 +7,7 @@ Checks come in three layers. The first two need no credentials or model services
 | Layer | Command | Coverage |
 | --- | --- | --- |
 | Plugin tests | `pnpm test plugin` | Service contract, input and result validation, request/provider timeout precedence, cancellation, provider registration and unload. Uses fake providers and no backend protocol |
-| Provider tests | `pnpm test providers` | Adapter request shapes, response normalization, error sanitization, missing credentials, plugin mount/unmount, and model-catalog/capability/timeout/primitive round trips for all four built-in providers. Uses local HTTP fixtures or an injected `fetch` |
+| Provider tests | `pnpm test providers` | Adapter request shapes, response normalization, error sanitization, missing credentials, plugin mount/unmount, and model-catalog/capability/timeout/primitive round trips for every built-in provider. Uses local HTTP fixtures or an injected `fetch` |
 | Live model probes | `pnpm probe <target>` | Calls a real model through the public service and the provider plugin entry |
 
 `pnpm test` runs the first two layers; `pnpm test <provider>` runs a single provider, for example `pnpm test nace`, and accepts several names. The shared provider conformance suite is `tests/providers/conformance.test.ts` and can run alone with `pnpm test conformance`. Add each new provider's model catalog, capabilities, and response fixtures to that suite, then add its protocol tests in `tests/providers/<provider>.test.ts`.
@@ -20,6 +20,7 @@ Probes load the built `lib/`, so run `pnpm build` first, then `pnpm probe <targe
 | --- | --- | --- | --- |
 | `typesafe` | Hosted API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`, default `jev-1.13.0` |
 | `nace` | Hosted API | `NACE_API_KEY` | `NACE_MODEL`, default `drex-v2.0`; `NACE_BASE_URL` |
+| `meragpt` | Hosted API | `MERAGPT_API_KEY` | `MERAGPT_MODEL`, default `decider-1`; `MERAGPT_BASE_URL` |
 | `cloudflare` | Hosted API | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`, default `clef-flash` |
 | `laya` | Local service | Python; prepared automatically on first run | `LAYA_BASE_URL`, `LAYA_MODEL` (default `auto`), `LAYA_TIMEOUT_MS`, `LAYA_API_KEY` |
 | `clef-local` | Local service | Python and Git LFS; prepared automatically on first run | `CLEF_LOCAL_PORT` (default `8765`), `CLEF_DEVICE` |
@@ -28,7 +29,7 @@ Every probe checks that:
 
 - the `noul`, `choice`, and `score` questions are all `ok`, with probabilities in [0, 1] and distributions summing to 1;
 - the service reports the provider and model that actually ran;
-- a pre-cancelled call returns `cancelled`, an unknown model returns `unsupported` before network I/O, and a 1 ms budget returns `timeout`. `clef-local` skips the timeout check to avoid leaving long CPU inference running; `nace` skips it to avoid an extra metered inference, with timeout and cancellation covered by local fixtures.
+- a pre-cancelled call returns `cancelled`, an unknown model returns `unsupported` before network I/O, and a 1 ms budget returns `timeout`. `clef-local` skips the timeout check to avoid leaving long CPU inference running; `nace` and `meragpt` skip it to avoid an extra metered inference, with timeout and cancellation covered by local fixtures.
 
 Local targets also check `/health`. `laya` requires the executed model to be a checkpoint loaded by the service and reports its revision and device; `clef-local` requires the pinned weight revision and reports quantization details.
 
@@ -46,6 +47,10 @@ curl --fail-with-body https://console.nace.ai/v1/models \
 ```
 
 After `pnpm build`, `pnpm probe nace` sends one real `POST /v1/systemone` with three questions and may spend account credit. Run it when that usage is acceptable. Probe output never includes the key. A successful response confirms the integration path for that key and model, not decision quality or latency.
+
+## meraGPT credentials and live probe
+
+Set `MERAGPT_API_KEY` in the repository-root `.env.local`; `MERAGPT_MODEL` selects a model (default `decider-1`), and `MERAGPT_BASE_URL` can override the API root. `pnpm probe meragpt` sends one real inference request covering all three primitives. It skips the short-timeout inference to avoid spending prepaid credit on a second request. Check the account balance before running it; insufficient credit returns HTTP 402. The probe never prints the key.
 
 ## Host Loader probe
 
@@ -96,7 +101,7 @@ Everything lives in the Git-ignored `.scratch/local-providers/<laya|cloudflare>/
 
 ### Laya
 
-The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.3.27` and `torch==2.14.1+cpu`, verified on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
+The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.4.19` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
 
 The top-level `model` in a Laya response is the service name `laya-rl-agent`; the plugin prefers `routing.model` as the executed model.
 

@@ -57,10 +57,10 @@ try {
   assert.ok(result.meta.executed?.model, 'the service must report the executed model')
 
   const { refund, topic, urgency } = result.answers
-  assert.equal(refund.status, 'ok', 'noul answer failed')
+  assert.equal(refund.status, 'ok', `noul answer failed: ${JSON.stringify(refund)}`)
   assert.equal(refund.answer.type, 'noul')
   assertProbability(refund.answer.probabilityTrue, 'noul probability')
-  assert.equal(topic.status, 'ok', 'choice answer failed')
+  assert.equal(topic.status, 'ok', `choice answer failed: ${JSON.stringify(topic)}`)
   assert.equal(topic.answer.type, 'choice')
   assert.deepEqual(
     Object.keys(topic.answer.probabilities).sort(),
@@ -68,7 +68,7 @@ try {
   )
   assert.ok(Object.hasOwn(questions.topic.criteria, topic.answer.value))
   assertDistribution(Object.values(topic.answer.probabilities), 'choice probabilities')
-  assert.equal(urgency.status, 'ok', 'score answer failed')
+  assert.equal(urgency.status, 'ok', `score answer failed: ${JSON.stringify(urgency)}`)
   assert.equal(urgency.answer.type, 'score')
   assert.equal(urgency.answer.probabilities.length, questions.urgency.criteria.length)
   assertDistribution(urgency.answer.probabilities, 'score probabilities')

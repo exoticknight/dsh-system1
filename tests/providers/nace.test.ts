@@ -19,12 +19,12 @@ const request: ProviderRequest = {
   questions: { q: { type: 'noul', instructions: 'Is this a support request?' } },
 }
 
-function uploadedRequest(size = 32): ProviderRequest {
+function uploadedRequest(size = 32, model = 'drex-max'): ProviderRequest {
   const bytes = Buffer.alloc(size)
   PNG_SIGNATURE.copy(bytes)
   return {
     ...request,
-    model: 'drex-max',
+    model,
     images: [{ mediaType: 'image/png', data: bytes.toString('base64') }],
   }
 }
@@ -120,6 +120,7 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
   assert.deepEqual(NACE_MODELS.map(({ id }) => id), [
     'drex-v2.0',
     'drex-v1.5',
+    'drex-max-v1.1',
     'drex-max',
   ])
   const provider = createNaceProvider({ apiKey: '' })
@@ -148,7 +149,7 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
   })
   const max = await provider.describe('drex-max', new AbortController().signal)
   assert.deepEqual(max.primitives, ['noul', 'choice', 'score'])
-  assert.equal(max.maxQuestions, 16)
+  assert.equal(max.maxQuestions, 512)
   assert.equal(max.maxChoiceOptions, 255)
   assert.equal(max.maxScoreLevels, 255)
   assert.deepEqual(max.images, {
@@ -156,6 +157,25 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
     maxCount: 8,
     maxBytesPerImage: 16 * 1024 * 1024,
     maxTotalBytes: 32 * 1024 * 1024,
+  })
+  assert.deepEqual(max.context, {
+    maxTokens: 524_288,
+    includesQuestions: false,
+    maxStatePlusQuestionTokens: 262_144,
+  })
+  const maxV11 = await provider.describe('drex-max-v1.1', new AbortController().signal)
+  assert.deepEqual(maxV11, {
+    primitives: ['noul', 'choice', 'score'],
+    maxQuestions: 512,
+    maxChoiceOptions: 255,
+    maxScoreLevels: 255,
+    images: {
+      formats: ['image/png', 'image/jpeg', 'image/webp'],
+      maxCount: 8,
+      maxBytesPerImage: 16 * 1024 * 1024,
+      maxTotalBytes: 32 * 1024 * 1024,
+    },
+    context: { maxTokens: 262_144, includesQuestions: true },
   })
   await assert.rejects(
     provider.describe('drex-latest', new AbortController().signal),
@@ -255,6 +275,31 @@ test('Nace serializes structured descriptions, retains null criteria, and normal
     },
   })
   assert.deepEqual(result.usage, { inputTokens: 12, outputTokens: 4 })
+})
+
+test('Drex Max v1.1 sends images through the Max request path', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne(body) {
+      assert.equal(body.model, 'drex-max-v1.1')
+      assert.deepEqual(body.images, [
+        `data:image/png;base64,${uploadedRequest().images![0]!.data}`,
+      ])
+      return Response.json({
+        model: 'drex-max-v1.1',
+        answers: { q: { type: 'noul', noul: 0.8 } },
+      })
+    },
+  })
+  const provider = createNaceProvider({ apiKey: 'fixture-only', fetch: fixture.fetch })
+  const result = await provider.evaluate(
+    uploadedRequest(32, 'drex-max-v1.1'),
+    new AbortController().signal,
+  )
+  assert.equal(result.model, 'drex-max-v1.1')
+  assert.deepEqual(result.answers.q, {
+    status: 'ok',
+    answer: { type: 'noul', probabilityTrue: 0.8 },
+  })
 })
 
 test('Nace accepts a score answer when the optional legend is absent', async () => {

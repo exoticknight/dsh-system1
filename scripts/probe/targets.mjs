@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import * as cloudflare from '../../lib/providers/cloudflare/index.js'
 import * as laya from '../../lib/providers/laya/index.js'
+import * as meragpt from '../../lib/providers/meragpt/index.js'
 import * as nace from '../../lib/providers/nace/index.js'
 import * as typesafe from '../../lib/providers/typesafe/index.js'
 import { CLEF_REVISION } from './local.mjs'
@@ -66,6 +67,23 @@ export const targets = {
     timeoutMs: 20_000,
     sample: english,
     mount: (ctx) => ctx.plugin(cloudflare, { id: 'cloudflare' }),
+  },
+
+  meragpt: {
+    kind: 'hosted',
+    requiredEnv: ['MERAGPT_API_KEY'],
+    model: () => process.env.MERAGPT_MODEL || 'decider-1',
+    timeoutMs: 30_000,
+    // One hosted inference verifies the wire contract; avoid a second billable call.
+    skipShortTimeout: true,
+    sample: english,
+    endpoint: () => process.env.MERAGPT_BASE_URL || 'https://meragpt.com',
+    mount: (ctx, endpoint) =>
+      ctx.plugin(meragpt, {
+        id: 'meragpt',
+        apiKeyEnv: 'MERAGPT_API_KEY',
+        baseURL: endpoint,
+      }),
   },
 
   laya: {

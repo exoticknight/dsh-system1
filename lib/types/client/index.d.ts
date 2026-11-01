@@ -4,6 +4,7 @@ declare const en: {
     provider: string;
     providerTypesafe: string;
     providerLaya: string;
+    providerMeraGpt: string;
     providerNace: string;
     providerCloudflare: string;
     providerUnknown: string;
@@ -22,6 +23,7 @@ declare const en: {
     defaultHint: string;
     timeoutTypesafeHint: string;
     timeoutLayaHint: string;
+    timeoutMeraGptHint: string;
     timeoutNaceHint: string;
     timeoutCloudflareHint: string;
     providerEnabledHint: string;
@@ -50,11 +52,14 @@ declare const en: {
     keyUnavailable: string;
     typesafeSummary: string;
     layaSummary: string;
+    meragptSummary: string;
     naceSummary: string;
     typesafeEndpoint: string;
     typesafeEndpointHint: string;
     layaEndpoint: string;
     layaEndpointHint: string;
+    meragptEndpoint: string;
+    meragptEndpointHint: string;
     naceEndpoint: string;
     naceEndpointHint: string;
     naceImageRetentionHint: string;
