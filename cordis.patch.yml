@@ -15,6 +15,12 @@
         id: laya
         apiKeyEnv: LAYA_API_KEY
         baseURL: http://127.0.0.1:8000
+    - id: system1-meragpt
+      name: dsh-system1/providers/meragpt
+      config:
+        id: meragpt
+        apiKeyEnv: MERAGPT_API_KEY
+        baseURL: https://meragpt.com
     - id: system1-nace
       name: dsh-system1/providers/nace
       config:

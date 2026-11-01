@@ -7,7 +7,7 @@
 | 层级 | 命令 | 覆盖范围 |
 | --- | --- | --- |
 | 插件测试 | `pnpm test plugin` | 服务契约、输入与结果校验、请求/Provider 超时优先级、取消、provider 注册与卸载。使用假 provider，不涉及任何后端协议 |
-| Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载，以及四个内置 provider 的目录、能力、超时和各支持原语往返一致性。使用本地 HTTP fixture 或替换的 `fetch` |
+| Provider 测试 | `pnpm test providers` | 各 adapter 的请求格式、响应归一化、错误脱敏、凭据缺失、插件挂载与卸载，以及所有内置 provider 的目录、能力、超时和各支持原语往返一致性。使用本地 HTTP fixture 或替换的 `fetch` |
 | 真实模型探针 | `pnpm probe <target>` | 通过公共服务和 provider 插件入口调用真实模型 |
 
 `pnpm test` 运行前两层；`pnpm test <provider>` 只运行某个 provider，例如 `pnpm test nace`，可同时指定多个。Provider 通用一致性套件位于 `tests/providers/conformance.test.ts`，可用 `pnpm test conformance` 单独运行；新增 provider 时在其中登记模型目录、能力和 fixture，再添加对应的 provider 协议测试文件。
@@ -20,6 +20,7 @@
 | --- | --- | --- | --- |
 | `typesafe` | 托管 API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`，默认 `jev-1.13.0` |
 | `nace` | 托管 API | `NACE_API_KEY` | `NACE_MODEL`，默认 `drex-v2.0`；`NACE_BASE_URL` |
+| `meragpt` | 托管 API | `MERAGPT_API_KEY` | `MERAGPT_MODEL`，默认 `decider-1`；`MERAGPT_BASE_URL` |
 | `cloudflare` | 托管 API | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`，默认 `clef-flash` |
 | `laya` | 本地服务 | Python；首次运行自动准备 | `LAYA_BASE_URL`、`LAYA_MODEL`（默认 `auto`）、`LAYA_TIMEOUT_MS`、`LAYA_API_KEY` |
 | `clef-local` | 本地服务 | Python、Git LFS；首次运行自动准备 | `CLEF_LOCAL_PORT`（默认 `8765`）、`CLEF_DEVICE` |
@@ -28,7 +29,7 @@
 
 - `noul`、`choice`、`score` 三道题均为 `ok`，概率在 [0, 1] 内，分布之和为 1；
 - 服务报告实际执行的 provider 与模型；
-- 预取消返回 `cancelled`，未知模型在网络调用前返回 `unsupported`，1 ms 预算返回 `timeout`。`clef-local` 跳过超时检查以免留下长时间运行的 CPU 推理；`nace` 跳过此检查以避免额外消耗额度的推理请求，其超时和取消由本地 fixture 覆盖。
+- 预取消返回 `cancelled`，未知模型在网络调用前返回 `unsupported`，1 ms 预算返回 `timeout`。`clef-local` 跳过超时检查以免留下长时间运行的 CPU 推理；`nace` 和 `meragpt` 跳过此检查，避免额外发送计费请求，其超时和取消由本地 fixture 覆盖。
 
 本地服务还会检查 `/health`：`laya` 要求实际模型是服务已加载的 checkpoint，并输出 revision 与设备；`clef-local` 要求固定的权重 revision 并输出量化信息。
 
@@ -46,6 +47,10 @@ curl --fail-with-body https://console.nace.ai/v1/models \
 ```
 
 运行 `pnpm build` 后，`pnpm probe nace` 会发送一次真实 `POST /v1/systemone`，包含三道题并可能消耗账户额度；确认可以使用额度后再运行。探针输出不会包含 key。成功响应只确认该 key 和模型的调用链路可用，不代表判断质量或延迟表现。
+
+## meraGPT 凭据与真实探针
+
+在仓库根目录 `.env.local` 配置 `MERAGPT_API_KEY`，可用 `MERAGPT_MODEL` 选择模型（默认 `decider-1`），也可用 `MERAGPT_BASE_URL` 覆盖 API 根地址。`pnpm probe meragpt` 会发送一次同时覆盖三种原语的真实推理请求；为避免额外使用预付费额度，它会跳过短超时推理。运行前确认账户余额；余额不足会返回 HTTP 402。探针不会输出密钥。
 
 ## 宿主 Loader 探针
 
@@ -96,7 +101,7 @@ pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的
 
 ### Laya
 
-[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.3.27` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
+[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.4.19` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
 
 Laya 响应顶层的 `model` 是服务名 `laya-rl-agent`，插件优先使用 `routing.model` 作为实际执行模型。
 

@@ -58,6 +58,8 @@ import { findProviderModel } from 'dsh-system1/providers'
 import * as typesafe from 'dsh-system1/providers/typesafe'
 import { TYPESAFE_MODELS } from 'dsh-system1/providers/typesafe'
 import { LAYA_MODELS } from 'dsh-system1/providers/laya'
+import * as meragpt from 'dsh-system1/providers/meragpt'
+import { MERAGPT_MODELS } from 'dsh-system1/providers/meragpt'
 import * as nace from 'dsh-system1/providers/nace'
 import { NACE_MODELS } from 'dsh-system1/providers/nace'
 import * as cloudflare from 'dsh-system1/providers/cloudflare'
@@ -73,6 +75,7 @@ if(result.answers.topic.status!=='ok')throw new Error('Consumer failed')
 const value:'a'|'b'=result.answers.topic.answer.value
 if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
 if(!TYPESAFE_MODELS.some(({id})=>id==='jev-latest')||!LAYA_MODELS.some(({id})=>id==='auto'))throw new Error('Missing provider model catalog')
+if(!MERAGPT_MODELS.some(({id})=>id==='decider-1')||typeof meragpt.apply!=='function'||typeof meragpt.createMeraGptProvider!=='function')throw new Error('Missing meraGPT provider entry')
 if(NACE_MODELS.map(({id})=>id).join(',')!=='drex-v2.0,drex-v1.5,drex-max-v1.1,drex-max')throw new Error('Missing pinned Nace model catalog')
 if(findProviderModel(CLOUDFLARE_MODELS,'@cf/cloudflare/clef')?.id!=='clef')throw new Error('Provider model alias did not resolve')
 if(typeof tool.apply!=='function'||tool.TOOL_NAME!=='system1_decide')throw new Error('Invalid agent tool public entry')
@@ -85,6 +88,17 @@ const cloudflareResult=await cloudflareCtx.system1.decide({state:'fixture',quest
 if(cloudflareResult.answers.q.status!=='error'||cloudflareResult.answers.q.error.code!=='unsupported')throw new Error('Cloudflare Cordis component did not register its provider')
 await cloudflarePlugin.dispose()
 await cloudflareService.dispose()
+for(const entry of ['icon','locale/en.json','locale/zh.json']){
+  const url=import.meta.resolve('dsh-system1/providers/meragpt/'+entry)
+  if(!existsSync(fileURLToPath(url)))throw new Error('Missing meraGPT package asset: '+entry)
+}
+const meragptCtx=new Context()
+const meragptService=await meragptCtx.plugin(Service,{defaultModel:{provider:'meragpt',model:'unsupported-probe'}})
+const meragptPlugin=await meragptCtx.plugin(meragpt,{id:'meragpt',apiKeyEnv:'DSH_SYSTEM1_PACKAGE_CHECK_MERAGPT_KEY',baseURL:'https://meragpt.com'})
+const meragptResult=await meragptCtx.system1.decide({state:'fixture',questions:{q:{type:'noul',instructions:'?'}}})
+if(meragptResult.answers.q.status!=='error'||meragptResult.answers.q.error.code!=='unsupported')throw new Error('meraGPT Cordis component did not register its provider')
+await meragptPlugin.dispose()
+await meragptService.dispose()
 if(typeof nace.apply!=='function'||typeof nace.createNaceProvider!=='function')throw new Error('Missing Nace provider exports')
 for(const entry of ['icon','locale/en.json','locale/zh.json']){
   const url=import.meta.resolve('dsh-system1/providers/nace/'+entry)

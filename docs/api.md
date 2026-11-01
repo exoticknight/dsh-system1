@@ -4,11 +4,11 @@
 
 ## 请求与结果
 
-`decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，优先级为：调用显式值、所选 provider 的 `timeoutMs` 配置、provider 自身默认值。TypeSafe、Laya 和 Cloudflare 默认 800 ms，Nace 默认 60,000 ms。每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
+`decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，优先级为：调用显式值、所选 provider 的 `timeoutMs` 配置、provider 自身默认值。TypeSafe、Laya 和 Cloudflare 默认 800 ms，meraGPT 默认 10,000 ms，Nace 默认 60,000 ms。每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
 
 0.4.0 迁移：服务级 `timeoutMs` 已移除，旧配置中残留的服务级值会被忽略；请将自定义超时移到对应 provider 设置页。第三方 `System1Provider` 需实现 `timeoutMs(): number`，以替代 `defaultTimeoutMs`；`ModelCapabilities` 现在要求显式声明题目限制和所支持附件的数量、字节上限。
 
-公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出类型，包括 `ProviderModel`；`dsh-system1/providers` 导出 `findProviderModel`。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya`、`dsh-system1/providers/nace` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件、`create…Provider` 工厂及各自模型数组（`TYPESAFE_MODELS`、`LAYA_MODELS`、`NACE_MODELS`、`CLOUDFLARE_MODELS`）。连接参数与模型选择见[模型服务配置](providers.md)。
+公开入口：根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出类型，包括 `ProviderModel`；`dsh-system1/providers` 导出 `findProviderModel`。`dsh-system1/providers/typesafe`、`dsh-system1/providers/laya`、`dsh-system1/providers/meragpt`、`dsh-system1/providers/nace` 和 `dsh-system1/providers/cloudflare` 分别导出 provider 插件、`create…Provider` 工厂及各自模型数组（包括 `MERAGPT_MODELS`）。连接参数与模型选择见[模型服务配置](providers.md)。
 
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 
@@ -36,7 +36,7 @@ if (result.answers.topic.status === 'ok') {
 
 `noul` 返回 `probabilityTrue`；`choice` 返回候选键与完整 `probabilities`；`score` 返回从 0 开始的期望等级，以及按 `criteria` 顺序排列的分布。`box` 问题返回 `{ type: 'box', box: { top, bottom, left, right }, confidence? }`，边缘是 0 到 1 之间的图片比例。概率和坐标都是模型输出，消费插件自行确定动作阈值。
 
-`images`、`audio` 和 `videos` 是对整个请求共享的可选附件列表，每项为 `{ mediaType, data }`，`data` 是标准补位 Base64，不带 data URL 前缀。通用层校验结构，并设资源安全上限：每类最多 16 项、单项最多 16 MiB、全部附件解码后合计最多 64 MiB；这些不是 provider 能力值。图片支持 `image/png`、`image/jpeg` 和 `image/webp`；每个问题都可以使用这些图片，`box` 需要至少一张图片。provider 再按模型能力检查格式、数量和大小：Nace 只有 `drex-max` 接受图片（最多 8 张），TypeSafe 和 Cloudflare 最多 4 张。音频支持 `audio/wav`、`audio/mpeg`，视频支持 `video/mp4`、`video/webm`；目前只有 Cloudflare `clef-omni` 接受音频和视频，最多 4 段音频（每段 8 MiB、300 秒）与 2 段视频（每段 16 MiB、60 秒）。Cloudflare 的音频和视频解码后合计最多 16 MiB，图片预算独立；时长由 Cloudflare 校验，视频按 2 fps 采样。provider 会按模型能力预检格式、数量和字节数，兜底链会跳过不支持这些附件的模型。`longContext: true` 请求模型启用扩展上下文，当前 TypeSafe Jev 支持至多 262k tokens；未设置时使用常规上下文限制。
+`images`、`audio` 和 `videos` 是对整个请求共享的可选附件列表，每项为 `{ mediaType, data }`，`data` 是标准补位 Base64，不带 data URL 前缀。通用层校验结构，并设资源安全上限：每类最多 16 项、单项最多 16 MiB、全部附件解码后合计最多 64 MiB；这些不是 provider 能力值。图片支持 `image/png`、`image/jpeg` 和 `image/webp`；每个问题都可以使用这些图片，`box` 需要至少一张图片。provider 再按模型能力检查格式、数量和大小：Nace 的 `drex-max` 与 `drex-max-v1.1` 接受图片（最多 8 张），TypeSafe 和 Cloudflare 最多 4 张。meraGPT 不声明附件能力。音频支持 `audio/wav`、`audio/mpeg`，视频支持 `video/mp4`、`video/webm`；目前只有 Cloudflare `clef-omni` 接受音频和视频，最多 4 段音频（每段 8 MiB、300 秒）与 2 段视频（每段 16 MiB、60 秒）。Cloudflare 的音频和视频解码后合计最多 16 MiB，图片预算独立；时长由 Cloudflare 校验，视频按 2 fps 采样。provider 会按模型能力预检格式、数量和字节数，兜底链会跳过不支持这些附件的模型。`longContext: true` 请求模型启用扩展上下文，当前 TypeSafe Jev 支持至多 262k tokens；未设置时使用常规上下文限制。
 
 Cloudflare 的公开示例明确使用 MP3=`audio/mpeg` 和 MP4=`video/mp4`；本包将 WAV、WebM 分别映射为 `audio/wav`、`video/webm`，但这两个 MIME 值尚未通过账户级 schema 或真实请求验证。首次使用 WAV 或 WebM 前，请先用小样本验证。
 
@@ -119,6 +119,10 @@ provider 插件接受 `id`、`apiKeyEnv` 和可选的 `baseURL`；前两者默�
 
 ## Nace.AI Drex 能力与限制
 
-`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions` 和 `NACE_MODELS` 模型数组（`drex-v2.0`、`drex-v1.5`、`drex-max`）。Nace 支持 `noul`、`choice`、`score`，不支持 `box`。DSH 的结构化描述会被紧凑 JSON 字符串化后交给 Nace；`choice` criterion 中的 `null` 会保留；score 等级与返回概率保持数组顺序。
+`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions` 和 `NACE_MODELS` 模型数组（`drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1`）。Nace 支持 `noul`、`choice`、`score`，不支持 `box`。DSH 的结构化描述会被紧凑 JSON 字符串化后交给 Nace；`choice` criterion 中的 `null` 会保留；score 等级与返回概率保持数组顺序。
 
-`drex-v1.5` 与 `drex-v2.0` 每次最多接受 512 道题，不支持图片；`drex-max` 最多接受 16 道题、8 张 PNG/JPEG/WebP 图片（单张最大 16 MiB、总计最大 32 MiB、单图分辨率不超过 40 megapixels），每道 choice 最多 255 个候选，每道 score 最多 255 个等级。模型 token 限制作为 provider 能力元数据公开；DSH 不对 Drex 输入分词，实际 token 校验由 Nace 执行。UTF-8 JSON 请求体上限为 4 MiB，计量 `state`、`questions` 和非空 `images`，不计顶层 `model`。Max 图片在请求未超限时以内联方式发送；大请求只上传足够数量的图片到账号级文件。Nace 返回的 token 或其他请求限制错误会安全映射为 provider error。模型 token 上限、上传行为与留存说明见 [Nace 模型服务配置](providers.md#naceai-drex)。
+`drex-v1.5` 与 `drex-v2.0` 每次最多接受 512 道题，不支持图片；两版 Max 每次也最多接受 512 道题，支持最多 8 张 PNG/JPEG/WebP 图片（单张最大 16 MiB、总计最大 32 MiB、单图分辨率不超过 40 megapixels），每道 choice 最多 255 个候选，每道 score 最多 255 个等级。原版 `drex-max` 可从最多 524,288-token 的 state 中选择内容，每道题的 state 与 question 合计最多 262,144 tokens；当单题超过 131,072 tokens 时，跨题累计不超过 1,048,576 tokens，计入图像 tokens。`drex-max-v1.1` 的 262,144-token 限制覆盖整份请求，包括 state、所有问题、图片和格式标记。模型 token 限制作为 provider 能力元数据公开；DSH 不对 Drex 输入分词，实际 token 校验由 Nace 执行。UTF-8 JSON 请求体上限为 4 MiB，计量 `state`、`questions` 和非空 `images`，不计顶层 `model`。Max 图片在请求未超限时以内联方式发送；大请求只上传足够数量的图片到账号级文件。Nace 返回的 token 或其他请求限制错误会安全映射为 provider error。模型 token 上限、上传行为与留存说明见 [Nace 模型服务配置](providers.md#naceai-drex)。
+
+## meraGPT Decider 1 能力与限制
+
+`dsh-system1/providers/meragpt` 导出 Cordis 插件、`createMeraGptProvider` 和 `MERAGPT_MODELS`。它提供一个规范模型 `decider-1`，并将 `sd-1` 与旧别名 `state-decider-1` 解析为该 ID；上游请求始终使用 `decider-1`。meraGPT 支持 `noul`、`choice`、`score`，每次最多 64 道题，每题最多 10 个选项或等级；4,096-token context 覆盖 state 与全部 questions。该 provider 不接受图片、音频或视频。API 使用预付费额度，额度不足的 HTTP 402 不会重试；速率限制与服务端错误按共享重试策略处理。连接和额度说明见[模型服务配置](providers.md#meragpt-decider-1)。

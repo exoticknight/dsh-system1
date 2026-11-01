@@ -9,14 +9,16 @@ const root = resolve('.scratch/local-providers')
 const isWindows = process.platform === 'win32'
 
 export const CLEF_REVISION = '17f0b0ad64efb65d273590632833508766b2aae6'
+export const LAYA_VERSION = '0.4.19'
 
 export const services = {
   laya: {
     dir: join(root, 'laya'),
     venv: '.venv',
+    installedVersion: (python) => installedPythonPackageVersion(python, 'laya'),
     install: [
       ['-m', 'pip', 'install', 'torch==2.14.1+cpu', '--index-url', 'https://download.pytorch.org/whl/cpu'],
-      ['-m', 'pip', 'install', 'laya[serve]==0.3.27'],
+      ['-m', 'pip', 'install', `laya[serve]==${LAYA_VERSION}`],
     ],
     // The official service downloads its checkpoint during preload.
     start: (python, port) => ({
@@ -103,12 +105,33 @@ export async function ensureService(name, endpoint) {
 function ensureVenv(name, service) {
   const venv = join(service.dir, service.venv)
   const python = isWindows ? join(venv, 'Scripts', 'python.exe') : join(venv, 'bin', 'python')
-  if (existsSync(python)) return python
-  log(name, `creating Python environment at ${venv}`)
-  mkdirSync(service.dir, { recursive: true })
-  exec(process.env.PYTHON || (isWindows ? 'python' : 'python3'), ['-m', 'venv', venv])
-  for (const args of service.install) exec(python, ['-I', ...args])
+  if (!existsSync(python)) {
+    log(name, `creating Python environment at ${venv}`)
+    mkdirSync(service.dir, { recursive: true })
+    exec(process.env.PYTHON || (isWindows ? 'python' : 'python3'), ['-m', 'venv', venv])
+    for (const args of service.install) exec(python, ['-I', ...args])
+  } else if (service.installedVersion) {
+    const currentVersion = service.installedVersion(python)
+    if (currentVersion !== LAYA_VERSION) {
+      log(name, `updating Laya ${currentVersion || '(not installed)'} to ${LAYA_VERSION}`)
+      exec(python, ['-I', ...service.install.at(-1)])
+    }
+  }
   return python
+}
+
+function installedPythonPackageVersion(python, packageName) {
+  const code = [
+    'from importlib.metadata import PackageNotFoundError, version',
+    'try:',
+    '    print(version(' + JSON.stringify(packageName) + '))',
+    'except PackageNotFoundError:',
+    '    print("")',
+  ].join('\n')
+  const result = spawnSync(python, ['-I', '-c', code], { encoding: 'utf8' })
+  if (result.status !== 0)
+    throw new Error(`Could not inspect the installed ${packageName} version in the probe environment.`)
+  return result.stdout.trim()
 }
 
 function downloadClef(dir) {

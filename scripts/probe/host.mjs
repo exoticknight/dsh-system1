@@ -1,11 +1,16 @@
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
-import { readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { targets } from './targets.mjs'
+import { findProviderModel } from '../../lib/providers/models.js'
+import { MERAGPT_MODELS } from '../../lib/providers/meragpt/models.js'
 if (!process.argv[2])
   throw new Error(
-    'Pass the absolute path of installed @deepseek-ai/dsh/package.json.',
+    'Pass the absolute path of installed @deepseek-ai/dsh/package.json; optionally add --live-meragpt.',
   )
+const liveMera = process.argv.includes('--live-meragpt')
+if (liveMera && existsSync('.env.local')) process.loadEnvFile('.env.local')
 const host = pathToFileURL(realpathSync(process.argv[2]))
 const require = createRequire(host)
 const manifest = JSON.parse(readFileSync(host, 'utf8'))
@@ -23,6 +28,11 @@ const { Loader } = await load('@deepseek-ai/cordis-plugin-loader')
 const { composeEntries, readPluginMeta } = await load('@deepseek-ai/dsh-app-boot')
 const yaml = require('js-yaml')
 const patches = yaml.load(readFileSync('cordis.patch.yml', 'utf8'))
+if (liveMera) {
+  const entry = patches[0].insert.find(({ id }) => id === 'system1-meragpt')
+  assert.ok(entry, 'meraGPT provider entry is missing from the bundle patch.')
+  entry.config = { ...entry.config, baseURL: targets.meragpt.endpoint() }
+}
 const system1Entry = patches[0].insert.find(({ id }) => id === 'system1')
 assert.ok(system1Entry, 'System1 service entry is missing from the bundle patch.')
 system1Entry.config = {
@@ -87,7 +97,7 @@ try {
     cancelled.answers.q.status === 'error' ? cancelled.answers.q.error.code : undefined,
     'cancelled',
   )
-  for (const provider of ['typesafe', 'laya', 'nace', 'cloudflare']) {
+  for (const provider of ['typesafe', 'laya', 'nace', 'cloudflare', 'meragpt']) {
     const result = await ctx.system1.decide({
       state: 'fixture',
       questions: { q: { type: 'noul', instructions: 'yes?' } },
@@ -145,6 +155,40 @@ try {
       },
     },
   ])
+  if (liveMera) {
+    assert.ok(process.env.MERAGPT_API_KEY?.trim(), 'MERAGPT_API_KEY is not set in .env.local.')
+    const { state, questions } = targets.meragpt.sample
+    const started = performance.now()
+    const result = await ctx.system1.decide({
+      state,
+      questions,
+      model: { provider: 'meragpt', model: targets.meragpt.model() },
+      timeoutMs: targets.meragpt.timeoutMs,
+    })
+    const latencyMs = Math.round(performance.now() - started)
+    assert.equal(result.meta.executed?.provider, 'meragpt')
+    assert.equal(
+      result.meta.executed?.model,
+      findProviderModel(MERAGPT_MODELS, targets.meragpt.model())?.id,
+    )
+    for (const id of Object.keys(questions))
+      assert.equal(
+        result.answers[id].status,
+        'ok',
+        `MeraGPT answer ${id} failed: ${JSON.stringify(result.answers[id])}`,
+      )
+    console.log(JSON.stringify({
+      status: 'verified',
+      target: 'meragpt',
+      hostVersion: manifest.version,
+      executedModel: result.meta.executed.model,
+      latencyMs,
+      ...(result.meta.usage ? { usage: result.meta.usage } : {}),
+      answerStatuses: Object.fromEntries(
+        Object.entries(result.answers).map(([id, answer]) => [id, answer.status]),
+      ),
+    }, null, 2))
+  }
   console.log(
     `Installed dsh ${manifest.version} loader mounted the service, all providers and the agent tool; the real tool registry accepted fallback output.`,
   )

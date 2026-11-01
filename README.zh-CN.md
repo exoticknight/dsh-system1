@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**用同一接口接入多种决策提供商与模型：在线可选 TypeSafe 提供的 Jev、Cloudflare 提供的 Clef、Nace 提供的 Drex；本地可连接 Laya，也支持兼容的自定义 provider。** Agent 和插件可用它进行内容分类、候选筛选、按标准评分或图片定位，再用结构化结果继续自己的流程。Provider 和模型支持时，请求也可包含文本、图片、音频和视频。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
+**用同一接口接入多种决策提供商与模型：在线可选 TypeSafe 提供的 Jev、Cloudflare 提供的 Clef、Nace 提供的 Drex、meraGPT 提供的 Decider 1；本地可连接 Laya，也支持兼容的自定义 provider。** Agent 和插件可用它进行内容分类、候选筛选、按标准评分或图片定位，再用结构化结果继续自己的流程。Provider 和模型支持时，请求也可包含文本、图片、音频和视频。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -21,7 +21,8 @@
 | --- | --- | --- |
 | TypeSafe（`typesafe`） | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 托管 Jev；支持 PNG/JPEG；`box` 需要 `jev-1.14.0` 或 `jev-preview`；可选 262k 上下文。 |
 | Cloudflare（`cloudflare`） | `clef`、`clef-flash`、`clef-omni` | Workers AI 或兼容的本地 Clef 服务；支持 PNG/JPEG/WebP；`clef-omni` 还支持音频和视频。 |
-| Nace.AI（`nace`） | `drex-v2.0`、`drex-v1.5`、`drex-max` | 托管 Drex；只有 `drex-max` 支持图片。 |
+| Nace.AI（`nace`） | `drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1` | 托管 Drex；两版 Max 均支持图片、最多 512 道题及每题 255 个 choice/score 选项。原版 Max 的 state 可达 524k tokens、每题最多 262k、长问题合计最多 1,048,576；v1.1 将整份请求限制为 262k。 |
+| meraGPT（`meragpt`） | `decider-1`（别名 `sd-1`、`state-decider-1`） | 托管 Decider 1；整份请求上下文 4k tokens，最多 64 道题、每题 10 个 choice/score 选项；API 使用预付费额度。 |
 | Laya（`laya`） | `auto`、`english`、`multilingual`、`typed-decisions` | 自建 [Laya 服务](https://github.com/NandhaKishorM/laya)；仅支持文本；API Key 可选。 |
 | 自定义 | — | 实现公开的 provider 契约即可接入。 |
 
@@ -116,7 +117,7 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-`pnpm test` 使用本地 fixture 运行插件和 provider 测试，与 CI 相同；`pnpm test <plugin|providers|provider 名>` 只运行其中一部分。真实模型探针 `pnpm probe <typesafe|nace|cloudflare|laya|clef-local>` 读取 `.env.local` 中的凭据；托管 provider 探针会发送真实请求并使用账户额度，本地 target 首次运行时自动准备服务。详见[测试与真实模型验证](docs/testing.md)。
+`pnpm test` 使用本地 fixture 运行插件和 provider 测试，与 CI 相同；`pnpm test <plugin|providers|provider 名>` 只运行其中一部分。真实模型探针 `pnpm probe <typesafe|nace|meragpt|cloudflare|laya|clef-local>` 读取 `.env.local` 中的凭据；托管 provider 探针会发送真实请求并使用账户额度或预付费余额，本地 target 首次运行时自动准备服务。详见[测试与真实模型验证](docs/testing.md)。
 
 更多内容见[贡献指南](CONTRIBUTING.zh-CN.md)和[发布流程](docs/releasing.md)。
 
