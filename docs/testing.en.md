@@ -48,6 +48,8 @@ curl --fail-with-body https://console.nace.ai/v1/models \
 
 After `pnpm build`, `pnpm probe nace` sends one real `POST /v1/systemone` with three questions and may spend account credit. Run it when that usage is acceptable. Probe output never includes the key. A successful response confirms the integration path for that key and model, not decision quality or latency.
 
+Set `NACE_MODEL` to `drex-max-finance` to probe Finance text inference. This probe covers text only; validate images separately through the `decide()` request’s `images` field.
+
 ## meraGPT credentials and live probe
 
 Set `MERAGPT_API_KEY` in the repository-root `.env.local`; `MERAGPT_MODEL` selects a model (default `decider-1`), and `MERAGPT_BASE_URL` can override the API root. `pnpm probe meragpt` sends one real inference request covering all three primitives. It skips the short-timeout inference to avoid spending prepaid credit on a second request. Check the account balance before running it; insufficient credit returns HTTP 402. The probe never prints the key.
@@ -90,6 +92,8 @@ The live probe sends a real inference request to Cloudflare. Before running it, 
 
 5. Run `pnpm build`, then `pnpm probe cloudflare`. Set `CLOUDFLARE_MODEL=clef` to check the full model.
 
+Select each hosted model with `CLOUDFLARE_MODEL`: `clef`, `clef-flash`, or `clef-omni`. This probe checks text inference; video requires a separate `videos` request to `clef-omni`. Use clips with reversed content order and check that answers change accordingly; an HTTP success alone does not establish that the model read the video.
+
 ## Local services
 
 `pnpm probe laya` and `pnpm probe clef-local` prepare what they need on demand, and only for the target being probed:
@@ -101,7 +105,7 @@ Everything lives in the Git-ignored `.scratch/local-providers/<laya|cloudflare>/
 
 ### Laya
 
-The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.4.19` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
+The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.4.26` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
 
 The top-level `model` in a Laya response is the service name `laya-rl-agent`; the plugin prefers `routing.model` as the executed model.
 

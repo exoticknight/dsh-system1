@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | TypeSafe（`typesafe`） | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 托管 Jev；支持 PNG/JPEG；`box` 需要 `jev-1.14.0` 或 `jev-preview`；可选 262k 上下文。 |
 | Cloudflare（`cloudflare`） | `clef`、`clef-flash`、`clef-omni` | Workers AI 或兼容的本地 Clef 服务；支持 PNG/JPEG/WebP；`clef-omni` 还支持音频和视频。 |
-| Nace.AI（`nace`） | `drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1` | 托管 Drex；两版 Max 均支持图片、最多 512 道题及每题 255 个 choice/score 选项。原版 Max 的 state 可达 524k tokens、每题最多 262k、长问题合计最多 1,048,576；v1.1 将整份请求限制为 262k。 |
+| Nace.AI（`nace`） | `drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1`、`drex-max-finance` | 托管 Drex；三款 Max 均支持图片、最多 512 道题及每题 255 个 choice/score 选项。原版 Max 的 state 可达 524k tokens、每题最多 262k、长问题合计最多 1,048,576；v1.1 与 Finance 将整份请求限制为 262k；Finance 面向金融决策。 |
 | meraGPT（`meragpt`） | `decider-1`（别名 `sd-1`、`state-decider-1`） | 托管 Decider 1；整份请求上下文 4k tokens，最多 64 道题、每题 10 个 choice/score 选项；API 使用预付费额度。 |
 | Laya（`laya`） | `auto`、`english`、`multilingual`、`typed-decisions` | 自建 [Laya 服务](https://github.com/NandhaKishorM/laya)；仅支持文本；API Key 可选。 |
 | 自定义 | — | 实现公开的 provider 契约即可接入。 |

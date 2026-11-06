@@ -1,6 +1,6 @@
 {
   "name": "dsh-system1",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider via meraGPT, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows.",
   "icon": "./icon.png",
   "license": "Apache-2.0",

@@ -76,7 +76,7 @@ const value:'a'|'b'=result.answers.topic.answer.value
 if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
 if(!TYPESAFE_MODELS.some(({id})=>id==='jev-latest')||!LAYA_MODELS.some(({id})=>id==='auto'))throw new Error('Missing provider model catalog')
 if(!MERAGPT_MODELS.some(({id})=>id==='decider-1')||typeof meragpt.apply!=='function'||typeof meragpt.createMeraGptProvider!=='function')throw new Error('Missing meraGPT provider entry')
-if(NACE_MODELS.map(({id})=>id).join(',')!=='drex-v2.0,drex-v1.5,drex-max-v1.1,drex-max')throw new Error('Missing pinned Nace model catalog')
+if(NACE_MODELS.map(({id})=>id).join(',')!=='drex-v2.0,drex-v1.5,drex-max-v1.1,drex-max-finance,drex-max')throw new Error('Missing pinned Nace model catalog')
 if(findProviderModel(CLOUDFLARE_MODELS,'@cf/cloudflare/clef')?.id!=='clef')throw new Error('Provider model alias did not resolve')
 if(typeof tool.apply!=='function'||tool.TOOL_NAME!=='system1_decide')throw new Error('Invalid agent tool public entry')
 await service.dispose()
