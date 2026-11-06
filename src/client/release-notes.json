@@ -1,30 +1,40 @@
 {
-  "0.5.0": {
-    "id": "0.5.0",
-    "version": "0.5.0",
+  "0.5.1": {
+    "id": "0.5.1",
+    "version": "0.5.1",
     "highlights": {
       "zh": [
         {
           "kind": "added",
-          "title": "新增 meraGPT Decider provider",
-          "description": "将 meraGPT 作为 provider 接入，可使用其 Decider 决策模型。"
+          "title": "新增 Drex Max Finance",
+          "description": "面向金融决策，支持文本和图片。在 Nace 设置中选择 drex-max-finance，整份请求上限为 262k tokens。"
         },
         {
-          "kind": "added",
-          "title": "新增 Drex Max v1.1",
-          "description": "原版 Drex Max 仍可选择；目录分别标明两者的问题数、上下文和图片能力限制。"
+          "kind": "improved",
+          "title": "明确 Clef 媒体支持范围",
+          "description": "Clef、Clef-flash 和 Clef-omni 均可用于文本决策；音频和视频请选择 Clef-omni。"
+        },
+        {
+          "kind": "improved",
+          "title": "支持 Laya 0.4.26 本地服务",
+          "description": "可连接 Laya 0.4.26，在本地进行中文判断、分类和评分。"
         }
       ],
       "en": [
         {
           "kind": "added",
-          "title": "Add the meraGPT Decider provider",
-          "description": "Use meraGPT as a provider to access its Decider decision model."
+          "title": "Add Drex Max Finance",
+          "description": "For financial decisions with text and images. Select drex-max-finance in Nace settings; the whole-request limit is 262k tokens."
         },
         {
-          "kind": "added",
-          "title": "Add Drex Max v1.1",
-          "description": "The original Drex Max remains available; the catalog distinguishes the two models' question, context, and image limits."
+          "kind": "improved",
+          "title": "Clarify Clef media support",
+          "description": "Clef, Clef-flash, and Clef-omni support text decisions; choose Clef-omni for audio and video."
+        },
+        {
+          "kind": "improved",
+          "title": "Support local Laya 0.4.26 servers",
+          "description": "Connect to Laya 0.4.26 for local Chinese yes/no decisions, classification, and scoring."
         }
       ]
     }

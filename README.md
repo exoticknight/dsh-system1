@@ -21,7 +21,7 @@ Choose a built-in provider or add one that implements the public provider contra
 | --- | --- | --- |
 | TypeSafe (`typesafe`) | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | Hosted Jev; PNG/JPEG; `box` requires `jev-1.14.0` or `jev-preview`; optional 262k context. |
 | Cloudflare (`cloudflare`) | `clef`, `clef-flash`, `clef-omni` | Workers AI or a compatible local Clef service; PNG/JPEG/WebP; `clef-omni` also accepts audio and video. |
-| Nace.AI (`nace`) | `drex-v2.0`, `drex-v1.5`, `drex-max`, `drex-max-v1.1` | Hosted Drex; both Max versions accept images, up to 512 questions and 255 choice/score options. Original Max selects from state up to 524k tokens, allows 262k per question and caps combined long questions at 1,048,576; v1.1 caps the whole request at 262k. |
+| Nace.AI (`nace`) | `drex-v2.0`, `drex-v1.5`, `drex-max`, `drex-max-v1.1`, `drex-max-finance` | Hosted Drex; all three Max models accept images, up to 512 questions and 255 choice/score options. Original Max selects from state up to 524k tokens, allows 262k per question and caps combined long questions at 1,048,576; v1.1 and Finance cap the whole request at 262k; Finance specializes in financial decisions. |
 | meraGPT (`meragpt`) | `decider-1` (`sd-1`, `state-decider-1`) | Hosted Decider 1; 4k-token whole-request context, up to 64 questions and 10 choice/score options. Uses prepaid API credit. |
 | Laya (`laya`) | `auto`, `english`, `multilingual`, `typed-decisions` | Self-hosted [Laya server](https://github.com/NandhaKishorM/laya); text only; API key optional. |
 | Custom | — | Any backend implementing the public provider contract. |

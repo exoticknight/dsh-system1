@@ -8,7 +8,8 @@ Choose the default provider and model in DSH plugin settings, and add fallback m
 | --- | --- | ---: | --- | --- |
 | `typesafe` | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | 800 ms | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | 800 ms | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
-| `nace` | `drex-v2.0`, `drex-v1.5`, `drex-max` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `meragpt` | `decider-1` (aliases: `sd-1`, `state-decider-1`) | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
+| `nace` | `drex-v2.0`, `drex-v1.5`, `drex-max`, `drex-max-v1.1`, `drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`, `clef-flash`, `clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` and `jev-1.13.0` are version-pinned IDs. `jev-latest` points to the newest stable release, while `jev-preview` points to the newest release; TypeSafe can move either alias over time. Choose a version ID when you need a fixed model. See TypeSafe's [model catalog](https://docs.typesafe.ai/models).
@@ -39,12 +40,13 @@ In DSH, save the key on the `nace` provider's settings page; it is stored in DSH
 | `drex-v2.0` | 512 | Up to 131,072 for state; up to 262,144 for state plus the longest question | No |
 | `drex-max` | 512 | State selection up to 524,288; up to 262,144 for state plus each question | Up to 8 |
 | `drex-max-v1.1` | 512 | 262,144 for the whole packed request, including state, all questions, images, and formatting | Up to 8 |
+| `drex-max-finance` | 512 | Same whole-request 262,144-token limit as v1.1; specialized for financial decisions | Up to 8 |
 
 Use the versioned IDs for reproducible calls; the provider does not list the moving `drex-latest` alias. `box` is not supported. The DSH service exposes Nace's token limits as capability metadata but has no Drex tokenizer, so Nace enforces those token limits.
 
 Drex may round each probability in a `choice` or `score` distribution to four decimal places, so the entries can add up slightly above or below 1. DSH renormalizes totals only within the maximum error from that per-entry rounding; larger deviations follow the regular answer validation rules.
 
-Both Max versions accept PNG, JPEG, and WebP images (up to 8 images, 16 MiB each, 32 MiB total, and 40 megapixels per image). Each permits up to 255 options per `choice` question and 255 levels per `score` question. Original Max can select from state up to 524,288 tokens; state plus each question may use up to 262,144 tokens, with a 1,048,576-token combined cap across questions above 131,072 tokens, including image tokens. Max v1.1 instead caps the whole packed request at 262,144 tokens, including state, all questions, images, and formatting. Nace enforces these limits; DSH does not tokenize Drex input. Nace limits the serialized UTF-8 JSON body to 4 MiB, counting `state`, `questions`, and non-empty `images`, but not the top-level `model`. Small images stay inline; when inline images would exceed the body limit, the adapter uploads only enough images to fit and sends account-level file references. The upload endpoint does not use a workspace. The adapter attempts to delete uploads after inference; if cleanup fails, Nace keeps account-level uploads for 24 hours by default. Removed files can take up to 35 days to disappear from backups. Avoid this provider path for images that policy does not allow to be temporarily uploaded. See Nace's [model catalog](https://console.nace.ai/docs/drex/reference/models), [request limits](https://console.nace.ai/docs/drex/reference/limits), [Drex Max image guide](https://console.nace.ai/docs/drex/guides/drex-max), and [data retention policy](https://console.nace.ai/docs/perception/data-retention).
+All three Max models accept PNG, JPEG, and WebP images (up to 8 images, 16 MiB each, 32 MiB total, and 40 megapixels per image). Each permits up to 255 options per `choice` question and 255 levels per `score` question. Original Max can select from state up to 524,288 tokens; state plus each question may use up to 262,144 tokens, with a 1,048,576-token combined cap across questions above 131,072 tokens, including image tokens. Max v1.1 and Finance instead cap the whole packed request at 262,144 tokens, including state, all questions, images, and formatting. Nace enforces these limits; DSH does not tokenize Drex input. Nace limits the serialized UTF-8 JSON body to 4 MiB, counting `state`, `questions`, and non-empty `images`, but not the top-level `model`. Small images stay inline; when inline images would exceed the body limit, the adapter uploads only enough images to fit and sends account-level file references. The upload endpoint does not use a workspace. The adapter attempts to delete uploads after inference; if cleanup fails, Nace keeps account-level uploads for 24 hours by default. Removed files can take up to 35 days to disappear from backups. Avoid this provider path for images that policy does not allow to be temporarily uploaded. See Nace's [model catalog](https://console.nace.ai/docs/drex/reference/models), [request limits](https://console.nace.ai/docs/drex/reference/limits), [Drex Max image guide](https://console.nace.ai/docs/drex/guides/drex-max), and [data retention policy](https://console.nace.ai/docs/perception/data-retention).
 
 For example, choose Nace per call without changing the service default:
 
@@ -58,7 +60,7 @@ const result = await ctx.system1.decide({
 })
 ```
 
-For image input, select `drex-max` or `drex-max-v1.1` and use the shared request `images` field:
+For image input, select `drex-max`, `drex-max-v1.1`, or `drex-max-finance` and use the shared request `images` field:
 
 ```ts
 const result = await ctx.system1.decide({
@@ -80,6 +82,8 @@ Save the API key on the `meragpt` provider settings page. DSH stores it under `M
 Decider 1 supports `noul`, `choice`, and `score`, up to 64 questions, 10 choice options or score levels per question, and a 4,096-token whole-request limit covering state and all questions. It declares no image, audio, or video input. The API uses prepaid credit: check the account balance before probing or inferring. Insufficient credit returns HTTP 402 and is not retried; rate limits and server errors use the shared retry policy. See [testing and live model validation](testing.en.md#meragpt-credentials-and-live-probe) before running a real probe.
 
 ## Cloudflare Clef
+
+Choose `clef` or `clef-flash` for text and images, or `clef-omni` for text, images, audio, and video. Sending video to Cloudflare-hosted Clef or Clef-flash returns HTTP 422.
 
 Create an API token with Workers AI access and obtain your Account ID from Cloudflare. In the Cloudflare component, enter the Account ID and the token as the API key, then press Save. You can also set `CLOUDFLARE_ACCOUNT_ID` in the dsh process environment.
 

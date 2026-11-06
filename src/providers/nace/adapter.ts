@@ -103,6 +103,10 @@ const MODEL_CAPABILITIES = {
     includesQuestions: false,
     maxStatePlusQuestionTokens: 262_144,
   }),
+  'drex-max-finance': maxCapabilities({
+    maxTokens: 262_144,
+    includesQuestions: true,
+  }),
   'drex-max-v1.1': maxCapabilities({
     maxTokens: 262_144,
     includesQuestions: true,
@@ -143,7 +147,7 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
       if (request.images?.length && !isDrexMaxModel(selected.id))
         throw new System1ProviderError({
           code: 'unsupported',
-          message: 'Nace images require drex-max or drex-max-v1.1.',
+          message: 'Nace images require a Drex Max model.',
         })
 
       let apiKey: string | undefined
@@ -211,8 +215,8 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
   }
 }
 
-function isDrexMaxModel(model: string): model is 'drex-max' | 'drex-max-v1.1' {
-  return model === 'drex-max' || model === 'drex-max-v1.1'
+function isDrexMaxModel(model: string): model is 'drex-max' | 'drex-max-v1.1' | 'drex-max-finance' {
+  return model === 'drex-max' || model === 'drex-max-v1.1' || model === 'drex-max-finance'
 }
 
 function normalizeNaceResponse(

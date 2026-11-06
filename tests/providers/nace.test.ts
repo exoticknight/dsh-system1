@@ -121,6 +121,7 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
     'drex-v2.0',
     'drex-v1.5',
     'drex-max-v1.1',
+    'drex-max-finance',
     'drex-max',
   ])
   const provider = createNaceProvider({ apiKey: '' })
@@ -177,6 +178,7 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
     },
     context: { maxTokens: 262_144, includesQuestions: true },
   })
+  assert.deepEqual(await provider.describe('drex-max-finance', new AbortController().signal), maxV11)
   await assert.rejects(
     provider.describe('drex-latest', new AbortController().signal),
     (error: unknown) =>
@@ -296,6 +298,31 @@ test('Drex Max v1.1 sends images through the Max request path', async () => {
     new AbortController().signal,
   )
   assert.equal(result.model, 'drex-max-v1.1')
+  assert.deepEqual(result.answers.q, {
+    status: 'ok',
+    answer: { type: 'noul', probabilityTrue: 0.8 },
+  })
+})
+
+test('Drex Max Finance sends images through the Max request path', async () => {
+  const fixture = createUploadFixture({
+    onSystemOne(body) {
+      assert.equal(body.model, 'drex-max-finance')
+      assert.deepEqual(body.images, [
+        `data:image/png;base64,${uploadedRequest().images![0]!.data}`,
+      ])
+      return Response.json({
+        model: 'drex-max-finance',
+        answers: { q: { type: 'noul', noul: 0.8 } },
+      })
+    },
+  })
+  const provider = createNaceProvider({ apiKey: 'fixture-only', fetch: fixture.fetch })
+  const result = await provider.evaluate(
+    uploadedRequest(32, 'drex-max-finance'),
+    new AbortController().signal,
+  )
+  assert.equal(result.model, 'drex-max-finance')
   assert.deepEqual(result.answers.q, {
     status: 'ok',
     answer: { type: 'noul', probabilityTrue: 0.8 },

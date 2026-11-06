@@ -9,7 +9,7 @@
 | `typesafe` | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 800 ms | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | 800 ms | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
 | `meragpt` | `decider-1`（别名：`sd-1`、`state-decider-1`） | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
-| `nace` | `drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `nace` | `drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1`、`drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`、`clef-flash`、`clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` 和 `jev-1.13.0` 是固定版本。`jev-latest` 指向最新稳定版，`jev-preview` 指向最新发布版；别名映射会随 TypeSafe 更新。需要固定行为时选择版本 ID。详见 TypeSafe 的[模型目录](https://docs.typesafe.ai/models)。
@@ -40,12 +40,13 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 | `drex-v2.0` | 512 | state 最多 131,072；state + 最长单题最多 262,144 tokens | 不支持 |
 | `drex-max` | 512 | state 最高 524,288；每题 state + question 最多 262,144 tokens | 最多 8 张 |
 | `drex-max-v1.1` | 512 | 整份请求最多 262,144 tokens，包含 state、所有问题、图片和格式标记 | 最多 8 张 |
+| `drex-max-finance` | 512 | 与 v1.1 相同的整份请求 262,144-token 上限；面向金融决策 | 最多 8 张 |
 
 版本号模型 ID 固定，便于复现；provider 不把会移动的 `drex-latest` 放入模型目录。Nace 不支持 `box`。服务会公开 token 限制供能力查询，但没有 Drex tokenizer，因此实际 token 上限由 Nace 校验。
 
 Drex 可能把 `choice` 或 `score` 分布中的每项概率舍入到四位小数，因此总和可能略高于或低于 1。DSH 仅在偏差不超过逐项舍入的最大误差时重新归一化；更大的偏差仍按常规答案校验规则处理。
 
-`drex-max` 和 `drex-max-v1.1` 均支持 PNG、JPEG、WebP 图片（最多 8 张、每张 16 MiB、合计 32 MiB、单图最高 40 megapixels），每道 `choice` 最多 255 个选项，每道 `score` 最多 255 个等级。原版 Max 可从最多 524,288-token 的 state 中选择内容；每道题的 state 与 question 合计最多 262,144 tokens，超过 131,072 tokens 的题目合计不超过 1,048,576 tokens（计入图像 tokens）。v1.1 的 262,144-token 上限覆盖整份打包请求，包括 state、所有 questions、图片和格式标记。上述 token 限制由 Nace 执行，DSH 不对 Drex 输入分词。Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`questions` 和非空 `images`，但不计顶层 `model`。小图以内联方式发送；内联图像会超出请求体上限时，adapter 只上传足够数量的图片并传递账号级文件引用，不使用 workspace。推理结束后 adapter 会尝试删除上传文件；清理失败时，Nace 默认在 24 小时后清除账号级上传，已删除文件的备份最多还需 35 天清除。对不允许临时上传到第三方服务的图片，不要使用该路径。详见 Nace 的[模型目录](https://console.nace.ai/docs/drex/reference/models)、[请求限制](https://console.nace.ai/docs/drex/reference/limits)、[Drex Max 图片说明](https://console.nace.ai/docs/drex/guides/drex-max)和[数据留存政策](https://console.nace.ai/docs/perception/data-retention)。
+`drex-max`、`drex-max-v1.1` 和 `drex-max-finance` 均支持 PNG、JPEG、WebP 图片（最多 8 张、每张 16 MiB、合计 32 MiB、单图最高 40 megapixels），每道 `choice` 最多 255 个选项，每道 `score` 最多 255 个等级。原版 Max 可从最多 524,288-token 的 state 中选择内容；每道题的 state 与 question 合计最多 262,144 tokens，超过 131,072 tokens 的题目合计不超过 1,048,576 tokens（计入图像 tokens）。v1.1 与 Finance 的 262,144-token 上限覆盖整份打包请求，包括 state、所有 questions、图片和格式标记。上述 token 限制由 Nace 执行，DSH 不对 Drex 输入分词。Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`questions` 和非空 `images`，但不计顶层 `model`。小图以内联方式发送；内联图像会超出请求体上限时，adapter 只上传足够数量的图片并传递账号级文件引用，不使用 workspace。推理结束后 adapter 会尝试删除上传文件；清理失败时，Nace 默认在 24 小时后清除账号级上传，已删除文件的备份最多还需 35 天清除。对不允许临时上传到第三方服务的图片，不要使用该路径。详见 Nace 的[模型目录](https://console.nace.ai/docs/drex/reference/models)、[请求限制](https://console.nace.ai/docs/drex/reference/limits)、[Drex Max 图片说明](https://console.nace.ai/docs/drex/guides/drex-max)和[数据留存政策](https://console.nace.ai/docs/perception/data-retention)。
 
 单次调用可指定 Nace，不改变服务默认模型：
 
@@ -59,7 +60,7 @@ const result = await ctx.system1.decide({
 })
 ```
 
-图片输入必须选择 `drex-max` 或 `drex-max-v1.1`，并使用请求共享的 `images` 字段：
+图片输入必须选择 `drex-max`、`drex-max-v1.1` 或 `drex-max-finance`，并使用请求共享的 `images` 字段：
 
 ```ts
 const result = await ctx.system1.decide({
@@ -81,6 +82,8 @@ const result = await ctx.system1.decide({
 Decider 1 支持 `noul`、`choice` 和 `score`，最多 64 道题、每题 10 个 choice 选项或 score 等级；4,096-token 限额覆盖整个请求（state 与所有问题）。它不声明图片、音频或视频输入。API 使用预付费额度：发起探针或推理前确认账户余额；额度不足会返回 HTTP 402，不会重试。速率限制与服务端错误使用共享的重试策略。实时探针配置与费用提醒见[测试与真实模型验证](testing.md#meragpt-凭据与真实探针)。
 
 ## Cloudflare Clef
+
+文本与图片可选 `clef` 或 `clef-flash`；需要音频或视频时选择 `clef-omni`。向 Cloudflare 托管的 Clef 或 Clef-flash 发送视频会返回 HTTP 422。
 
 在 Cloudflare 控制台创建有 Workers AI 调用权限的 API token，并取得 Account ID。在 Cloudflare 组件中填写 Account ID 和 API Key（即该 token），点「保存设置」。Account ID 也可通过启动进程的 `CLOUDFLARE_ACCOUNT_ID` 配置。
 

@@ -48,6 +48,8 @@ curl --fail-with-body https://console.nace.ai/v1/models \
 
 运行 `pnpm build` 后，`pnpm probe nace` 会发送一次真实 `POST /v1/systemone`，包含三道题并可能消耗账户额度；确认可以使用额度后再运行。探针输出不会包含 key。成功响应只确认该 key 和模型的调用链路可用，不代表判断质量或延迟表现。
 
+Finance 文本推理可将 `NACE_MODEL` 设为 `drex-max-finance` 后运行同一探针；该探针只覆盖文本，图片应通过 `decide()` 的 `images` 字段另行验证。
+
 ## meraGPT 凭据与真实探针
 
 在仓库根目录 `.env.local` 配置 `MERAGPT_API_KEY`，可用 `MERAGPT_MODEL` 选择模型（默认 `decider-1`），也可用 `MERAGPT_BASE_URL` 覆盖 API 根地址。`pnpm probe meragpt` 会发送一次同时覆盖三种原语的真实推理请求；为避免额外使用预付费额度，它会跳过短超时推理。运行前确认账户余额；余额不足会返回 HTTP 402。探针不会输出密钥。
@@ -90,6 +92,8 @@ pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的
 
 5. 运行 `pnpm build`，再运行 `pnpm probe cloudflare`。`CLOUDFLARE_MODEL=clef` 可验证完整版模型。
 
+三个云端模型均可分别用 `CLOUDFLARE_MODEL` 选择：`clef`、`clef-flash`、`clef-omni`。此探针检查文本推理；视频需向 `clef-omni` 发送单独的 `videos` 请求。验证视频时使用内容顺序相反的短片，并检查答案随内容变化；仅 HTTP 成功不足以确认模型读取了视频。
+
 ## 本地服务
 
 `pnpm probe laya` 和 `pnpm probe clef-local` 按需准备环境，只准备被测 target 所需的内容：
@@ -101,7 +105,7 @@ pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的
 
 ### Laya
 
-[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.4.19` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
+[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.4.26` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
 
 Laya 响应顶层的 `model` 是服务名 `laya-rl-agent`，插件优先使用 `routing.model` 作为实际执行模型。
 
