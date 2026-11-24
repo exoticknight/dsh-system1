@@ -8,8 +8,9 @@
 | --- | --- | ---: | --- | --- |
 | `typesafe` | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 800 ms | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | 800 ms | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
-| `meragpt` | `decider-1`（别名：`sd-1`、`state-decider-1`） | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
-| `nace` | `drex-v2.0`、`drex-v1.5`、`drex-max`、`drex-max-v1.1`、`drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `meragpt` | `decider-1`、`decider-1.1` | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
+| `liquid` | `d1.2`、`d1.2-ultra` | 10,000 ms | `https://api.liquid.ai/decisions` | `LIQUID_API_KEY` |
+| `nace` | `drex-v2.0`、`drex-max-v1.1`、`drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`、`clef-flash`、`clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` 和 `jev-1.13.0` 是固定版本。`jev-latest` 指向最新稳定版，`jev-preview` 指向最新发布版；别名映射会随 TypeSafe 更新。需要固定行为时选择版本 ID。详见 TypeSafe 的[模型目录](https://docs.typesafe.ai/models)。
@@ -22,7 +23,7 @@ provider 模型目录与能力由本项目显式维护，不会在运行时自�
 
 启动、复测与验证边界见[测试与真实模型验证](testing.md)。
 
-Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
+Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Laya 0.5.3 已通过 CPU 上的中文多语言探针。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
 
 TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstart)目前提供托管 API；[模型文档](https://docs.typesafe.ai/models)未提供可据此部署的 Jev 本地发行版。本项目通过真实托管调用验证 TypeSafe，不将本地协议模拟计作 Jev 本地推理。
 
@@ -36,17 +37,17 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 
 | 模型 | 每次请求题数 | Token 限制 | 图片 |
 | --- | ---: | --- | --- |
-| `drex-v1.5` | 512 | state 最多 131,072；state + 最长单题最多 139,264 tokens | 不支持 |
 | `drex-v2.0` | 512 | state 最多 131,072；state + 最长单题最多 262,144 tokens | 不支持 |
-| `drex-max` | 512 | state 最高 524,288；每题 state + question 最多 262,144 tokens | 最多 8 张 |
 | `drex-max-v1.1` | 512 | 整份请求最多 262,144 tokens，包含 state、所有问题、图片和格式标记 | 最多 8 张 |
 | `drex-max-finance` | 512 | 与 v1.1 相同的整份请求 262,144-token 上限；面向金融决策 | 最多 8 张 |
 
-版本号模型 ID 固定，便于复现；provider 不把会移动的 `drex-latest` 放入模型目录。Nace 不支持 `box`。服务会公开 token 限制供能力查询，但没有 Drex tokenizer，因此实际 token 上限由 Nace 校验。
+如果默认模型、备用模型或显式调用仍使用已退役的 `drex-v1.5` 或 `drex-max`，请改用 `drex-max-v1.1`。插件对旧 ID 返回 `unsupported`，不会替换已保存的配置。选择目录中的版本 ID 可固定模型；`drex-latest` 会随上游变动。
 
 Drex 可能把 `choice` 或 `score` 分布中的每项概率舍入到四位小数，因此总和可能略高于或低于 1。DSH 仅在偏差不超过逐项舍入的最大误差时重新归一化；更大的偏差仍按常规答案校验规则处理。
 
-`drex-max`、`drex-max-v1.1` 和 `drex-max-finance` 均支持 PNG、JPEG、WebP 图片（最多 8 张、每张 16 MiB、合计 32 MiB、单图最高 40 megapixels），每道 `choice` 最多 255 个选项，每道 `score` 最多 255 个等级。原版 Max 可从最多 524,288-token 的 state 中选择内容；每道题的 state 与 question 合计最多 262,144 tokens，超过 131,072 tokens 的题目合计不超过 1,048,576 tokens（计入图像 tokens）。v1.1 与 Finance 的 262,144-token 上限覆盖整份打包请求，包括 state、所有 questions、图片和格式标记。上述 token 限制由 Nace 执行，DSH 不对 Drex 输入分词。Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`questions` 和非空 `images`，但不计顶层 `model`。小图以内联方式发送；内联图像会超出请求体上限时，adapter 只上传足够数量的图片并传递账号级文件引用，不使用 workspace。推理结束后 adapter 会尝试删除上传文件；清理失败时，Nace 默认在 24 小时后清除账号级上传，已删除文件的备份最多还需 35 天清除。对不允许临时上传到第三方服务的图片，不要使用该路径。详见 Nace 的[模型目录](https://console.nace.ai/docs/drex/reference/models)、[请求限制](https://console.nace.ai/docs/drex/reference/limits)、[Drex Max 图片说明](https://console.nace.ai/docs/drex/guides/drex-max)和[数据留存政策](https://console.nace.ai/docs/perception/data-retention)。
+`drex-max-v1.1` 和 `drex-max-finance` 均支持 PNG、JPEG、WebP（最多 8 张、每张 16 MiB、总计 32 MiB、单图最高 4,000 万像素），每题最多 255 个 `choice` 选项或 `score` 等级。Nace 执行表中的 token 上限。
+
+Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`questions` 和非空 `images`，但不计顶层 `model`。小图以内联方式发送；内联图像会超出请求体上限时，adapter 只上传足够数量的图片并传递账号级文件引用，不使用 workspace。推理结束后 adapter 会尝试删除上传文件；清理失败时，Nace 默认在 24 小时后清除账号级上传，已删除文件的备份最多还需 35 天清除。对不允许临时上传到第三方服务的图片，不要使用该路径。详见 Nace 的[模型目录](https://console.nace.ai/docs/drex/reference/models)、[请求限制](https://console.nace.ai/docs/drex/reference/limits)、[Drex Max 图片说明](https://console.nace.ai/docs/drex/guides/drex-max)和[数据留存政策](https://console.nace.ai/docs/perception/data-retention)。
 
 单次调用可指定 Nace，不改变服务默认模型：
 
@@ -60,11 +61,11 @@ const result = await ctx.system1.decide({
 })
 ```
 
-图片输入必须选择 `drex-max`、`drex-max-v1.1` 或 `drex-max-finance`，并使用请求共享的 `images` 字段：
+图片输入请选择 `drex-max-v1.1` 或 `drex-max-finance`，并使用请求共享的 `images` 字段：
 
 ```ts
 const result = await ctx.system1.decide({
-  model: { provider: 'nace', model: 'drex-max' },
+  model: { provider: 'nace', model: 'drex-max-v1.1' },
   state: '请检查图片 1。',
   images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
   questions: {
@@ -75,11 +76,21 @@ const result = await ctx.system1.decide({
 
 发送真实请求前，先查看[测试与真实模型验证](testing.md#nace-凭据与真实探针)。
 
-## meraGPT Decider 1
+## meraGPT Decider 1.1
 
-在 `meragpt` provider 设置页保存 API Key；密钥写入 DSH credentials，引用名为 `MERAGPT_API_KEY`。没有 DSH credentials 服务时会读取进程环境中的同名变量。默认 API 根地址为 `https://meragpt.com`，可通过 `baseURL` 覆盖。唯一规范模型 ID 是 `decider-1`，也接受 `sd-1` 和旧别名 `state-decider-1`；设置页只显示规范 ID。
+在 `meragpt` 设置页保存 API Key，凭据引用为 `MERAGPT_API_KEY`。默认 API 根地址为 `https://meragpt.com`，可通过 `baseURL` 覆盖。`decider-1` 跟随最新 1.x，也接受旧别名 `sd-1`、`state-decider-1`；要固定版本，请选择 `decider-1.1`。
 
-Decider 1 支持 `noul`、`choice` 和 `score`，最多 64 道题、每题 10 个 choice 选项或 score 等级；4,096-token 限额覆盖整个请求（state 与所有问题）。它不声明图片、音频或视频输入。API 使用预付费额度：发起探针或推理前确认账户余额；额度不足会返回 HTTP 402，不会重试。速率限制与服务端错误使用共享的重试策略。实时探针配置与费用提醒见[测试与真实模型验证](testing.md#meragpt-凭据与真实探针)。
+支持 `noul`、`choice`、`score`，每次最多 64 道题；每题最多 255 个 `choice` 选项或 32 个 `score` 等级。state 与任一单题合计最多 32,768 tokens，图片计入该预算。请求可附带最多 8 张 PNG、JPEG 或 WebP，每张最多 8 MB（8,000,000 字节）。
+
+API 使用预付费额度。发起探针或推理前请确认账户余额；额度不足会返回 HTTP 402。详见 [Decider 接口](https://meragpt.com/docs/decider)和 [meraGPT 真实探针](testing.md#meragpt-凭据与真实探针)。
+
+## Liquid AI
+
+在 `liquid` 设置页保存 API Key，凭据引用为 `LIQUID_API_KEY`。默认 `baseURL` 是 `https://api.liquid.ai/decisions`；自定义地址须包含兼容的路径前缀，插件会追加 `/v1/systemone`。选择 `d1.2` 或 `d1.2-ultra`，默认超时 10,000 ms。
+
+两款模型均支持 `noul`、`choice` 和 `score`。单次最多 128 道题；共享 state、媒体和任一单题合计最多 65,536 tokens。可以在同一请求中附带最多 8 张 PNG/JPEG/WebP 图片与最多 8 段 WAV/MP3 音频，音频总长最多 300 秒。完整 JSON 请求体（含编码后的附件）须小于 4.5 MB（4,500,000 字节）；大附件宜先压缩。格式和后端限制见 [Liquid 接口文档](https://docs.liquid.ai/lfm/models/d1)。
+
+两款模型都已通过真实接口的文本评分、图片分类和音频判断。见[运行探针与实测样例](testing.md#liquid-ai-真实探针)。
 
 ## Cloudflare Clef
 
@@ -98,9 +109,9 @@ const result = await ctx.system1.decide({
 })
 ```
 
-Cloudflare 对每次请求最多接受 64 道题，题号最长 100 个字符，可使用字母、数字、下划线、点和连字符。上下文上限按模型分别为 `clef` 65,536、`clef-flash` 24,576、`clef-omni` 64,000 tokens；长输入可能由后端截断，应在业务侧控制输入长度。统一 `images` 附件支持 PNG、JPEG 和 WebP，每张最大 4 MiB、总计最大 8 MiB，最多 4 张；provider 会转换成 Cloudflare 所需的 base64 data URL。
+Cloudflare 对每次请求最多接受 64 道题；每道 `choice` 最多 255 个选项，每道 `score` 最多 10 个等级。题号最长 100 个字符，可使用字母、数字、下划线、点和连字符。上下文上限按模型分别为 `clef` 65,536、`clef-flash` 24,576、`clef-omni` 64,000 tokens；长输入可能由后端截断，应在业务侧控制输入长度。统一 `images` 附件支持 PNG、JPEG 和 WebP，每张最大 4 MiB、总计最大 8 MiB，最多 4 张；provider 会转换成 Cloudflare 所需的 base64 data URL。
 
-只有 `clef-omni` 接受音频和视频：音频可用 `audio/wav` 或 `audio/mpeg`，最多 4 段、每段不超过 8 MiB；视频可用 `video/mp4` 或 `video/webm`，最多 2 段、每段不超过 16 MiB。音频与视频解码后合计不超过 16 MiB；音频最长 300 秒、视频最长 60 秒，时长由 Cloudflare 校验，视频按 2 fps 采样。图片的 8 MiB 预算单独计算。附件以不带前缀的 Base64 传入，provider 会添加 data URL 前缀并写入顶层 `audio`、`videos` 字段；其他模型会在发出请求前因不支持媒体而被跳过，沿用现有备用模型链。参见 [Clef 官方接口](https://developers.cloudflare.com/workers-ai/models/clef/)、[Clef-omni 官方接口](https://developers.cloudflare.com/workers-ai/models/clef-omni/)和 [Workers AI REST 入门](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)。
+在 Clef 系列中，音频和视频由 `clef-omni` 处理：音频可用 `audio/wav` 或 `audio/mpeg`，最多 4 段、每段不超过 8 MiB；视频可用 `video/mp4` 或 `video/webm`，最多 2 段、每段不超过 16 MiB。音频与视频解码后合计不超过 16 MiB；音频最长 300 秒、视频最长 60 秒，时长由 Cloudflare 校验，视频按 2 fps 采样。图片的 8 MiB 预算单独计算。附件以不带前缀的 Base64 传入，provider 会添加 data URL 前缀并写入顶层 `audio`、`videos` 字段；其他模型会在发出请求前因不支持媒体而被跳过，沿用现有备用模型链。参见 [Clef 官方接口](https://developers.cloudflare.com/workers-ai/models/clef/)、[Clef-omni 官方接口](https://developers.cloudflare.com/workers-ai/models/clef-omni/)和 [Workers AI REST 入门](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)。
 
 Cloudflare 的公开示例明确展示 `audio/mpeg` 与 `video/mp4`；本包把 WAV 与 WebM 分别映射为 `audio/wav`、`video/webm`，但尚未用账户级 schema 或真实请求验证这两个 MIME 值。首次使用 WAV 或 WebM 前，建议先以小样本验证；MP3 与 MP4 有官方请求示例可参考。
 

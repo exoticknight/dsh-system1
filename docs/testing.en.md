@@ -21,6 +21,7 @@ Probes load the built `lib/`, so run `pnpm build` first, then `pnpm probe <targe
 | `typesafe` | Hosted API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`, default `jev-1.13.0` |
 | `nace` | Hosted API | `NACE_API_KEY` | `NACE_MODEL`, default `drex-v2.0`; `NACE_BASE_URL` |
 | `meragpt` | Hosted API | `MERAGPT_API_KEY` | `MERAGPT_MODEL`, default `decider-1`; `MERAGPT_BASE_URL` |
+| `liquid` | Hosted API | `LIQUID_API_KEY` | `LIQUID_MODEL`, default `d1.2`; `LIQUID_BASE_URL` |
 | `cloudflare` | Hosted API | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`, default `clef-flash` |
 | `laya` | Local service | Python; prepared automatically on first run | `LAYA_BASE_URL`, `LAYA_MODEL` (default `auto`), `LAYA_TIMEOUT_MS`, `LAYA_API_KEY` |
 | `clef-local` | Local service | Python and Git LFS; prepared automatically on first run | `CLEF_LOCAL_PORT` (default `8765`), `CLEF_DEVICE` |
@@ -29,7 +30,7 @@ Every probe checks that:
 
 - the `noul`, `choice`, and `score` questions are all `ok`, with probabilities in [0, 1] and distributions summing to 1;
 - the service reports the provider and model that actually ran;
-- a pre-cancelled call returns `cancelled`, an unknown model returns `unsupported` before network I/O, and a 1 ms budget returns `timeout`. `clef-local` skips the timeout check to avoid leaving long CPU inference running; `nace` and `meragpt` skip it to avoid an extra metered inference, with timeout and cancellation covered by local fixtures.
+- a pre-cancelled call returns `cancelled`, an unknown model returns `unsupported` before network I/O, and a 1 ms budget returns `timeout`. `clef-local` skips the timeout check to avoid leaving long CPU inference running; `nace`, `meragpt`, and `liquid` skip it to avoid an extra metered inference.
 
 Local targets also check `/health`. `laya` requires the executed model to be a checkpoint loaded by the service and reports its revision and device; `clef-local` requires the pinned weight revision and reports quantization details.
 
@@ -54,6 +55,19 @@ Set `NACE_MODEL` to `drex-max-finance` to probe Finance text inference. This pro
 
 Set `MERAGPT_API_KEY` in the repository-root `.env.local`; `MERAGPT_MODEL` selects a model (default `decider-1`), and `MERAGPT_BASE_URL` can override the API root. `pnpm probe meragpt` sends one real inference request covering all three primitives. It skips the short-timeout inference to avoid spending prepaid credit on a second request. Check the account balance before running it; insufficient credit returns HTTP 402. The probe never prints the key.
 
+## Liquid AI live probe
+
+Set `LIQUID_API_KEY` in the repository-root `.env.local`. Run `pnpm build`, then `pnpm probe liquid` to test the default `d1.2` model. Set `LIQUID_MODEL=d1.2-ultra` first to test Ultra. The probe sends one metered text request with all three decision primitives. To check media, call `decide()` on a [Liquid model](providers.en.md#liquid-ai) with `state`, `images`, and `audio` in the same request.
+
+In a live multimodal check, each model received one synthetic ticket marked high priority, a solid red PNG, and a 2.8-second synthesized WAV saying “The animal I saw was a zebra.” Separate questions checked text scoring, image classification, and a yes/no judgment on the recording.
+
+| Model returned | High-priority score (out of 2) | Probability of red | Probability the recording says “zebra” | Elapsed |
+| --- | ---: | ---: | ---: | ---: |
+| `d1.2` | 1.9888 | 99.90% | 96.52% | 1.04 s |
+| `d1.2-ultra` | 1.9996 | 99.91% | 97.61% | 4.78 s |
+
+Both models assigned less than 1.2% probability to the negative control, “Does the recording say elephant?” Each successful request used 236 input tokens and 0 output tokens; the API reported a combined cost of about $0.000015. Ultra initially returned HTTP 429 and succeeded on a separate retry after a pause.
+
 ## Host Loader probe
 
 Install a DSH release listed in `dsh.compatibility.dshReleases` in a separate directory, then run:
@@ -63,7 +77,7 @@ pnpm build
 pnpm probe:host <absolute-path-to-test-host/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-It loads `cordis.patch.yml` through the real Loader and checks the four provider registrations, registration and a call of `system1_decide` in the host's real tool registry, the English and Chinese titles and descriptions each component shows on the Plugins page, pre-cancellation, and unload without calling a model. When installing the test host inside the repository, use pnpm's `--ignore-workspace`:
+It loads `cordis.patch.yml` through the real Loader and checks all built-in provider registrations, registration and a call of `system1_decide` in the host's real tool registry, the English and Chinese titles and descriptions each component shows on the Plugins page, pre-cancellation, and unload without calling a model. For DSH `0.2.3-alpha.2`, use Node.js 24.22.3 or later in the 24.x series, or 26.13.1 or later in the 26.x series. When installing the test host inside the repository, use pnpm's `--ignore-workspace`:
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null
@@ -71,7 +85,7 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.1-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.3-alpha.2
 ```
 
 pnpm may report `ERR_PNPM_IGNORED_BUILDS`. The Loader probe does not depend on the skipped native build scripts; confirm the packages are installed and run the probe separately.
@@ -105,7 +119,7 @@ Everything lives in the Git-ignored `.scratch/local-providers/<laya|cloudflare>/
 
 ### Laya
 
-The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.4.26` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
+The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.5.3` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
 
 The top-level `model` in a Laya response is the service name `laya-rl-agent`; the plugin prefers `routing.model` as the executed model.
 

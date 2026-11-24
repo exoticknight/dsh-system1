@@ -56,27 +56,21 @@ const naceAnswerSchema = z.discriminatedUnion('type', [
   }),
 ])
 
-const maxImageCapabilities = {
-  formats: ['image/png', 'image/jpeg', 'image/webp'],
-  maxCount: 8,
-  maxBytesPerImage: 16 * 1024 * 1024,
-  maxTotalBytes: 32 * 1024 * 1024,
-} as const
-
-type ModelContext = NonNullable<ModelCapabilities['context']>
-
-function maxCapabilities(context: ModelContext): ModelCapabilities {
-  return {
-    primitives: ['noul', 'choice', 'score'],
-    maxQuestions: 512,
-    maxChoiceOptions: 255,
-    maxScoreLevels: 255,
-    images: maxImageCapabilities,
-    context,
-  }
+const MAX_CAPABILITIES: ModelCapabilities = {
+  primitives: ['noul', 'choice', 'score'],
+  maxQuestions: 512,
+  maxChoiceOptions: 255,
+  maxScoreLevels: 255,
+  images: {
+    formats: ['image/png', 'image/jpeg', 'image/webp'],
+    maxCount: 8,
+    maxBytesPerImage: 16 * 1024 * 1024,
+    maxTotalBytes: 32 * 1024 * 1024,
+  },
+  context: { maxTokens: 262_144, includesQuestions: true },
 }
 
-const ACTIVE_CAPABILITIES = {
+const MODEL_CAPABILITIES: Readonly<Record<(typeof NACE_MODELS)[number]['id'], ModelCapabilities>> = {
   'drex-v2.0': {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
@@ -88,12 +82,8 @@ const ACTIVE_CAPABILITIES = {
       maxStatePlusQuestionTokens: 262_144,
     },
   },
-  'drex-max-v1.1': maxCapabilities({ maxTokens: 262_144, includesQuestions: true }),
-  'drex-max-finance': maxCapabilities({ maxTokens: 262_144, includesQuestions: true }),
-} as const satisfies Record<string, ModelCapabilities>
-
-function capabilitiesFor(model: (typeof NACE_MODELS)[number]): ModelCapabilities {
-  return ACTIVE_CAPABILITIES['retiredTo' in model ? model.retiredTo : model.id]
+  'drex-max-v1.1': MAX_CAPABILITIES,
+  'drex-max-finance': MAX_CAPABILITIES,
 }
 
 export interface NaceOptions {
@@ -118,7 +108,7 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           code: 'unsupported',
           message: 'Nace model is not supported.',
         })
-      return capabilitiesFor(selected)
+      return MODEL_CAPABILITIES[selected.id]
     },
     async evaluate(request, signal) {
       const selected = findProviderModel(NACE_MODELS, request.model)
@@ -127,7 +117,7 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           code: 'unsupported',
           message: 'Nace model is not supported.',
         })
-      if (request.images?.length && !capabilitiesFor(selected).images)
+      if (request.images?.length && !MODEL_CAPABILITIES[selected.id].images)
         throw new System1ProviderError({
           code: 'unsupported',
           message: 'Nace images require a Drex Max model.',

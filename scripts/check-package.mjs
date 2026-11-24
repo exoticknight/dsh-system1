@@ -82,7 +82,7 @@ for(const entry of ['icon','locale/en.json','locale/zh.json']) {
   if(!existsSync(new URL(url)))throw new Error('Missing Liquid AI provider asset: '+entry)
 }
 if(!MERAGPT_MODELS.some(({id})=>id==='decider-1')||typeof meragpt.apply!=='function'||typeof meragpt.createMeraGptProvider!=='function')throw new Error('Missing meraGPT provider entry')
-if(NACE_MODELS.filter(model=>!('retiredTo' in model)).map(({id})=>id).join(',')!=='drex-v2.0,drex-max-v1.1,drex-max-finance')throw new Error('Missing pinned Nace model catalog')
+if(NACE_MODELS.map(({id})=>id).join(',')!=='drex-v2.0,drex-max-v1.1,drex-max-finance')throw new Error('Missing pinned Nace model catalog')
 if(findProviderModel(CLOUDFLARE_MODELS,'@cf/cloudflare/clef')?.id!=='clef')throw new Error('Provider model alias did not resolve')
 if(typeof tool.apply!=='function'||tool.TOOL_NAME!=='system1_decide')throw new Error('Invalid agent tool public entry')
 await service.dispose()

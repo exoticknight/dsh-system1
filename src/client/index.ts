@@ -119,7 +119,6 @@ const en = {
   liquidEndpoint: 'Liquid AI API base URL',
   liquidEndpointHint: 'Include /decisions in the base URL. The plugin appends /v1/systemone.',
   timeoutLiquidHint: 'Leave blank to use Liquid AI’s 10,000 ms default.',
-  naceRetired: 'Retired; served by {model}',
   meragptSummary: 'Configure meraGPT and its API Key.',
   naceSummary: 'Configure Nace.AI Drex and its API Key.',
   typesafeEndpoint: 'TypeSafe API base URL',
@@ -212,7 +211,6 @@ const zh = {
   liquidEndpoint: 'Liquid AI API 根地址',
   liquidEndpointHint: '根地址包含 /decisions；插件会自动拼接 /v1/systemone。',
   timeoutLiquidHint: '留空使用 Liquid AI 的 10,000 ms 默认值。',
-  naceRetired: '已退役，由 {model} 提供服务',
   meragptSummary: '配置 meraGPT 服务和 API Key。',
   naceSummary: '配置 Nace.AI Drex 服务和 API Key。',
   typesafeEndpoint: 'TypeSafe API 根地址',
@@ -258,7 +256,7 @@ type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
 type ProviderId = 'typesafe' | 'laya' | 'meragpt' | 'nace' | 'cloudflare' | 'liquid'
-type ModelOption = { id: string; label?: keyof typeof en; retiredTo?: string }
+type ModelOption = { id: string; label?: keyof typeof en }
 type ProviderSettings = {
   id: ProviderId
   rowId: string
@@ -326,10 +324,7 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointHint: 'naceEndpointHint',
     timeoutHint: 'timeoutNaceHint',
     baseURL: 'https://console.nace.ai',
-    models: NACE_MODELS.map((entry) => ({
-      id: entry.id,
-      ...('retiredTo' in entry ? { retiredTo: entry.retiredTo } : {}),
-    })),
+    models: NACE_MODELS,
     note: 'naceImageRetentionHint',
   },
   {
@@ -665,17 +660,11 @@ function modelSelectors(
       : []),
     ...PROVIDERS.map((entry) => ({ id: entry.id, label: t(entry.label) })),
   ]
-  const savedModel = models.find((candidate) => candidate.id === row.model)
   const modelOptions = [
-    ...(row.model && (!savedModel || savedModel.retiredTo)
-      ? [{
-          id: row.model,
-          label: savedModel?.retiredTo
-            ? `${row.model} (${t('naceRetired').replace('{model}', savedModel.retiredTo)})`
-            : row.model,
-        }]
+    ...(row.model && !models.some((candidate) => candidate.id === row.model)
+      ? [{ id: row.model, label: row.model }]
       : []),
-    ...models.filter((entry) => !entry.retiredTo).map((entry) => ({
+    ...models.map((entry) => ({
       id: entry.id,
       label: entry.label ? t(entry.label) : entry.id,
     })),

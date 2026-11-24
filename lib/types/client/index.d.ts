@@ -57,7 +57,6 @@ declare const en: {
     liquidEndpoint: string;
     liquidEndpointHint: string;
     timeoutLiquidHint: string;
-    naceRetired: string;
     meragptSummary: string;
     naceSummary: string;
     typesafeEndpoint: string;

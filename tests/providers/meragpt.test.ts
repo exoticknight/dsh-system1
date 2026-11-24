@@ -232,19 +232,31 @@ test('Decider 1.1 sends the fixed ID and embeds attachments without changing the
     assert.ok(Math.abs(result.answers.q.answer.probabilities.reduce((sum, p) => sum + p, 0) - 1) < 1e-12)
 })
 
-test('Decider score rounding at 32 levels preserves a valid answer and rejects a far-off score', async () => {
+test('Decider reconciles valid 32-level rounded scores and rejects invalid ones', async () => {
   const levels = Array.from({ length: 32 }, (_, i) => String(i))
   const probabilities = Object.fromEntries(levels.map((level, i) => [level, i === 31 ? 0.9985 : 0]))
+  // 16 buckets rounded down and 16 rounded up can still sum exactly to 1.
+  const unitTotal = Object.fromEntries(levels.map((level, i) => [level, i < 16 ? 0.0312 : 0.0313]))
+  const firstLevel = Object.fromEntries(levels.map((level, i) => [level, i === 0 ? 1 : 0]))
   const question = { type: 'score', instructions: 'Select a level', criteria: levels } as const
   const engine = new System1Engine({ defaultModel: { provider: 'meragpt', model: 'decider-1.1' } })
   engine.registerProvider('meragpt', createMeraGptProvider({
     apiKey: 'fixture-only',
     fetch: async () => Response.json({ answers: {
       valid: { type: 'score', score: 30.9757, probabilities },
+      balanced: { type: 'score', score: 15.5003, probabilities: unitTotal },
       invalid: { type: 'score', score: 30, probabilities },
+      outOfRange: { type: 'score', score: -0.00001, probabilities: firstLevel },
     } }),
   }))
-  const result = await engine.decide({ state: 'fixture', questions: { valid: question, invalid: question } })
+  const result = await engine.decide({
+    state: 'fixture',
+    questions: { valid: question, balanced: question, invalid: question, outOfRange: question },
+  })
   assert.equal(result.answers.valid.status === 'ok' && result.answers.valid.answer.value, 31)
+  const balanced = result.answers.balanced
+  assert.equal(balanced.status, 'ok')
+  if (balanced.status === 'ok') assert.ok(Math.abs(balanced.answer.value - 15.5128) < 1e-12)
   assert.equal(result.answers.invalid.status === 'error' && result.answers.invalid.error.code, 'invalid_response')
+  assert.equal(result.answers.outOfRange.status === 'error' && result.answers.outOfRange.error.code, 'invalid_response')
 })
