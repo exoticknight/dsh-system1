@@ -24,7 +24,7 @@ const result = await build({
 const entry = result.outputFiles[0]?.text
 if (!entry) throw new Error('esbuild did not emit the client entry.')
 
-// DSH 1.7 expects a lazy CommonJS factory in ModuleLoader. Its clientBundle
+// DSH expects a lazy CommonJS factory in ModuleLoader. Its clientBundle
 // build preset is not published, so esbuild handles TypeScript and package
 // resolution while this wrapper supplies DSH's small runtime format boundary.
 const bundle = `window.__ModuleLoader__.load({

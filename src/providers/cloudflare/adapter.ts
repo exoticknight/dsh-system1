@@ -35,8 +35,8 @@ function resolveCloudflareModel(model: string) {
 const CAPABILITIES: Omit<ModelCapabilities, 'context'> = {
   primitives: ['noul', 'choice', 'score'],
   maxQuestions: 64,
-  maxChoiceOptions: null,
-  maxScoreLevels: null,
+  maxChoiceOptions: 255,
+  maxScoreLevels: 10,
   images: {
     formats: ['image/png', 'image/jpeg', 'image/webp'],
     maxCount: 4,

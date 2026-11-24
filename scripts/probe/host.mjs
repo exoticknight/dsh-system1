@@ -25,9 +25,14 @@ assert.equal(
 const load = async (name) => import(pathToFileURL(require.resolve(name)).href)
 const { Context, Service } = await load('@deepseek-ai/cordis')
 const { Loader } = await load('@deepseek-ai/cordis-plugin-loader')
-const { composeEntries, readPluginMeta } = await load('@deepseek-ai/dsh-app-boot')
-const yaml = require('js-yaml')
-const patches = yaml.load(readFileSync('cordis.patch.yml', 'utf8'))
+const { composeEntries, readPluginMeta, evaluatePluginCompatibility } = await load('@deepseek-ai/dsh-app-boot')
+if (evaluatePluginCompatibility)
+  assert.equal(evaluatePluginCompatibility(pluginManifest, {}, manifest.version), undefined)
+const bootRequire = createRequire(require.resolve('@deepseek-ai/dsh-app-boot'))
+const { parseEntryYaml } = await import(
+  pathToFileURL(bootRequire.resolve('@deepseek-ai/cordis-plugin-include')).href
+)
+const patches = (parseEntryYaml ?? bootRequire('js-yaml').load)(readFileSync('cordis.patch.yml', 'utf8'))
 if (liveMera) {
   const entry = patches[0].insert.find(({ id }) => id === 'system1-meragpt')
   assert.ok(entry, 'meraGPT provider entry is missing from the bundle patch.')
@@ -58,7 +63,7 @@ for (const { name } of patches[0].insert) {
 // dsh-tools is not a direct dependency of @deepseek-ai/dsh; resolve it through dsh-app-boot.
 const tools = await import(
   pathToFileURL(
-    createRequire(require.resolve('@deepseek-ai/dsh-app-boot')).resolve(
+    bootRequire.resolve(
       '@deepseek-ai/dsh-tools',
     ),
   ).href
@@ -81,6 +86,14 @@ class SystemPromptStub extends Service {
 const ctx = new Context()
 await ctx.plugin(SystemPromptStub)
 await ctx.plugin(tools.default)
+const usesBatchExecutor = typeof ctx.tools.setExecutor === 'function'
+if (usesBatchExecutor) {
+  const baseRequire = createRequire(require.resolve('@deepseek-ai/dsh-base'))
+  const executor = await import(
+    pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-tool-executor-native')).href
+  )
+  await ctx.plugin(executor)
+}
 const fiber = await ctx.plugin(Loader, {
   baseUrl,
 })
@@ -97,7 +110,7 @@ try {
     cancelled.answers.q.status === 'error' ? cancelled.answers.q.error.code : undefined,
     'cancelled',
   )
-  for (const provider of ['typesafe', 'laya', 'nace', 'cloudflare', 'meragpt']) {
+  for (const provider of ['typesafe', 'laya', 'nace', 'cloudflare', 'meragpt', 'liquid']) {
     const result = await ctx.system1.decide({
       state: 'fixture',
       questions: { q: { type: 'noul', instructions: 'yes?' } },
@@ -114,7 +127,16 @@ try {
     ['system1_decide'],
     'The agent tool component did not register system1_decide.',
   )
-  const call = await ctx.tools.execute({
+  async function executeTool({ callId, name, arguments: args, signal }) {
+    if (!usesBatchExecutor) return ctx.tools.execute({ callId, name, arguments: args, signal })
+    const batch = await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: callId, name, arguments: JSON.stringify(args) }],
+      signal,
+    })
+    assert.equal(batch.results.length, 1)
+    return batch.results[0].result
+  }
+  const call = await executeTool({
     callId: 'host-probe',
     name: 'system1_decide',
     arguments: {
@@ -126,7 +148,7 @@ try {
   })
   assert.equal(call.isError, false, JSON.stringify(call))
   assert.equal(call.value.answers.q.error?.code, 'unsupported')
-  const fallbackCall = await ctx.tools.execute({
+  const fallbackCall = await executeTool({
     callId: 'host-probe-fallback-output',
     name: 'system1_decide',
     arguments: {

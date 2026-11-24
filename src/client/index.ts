@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { CLOUDFLARE_MODELS } from '../providers/cloudflare/models.js'
 import { LAYA_MODELS } from '../providers/laya/models.js'
+import { LIQUID_BASE_URL, LIQUID_MODELS } from '../providers/liquid/models.js'
 import { MERAGPT_MODELS } from '../providers/meragpt/models.js'
 import { NACE_MODELS } from '../providers/nace/models.js'
 import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
@@ -66,6 +67,7 @@ const en = {
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
   providerMeraGpt: 'meraGPT',
+  providerLiquid: 'Liquid AI',
   providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: 'Unsupported service',
@@ -113,6 +115,11 @@ const en = {
   keyUnavailable: 'The DSH credential service is unavailable.',
   typesafeSummary: 'Configure the TypeSafe endpoint and its API Key.',
   layaSummary: 'Configure the Laya endpoint and optional API Key.',
+  liquidSummary: 'Configure Liquid AI and its API Key.',
+  liquidEndpoint: 'Liquid AI API base URL',
+  liquidEndpointHint: 'Include /decisions in the base URL. The plugin appends /v1/systemone.',
+  timeoutLiquidHint: 'Leave blank to use Liquid AI’s 10,000 ms default.',
+  naceRetired: 'Retired; served by {model}',
   meragptSummary: 'Configure meraGPT and its API Key.',
   naceSummary: 'Configure Nace.AI Drex and its API Key.',
   typesafeEndpoint: 'TypeSafe API base URL',
@@ -153,6 +160,7 @@ const zh = {
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
   providerMeraGpt: 'meraGPT',
+  providerLiquid: 'Liquid AI',
   providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
   providerUnknown: '暂不支持的服务',
@@ -200,6 +208,11 @@ const zh = {
   keyUnavailable: 'DSH 凭据服务暂不可用。',
   typesafeSummary: '配置 TypeSafe 接口地址和 API Key。',
   layaSummary: '配置 Laya 接口地址和可选 API Key。',
+  liquidSummary: '配置 Liquid AI 服务和 API Key。',
+  liquidEndpoint: 'Liquid AI API 根地址',
+  liquidEndpointHint: '根地址包含 /decisions；插件会自动拼接 /v1/systemone。',
+  timeoutLiquidHint: '留空使用 Liquid AI 的 10,000 ms 默认值。',
+  naceRetired: '已退役，由 {model} 提供服务',
   meragptSummary: '配置 meraGPT 服务和 API Key。',
   naceSummary: '配置 Nace.AI Drex 服务和 API Key。',
   typesafeEndpoint: 'TypeSafe API 根地址',
@@ -244,8 +257,8 @@ type Copy = Translate<keyof typeof en>
 type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
-type ProviderId = 'typesafe' | 'laya' | 'meragpt' | 'nace' | 'cloudflare'
-type ModelOption = { id: string; label?: keyof typeof en }
+type ProviderId = 'typesafe' | 'laya' | 'meragpt' | 'nace' | 'cloudflare' | 'liquid'
+type ModelOption = { id: string; label?: keyof typeof en; retiredTo?: string }
 type ProviderSettings = {
   id: ProviderId
   rowId: string
@@ -313,7 +326,10 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     endpointHint: 'naceEndpointHint',
     timeoutHint: 'timeoutNaceHint',
     baseURL: 'https://console.nace.ai',
-    models: NACE_MODELS.map(({ id }) => ({ id })),
+    models: NACE_MODELS.map((entry) => ({
+      id: entry.id,
+      ...('retiredTo' in entry ? { retiredTo: entry.retiredTo } : {}),
+    })),
     note: 'naceImageRetentionHint',
   },
   {
@@ -328,6 +344,19 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     timeoutHint: 'timeoutMeraGptHint',
     baseURL: 'https://meragpt.com',
     models: MERAGPT_MODELS.map(({ id }) => ({ id })),
+  },
+  {
+    id: 'liquid',
+    rowId: 'system1-liquid',
+    label: 'providerLiquid',
+    summary: 'liquidSummary',
+    keyRef: 'LIQUID_API_KEY',
+    keyHint: 'keyHint',
+    endpointLabel: 'liquidEndpoint',
+    endpointHint: 'liquidEndpointHint',
+    timeoutHint: 'timeoutLiquidHint',
+    baseURL: LIQUID_BASE_URL,
+    models: LIQUID_MODELS,
   },
   {
     id: 'cloudflare',
@@ -636,11 +665,20 @@ function modelSelectors(
       : []),
     ...PROVIDERS.map((entry) => ({ id: entry.id, label: t(entry.label) })),
   ]
+  const savedModel = models.find((candidate) => candidate.id === row.model)
   const modelOptions = [
-    ...(row.model && !models.some((candidate) => candidate.id === row.model)
-      ? [{ id: row.model, label: row.model }]
+    ...(row.model && (!savedModel || savedModel.retiredTo)
+      ? [{
+          id: row.model,
+          label: savedModel?.retiredTo
+            ? `${row.model} (${t('naceRetired').replace('{model}', savedModel.retiredTo)})`
+            : row.model,
+        }]
       : []),
-    ...models.map((entry) => ({ id: entry.id, label: entry.label ? t(entry.label) : entry.id })),
+    ...models.filter((entry) => !entry.retiredTo).map((entry) => ({
+      id: entry.id,
+      label: entry.label ? t(entry.label) : entry.id,
+    })),
   ]
   return [
     h(Dropdown, {

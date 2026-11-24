@@ -15,7 +15,7 @@ export interface MeraGptOptions {
   fetch?: typeof fetch
 }
 
-/** Hosted meraGPT Decider 1, which speaks the shared System One wire contract. */
+/** Hosted meraGPT Decider 1.1, which speaks the shared System One wire contract. */
 export function createMeraGptProvider(options: MeraGptOptions = {}): System1Provider {
   return createSystemOneHttpProvider({
     providerName: 'meraGPT',
@@ -25,13 +25,37 @@ export function createMeraGptProvider(options: MeraGptOptions = {}): System1Prov
     ...(options.resolveBaseURL ? { resolveBaseURL: options.resolveBaseURL } : {}),
     apiKeyRequired: true,
     resolveModel: (model) => findProviderModel(MERAGPT_MODELS, model),
-    requestModel: (model) => model,
+    roundedProbabilities: true,
+    serializeRequest: ({ state, questions, images }) => ({
+      body: {
+        state: images?.length
+          ? {
+              state,
+              images: images.map(({ mediaType, data }) => ({
+                type: 'image_url',
+                image_url: { url: `data:${mediaType};base64,${data}` },
+              })),
+            }
+          : state,
+        questions,
+      },
+    }),
     capabilities: {
       primitives: ['noul', 'choice', 'score'],
       maxQuestions: 64,
-      maxChoiceOptions: 10,
-      maxScoreLevels: 10,
-      context: { maxTokens: 4_096, includesQuestions: true },
+      maxChoiceOptions: 255,
+      maxScoreLevels: 32,
+      images: {
+        formats: ['image/png', 'image/jpeg', 'image/webp'],
+        maxCount: 8,
+        maxBytesPerImage: 8_000_000,
+        maxTotalBytes: 64_000_000,
+      },
+      context: {
+        maxTokens: 32_768,
+        includesQuestions: false,
+        maxStatePlusQuestionTokens: 32_768,
+      },
     },
     ...(options.fetch ? { fetch: options.fetch } : {}),
   })

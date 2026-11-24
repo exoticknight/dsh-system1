@@ -74,8 +74,8 @@ test('Cloudflare Clef sends the REST contract and normalizes the System One resu
   assert.deepEqual(await provider.describe('clef', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 64,
-    maxChoiceOptions: null,
-    maxScoreLevels: null,
+    maxChoiceOptions: 255,
+    maxScoreLevels: 10,
     images: {
       formats: ['image/png', 'image/jpeg', 'image/webp'],
       maxCount: 4,
@@ -143,8 +143,8 @@ test('Cloudflare Clef family routes model IDs and reports model-specific context
       assert.deepEqual(await provider.describe(model, new AbortController().signal), {
         primitives: ['noul', 'choice', 'score'],
         maxQuestions: 64,
-        maxChoiceOptions: null,
-        maxScoreLevels: null,
+        maxChoiceOptions: 255,
+        maxScoreLevels: 10,
         images: {
           formats: ['image/png', 'image/jpeg', 'image/webp'],
           maxCount: 4,

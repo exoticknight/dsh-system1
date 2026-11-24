@@ -19,6 +19,7 @@ import type { ImageInput, ModelCapabilities, ProviderRequest } from '../../contr
 import { System1ProviderError } from '../../contracts/error.js'
 import { findProviderModel } from '../models.js'
 import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from '../answers.js'
+import { normalizeRoundedDistribution, normalizeRoundedDistributionRecord } from '../probabilities.js'
 import { NACE_MODELS } from './models.js'
 
 const DEFAULT_BASE_URL = 'https://console.nace.ai'
@@ -75,18 +76,7 @@ function maxCapabilities(context: ModelContext): ModelCapabilities {
   }
 }
 
-const MODEL_CAPABILITIES = {
-  'drex-v1.5': {
-    primitives: ['noul', 'choice', 'score'],
-    maxQuestions: 512,
-    maxChoiceOptions: null,
-    maxScoreLevels: null,
-    context: {
-      maxTokens: 131_072,
-      includesQuestions: false,
-      maxStatePlusQuestionTokens: 139_264,
-    },
-  },
+const ACTIVE_CAPABILITIES = {
   'drex-v2.0': {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
@@ -98,20 +88,13 @@ const MODEL_CAPABILITIES = {
       maxStatePlusQuestionTokens: 262_144,
     },
   },
-  'drex-max': maxCapabilities({
-    maxTokens: 524_288,
-    includesQuestions: false,
-    maxStatePlusQuestionTokens: 262_144,
-  }),
-  'drex-max-finance': maxCapabilities({
-    maxTokens: 262_144,
-    includesQuestions: true,
-  }),
-  'drex-max-v1.1': maxCapabilities({
-    maxTokens: 262_144,
-    includesQuestions: true,
-  }),
-} as const satisfies Record<(typeof NACE_MODELS)[number]['id'], ModelCapabilities>
+  'drex-max-v1.1': maxCapabilities({ maxTokens: 262_144, includesQuestions: true }),
+  'drex-max-finance': maxCapabilities({ maxTokens: 262_144, includesQuestions: true }),
+} as const satisfies Record<string, ModelCapabilities>
+
+function capabilitiesFor(model: (typeof NACE_MODELS)[number]): ModelCapabilities {
+  return ACTIVE_CAPABILITIES['retiredTo' in model ? model.retiredTo : model.id]
+}
 
 export interface NaceOptions {
   apiKey: string
@@ -135,7 +118,7 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           code: 'unsupported',
           message: 'Nace model is not supported.',
         })
-      return MODEL_CAPABILITIES[selected.id]
+      return capabilitiesFor(selected)
     },
     async evaluate(request, signal) {
       const selected = findProviderModel(NACE_MODELS, request.model)
@@ -144,7 +127,7 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
           code: 'unsupported',
           message: 'Nace model is not supported.',
         })
-      if (request.images?.length && !isDrexMaxModel(selected.id))
+      if (request.images?.length && !capabilitiesFor(selected).images)
         throw new System1ProviderError({
           code: 'unsupported',
           message: 'Nace images require a Drex Max model.',
@@ -215,10 +198,6 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
   }
 }
 
-function isDrexMaxModel(model: string): model is 'drex-max' | 'drex-max-v1.1' | 'drex-max-finance' {
-  return model === 'drex-max' || model === 'drex-max-v1.1' || model === 'drex-max-finance'
-}
-
 function normalizeNaceResponse(
   request: ProviderRequest,
   response: unknown,
@@ -283,29 +262,6 @@ function normalizeNaceResponse(
       ? { usage: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens } }
       : {}),
   }
-}
-
-function normalizeRoundedDistributionRecord(
-  probabilities: Readonly<Record<string, number>>,
-): Readonly<Record<string, number>> {
-  const keys = Object.keys(probabilities)
-  const values = normalizeRoundedDistribution(keys.map((key) => probabilities[key]!))
-  return Object.fromEntries(keys.map((key, index) => [key, values[index]!]))
-}
-
-function normalizeRoundedDistribution(
-  probabilities: readonly number[],
-): readonly number[] {
-  if (probabilities.length === 0 || probabilities.some(
-    (value) => !Number.isFinite(value) || value < 0 || value > 1,
-  )) return probabilities
-  const total = probabilities.reduce((sum, value) => sum + value, 0)
-  const roundingBound = probabilities.length * 0.5e-4
-  if (
-    !(total > 0) || total === 1 ||
-    Math.abs(total - 1) > roundingBound + Number.EPSILON * probabilities.length
-  ) return probabilities
-  return probabilities.map((value) => value / total)
 }
 
 function stringifyDescription(value: string | object | readonly unknown[]): string {

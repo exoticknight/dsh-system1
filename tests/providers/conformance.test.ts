@@ -14,6 +14,8 @@ import { createCloudflareProvider } from '../../src/providers/cloudflare/adapter
 import { CLOUDFLARE_MODELS } from '../../src/providers/cloudflare/models.js'
 import { createLayaProvider } from '../../src/providers/laya/adapter.js'
 import { LAYA_MODELS } from '../../src/providers/laya/models.js'
+import { createLiquidProvider } from '../../src/providers/liquid/adapter.js'
+import { LIQUID_MODELS } from '../../src/providers/liquid/models.js'
 import { createMeraGptProvider } from '../../src/providers/meragpt/adapter.js'
 import { MERAGPT_MODELS } from '../../src/providers/meragpt/models.js'
 import { createNaceProvider } from '../../src/providers/nace/adapter.js'
@@ -42,6 +44,12 @@ const suites: readonly ProviderSuite[] = [
     id: 'laya',
     models: LAYA_MODELS,
     create: (fetch) => createLayaProvider({ fetch }),
+    supports: (_model, primitive) => primitive !== 'box',
+  },
+  {
+    id: 'liquid',
+    models: LIQUID_MODELS,
+    create: (fetch) => createLiquidProvider({ apiKey: 'fixture-only', fetch }),
     supports: (_model, primitive) => primitive !== 'box',
   },
   {

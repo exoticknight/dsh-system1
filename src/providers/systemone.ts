@@ -4,6 +4,7 @@ import type { ProviderRequest, ProviderResponse, System1Provider } from '../cont
 import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js'
 import { System1ProviderError } from '../contracts/error.js'
 import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from './answers.js'
+import { normalizeRoundedDistributionRecord, normalizeRoundedScore } from './probabilities.js'
 
 const wireAnswer = z.discriminatedUnion('type', [
   z.object({ type: z.literal('noul'), noul: z.number() }),
@@ -57,6 +58,7 @@ export interface SystemOneHttpProviderOptions {
     readonly body: Readonly<Record<string, unknown>>
     readonly headers?: Readonly<Record<string, string>>
   }
+  readonly roundedProbabilities?: boolean
   readonly selectResponseModel?: (
     response: z.infer<typeof wireResponse>,
   ) => string | undefined
@@ -173,6 +175,7 @@ export function createSystemOneHttpProvider(
         raw,
         options.providerName,
         options.selectResponseModel,
+        options.roundedProbabilities,
       )
     },
   }
@@ -186,6 +189,7 @@ export function normalizeSystemOneResponse(
   selectResponseModel?: (
     response: z.infer<typeof wireResponse>,
   ) => string | undefined,
+  roundedProbabilities = false,
 ): ProviderResponse {
   const parsed = wireResponse.safeParse(raw)
   if (!parsed.success)
@@ -198,7 +202,7 @@ export function normalizeSystemOneResponse(
     selectResponseModel?.(parsed.data) ?? parsed.data.model ?? request.model
   return {
     model: answeredModel || request.model,
-    answers: normalizeAnswers(request, parsed.data.answers),
+    answers: normalizeAnswers(request, parsed.data.answers, roundedProbabilities),
     ...(parsed.data.usage
       ? {
           usage: {
@@ -217,6 +221,7 @@ export function normalizeSystemOneResponse(
 function normalizeAnswers(
   request: ProviderRequest,
   answers: Record<string, unknown>,
+  roundedProbabilities: boolean,
 ) {
   return Object.fromEntries(
     Object.entries(answers).map(([id, raw]) => {
@@ -228,7 +233,11 @@ function normalizeAnswers(
       const answer = parsed.data
       if (answer.type === 'noul') return [id, noulAnswer(answer.noul)]
       if (answer.type === 'choice')
-        return [id, choiceAnswer(answer.choice, answer.probabilities, answer.confidence)]
+        return [id, choiceAnswer(
+          answer.choice,
+          roundedProbabilities ? normalizeRoundedDistributionRecord(answer.probabilities) : answer.probabilities,
+          answer.confidence,
+        )]
       if (answer.type === 'box')
         return [id, {
           status: 'ok',
@@ -257,12 +266,15 @@ function normalizeAnswers(
         const probability = answer.probabilities[String(index)]
         return probability
       })
-      if (probabilities.some((probability) => probability === undefined))
+      if (!probabilities.every((probability) => probability !== undefined))
         return [id, invalidAnswer()]
+      const score = roundedProbabilities
+        ? normalizeRoundedScore(answer.score, probabilities)
+        : { value: answer.score, probabilities }
       return [id, scoreAnswer(
-        answer.score,
+        score.value,
         question.criteria,
-        probabilities as number[],
+        score.probabilities,
         answer.confidence,
       )]
     }),

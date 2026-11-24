@@ -8,6 +8,6 @@ export interface MeraGptOptions {
     resolveBaseURL?: () => string | undefined;
     fetch?: typeof fetch;
 }
-/** Hosted meraGPT Decider 1, which speaks the shared System One wire contract. */
+/** Hosted meraGPT Decider 1.1, which speaks the shared System One wire contract. */
 export declare function createMeraGptProvider(options?: MeraGptOptions): System1Provider;
 //# sourceMappingURL=adapter.d.ts.map

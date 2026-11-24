@@ -116,27 +116,16 @@ function createUploadFixture(options: {
   }
 }
 
-test('Nace catalog pins stable model IDs and advertises per-model limits', async () => {
+test('Nace catalog exposes active limits and forwards retired IDs to successor capabilities', async () => {
   assert.deepEqual(NACE_MODELS.map(({ id }) => id), [
     'drex-v2.0',
-    'drex-v1.5',
     'drex-max-v1.1',
     'drex-max-finance',
+    'drex-v1.5',
     'drex-max',
   ])
   const provider = createNaceProvider({ apiKey: '' })
   assert.equal(provider.timeoutMs(), 60_000)
-  assert.deepEqual(await provider.describe('drex-v1.5', new AbortController().signal), {
-    primitives: ['noul', 'choice', 'score'],
-    maxQuestions: 512,
-    maxChoiceOptions: null,
-    maxScoreLevels: null,
-    context: {
-      maxTokens: 131_072,
-      includesQuestions: false,
-      maxStatePlusQuestionTokens: 139_264,
-    },
-  })
   assert.deepEqual(await provider.describe('drex-v2.0', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
@@ -147,22 +136,6 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
       includesQuestions: false,
       maxStatePlusQuestionTokens: 262_144,
     },
-  })
-  const max = await provider.describe('drex-max', new AbortController().signal)
-  assert.deepEqual(max.primitives, ['noul', 'choice', 'score'])
-  assert.equal(max.maxQuestions, 512)
-  assert.equal(max.maxChoiceOptions, 255)
-  assert.equal(max.maxScoreLevels, 255)
-  assert.deepEqual(max.images, {
-    formats: ['image/png', 'image/jpeg', 'image/webp'],
-    maxCount: 8,
-    maxBytesPerImage: 16 * 1024 * 1024,
-    maxTotalBytes: 32 * 1024 * 1024,
-  })
-  assert.deepEqual(max.context, {
-    maxTokens: 524_288,
-    includesQuestions: false,
-    maxStatePlusQuestionTokens: 262_144,
   })
   const maxV11 = await provider.describe('drex-max-v1.1', new AbortController().signal)
   assert.deepEqual(maxV11, {
@@ -178,6 +151,8 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
     },
     context: { maxTokens: 262_144, includesQuestions: true },
   })
+  for (const model of ['drex-v1.5', 'drex-max'])
+    assert.deepEqual(await provider.describe(model, AbortSignal.timeout(1_000)), maxV11)
   assert.deepEqual(await provider.describe('drex-max-finance', new AbortController().signal), maxV11)
   await assert.rejects(
     provider.describe('drex-latest', new AbortController().signal),
@@ -811,4 +786,22 @@ test('temporary-file deletion failure is sanitized and does not discard a valid 
   assert.equal(warnings.length, 1)
   assert.ok(!warnings[0]!.includes('fixture-only'))
   assert.ok(!warnings[0]!.includes('private delete response'))
+})
+
+test('saved retired Nace IDs stay on the wire while execution reports the successor', async () => {
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v1.5' } })
+  engine.registerProvider('nace', createNaceProvider({
+    apiKey: 'fixture-only',
+    fetch: async (_url, init) => {
+      assert.equal(JSON.parse(String(init?.body)).model, 'drex-v1.5')
+      return Response.json({
+        model: 'drex-max-v1.1',
+        answers: { q: { type: 'noul', noul: 0.8 } },
+      })
+    },
+  }))
+  const { answers, meta } = await engine.decide({ state: request.state, questions: request.questions })
+  assert.equal(answers.q?.status, 'ok')
+  assert.equal(meta.requested.model, 'drex-v1.5')
+  assert.equal(meta.executed?.model, 'drex-max-v1.1')
 })

@@ -9,7 +9,7 @@ const root = resolve('.scratch/local-providers')
 const isWindows = process.platform === 'win32'
 
 export const CLEF_REVISION = '17f0b0ad64efb65d273590632833508766b2aae6'
-export const LAYA_VERSION = '0.4.26'
+export const LAYA_VERSION = '0.5.3'
 
 export const services = {
   laya: {

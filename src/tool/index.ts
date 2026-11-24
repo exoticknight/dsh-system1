@@ -59,7 +59,7 @@ const PARAMETERS = {
       type: 'array',
       maxItems: MAX_ATTACHMENT_COUNT_PER_TYPE,
       description:
-        `Optional image attachments visible to every question (${ATTACHMENT_RESOURCE_LIMITS}). Each data value is padded base64 without a data-URL prefix. Provider limits may be lower. TypeSafe supports PNG and JPEG; Cloudflare and Nace drex-max also support WebP.`,
+        `Optional image attachments visible to every question (${ATTACHMENT_RESOURCE_LIMITS}). Each data value is padded base64 without a data-URL prefix. Provider limits may be lower. TypeSafe supports PNG and JPEG; Cloudflare, Drex Max, meraGPT, and Liquid AI also support WebP.`,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -77,7 +77,7 @@ const PARAMETERS = {
       type: 'array',
       maxItems: MAX_ATTACHMENT_COUNT_PER_TYPE,
       description:
-        `Optional audio clips (${ATTACHMENT_RESOURCE_LIMITS}). Cloudflare Clef-omni allows up to 4, 8 MiB each, 300 seconds each; audio and video share a 16 MiB decoded-size limit. Provider limits may be lower. Each data value is padded base64 without a data-URL prefix.`,
+        `Optional audio clips (${ATTACHMENT_RESOURCE_LIMITS}). Liquid AI accepts WAV and MP3 audio. Cloudflare Clef-omni allows up to 4, 8 MiB each, 300 seconds each; audio and video share a 16 MiB decoded-size limit. Provider limits may be lower. Each data value is padded base64 without a data-URL prefix.`,
       items: {
         type: 'object',
         additionalProperties: false,

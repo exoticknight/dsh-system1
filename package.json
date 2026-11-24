@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.5.1",
-  "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider via meraGPT, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows.",
+  "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider via meraGPT, Liquid AI d1.2, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows.",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [
@@ -16,6 +16,7 @@
     "laya",
     "nace",
     "meragpt",
+    "liquid-ai",
     "decider",
     "llm",
     "classification",
@@ -25,7 +26,8 @@
   "type": "module",
   "packageManager": "pnpm@11.19.0",
   "engines": {
-    "node": "^22.19.0 || ^24.0.0"
+    "node": "^22.19.0 || ^24.0.0 || ^26.13.1",
+    "dsh": ">=0.1.7-rc.1 <0.3.0"
   },
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
@@ -66,6 +68,12 @@
     },
     "./providers/meragpt/locale/*.json": "./locale/providers/meragpt/*.json",
     "./providers/meragpt/icon": "./assets/provider-icons/meragpt.svg",
+    "./providers/liquid": {
+      "types": "./lib/providers/liquid/index.d.ts",
+      "import": "./lib/providers/liquid/index.js"
+    },
+    "./providers/liquid/locale/*.json": "./locale/providers/liquid/*.json",
+    "./providers/liquid/icon": "./assets/provider-icons/liquid.svg",
     "./providers/cloudflare": {
       "types": "./lib/providers/cloudflare/index.d.ts",
       "import": "./lib/providers/cloudflare/index.js"
@@ -95,6 +103,7 @@
     "assets/provider-icons/laya.png",
     "assets/provider-icons/meragpt.svg",
     "assets/provider-icons/cloudflare-clef.svg",
+    "assets/provider-icons/liquid.svg",
     "LICENSE",
     "cordis.patch.yml",
     "README.md",
@@ -115,7 +124,8 @@
         "0.1.7-rc.1": "compatible",
         "0.1.7-rc.2": "compatible",
         "0.2.0-rc.2": "compatible",
-        "0.2.1-rc.2": "compatible"
+        "0.2.1-rc.2": "compatible",
+        "0.2.3-alpha.2": "compatible"
       },
       "profiles": [
         "headless",
@@ -125,8 +135,6 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-settings-plugins",
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings",
@@ -150,12 +158,12 @@
     "pre-commit": "node scripts/build-before-commit.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-credentials": ">=0.1.7-rc.1 <0.3.0"
+    "@deepseek-ai/cordis": "^4.0.4 || 4.2.0-alpha.1",
+    "@deepseek-ai/dsh-credentials": ">=0.1.7-rc.1 <0.3.0 || 0.2.3-alpha.2"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.4",
-    "nace-sdk": "0.2.0",
+    "nace-sdk": "0.11.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
