@@ -1,3 +1,4 @@
+import { decideOperation } from '../../src/index.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { ProviderRequest } from '../../src/contracts/index.js'
@@ -16,7 +17,7 @@ const request = {
 
 test('Liquid sends the chosen model and media with the existing typed decision contract', async () => {
   const engine = new System1Engine({ defaultModel: { provider: 'liquid', model: request.model } })
-  engine.registerProvider('liquid', createLiquidProvider({
+  engine.registerImplementation(decideOperation, 'liquid', createLiquidProvider({
     apiKey: 'fixture-only',
     fetch: async (url, init) => {
       assert.equal(String(url), 'https://api.liquid.ai/decisions/v1/systemone')

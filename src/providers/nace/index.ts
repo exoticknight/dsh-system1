@@ -4,10 +4,13 @@ import {
   credentialRef,
   isCredentialRefName,
 } from '@deepseek-ai/dsh-credentials'
-import type {} from '../../index.js'
+import { decideOperation, locateOperation } from '../../index.js'
 import { createNaceProvider } from './adapter.js'
+import type { NaceOptions } from './adapter.js'
+import { createNaceLocateProvider } from './locate.js'
 
 export { createNaceProvider, type NaceOptions } from './adapter.js'
+export { createNaceLocateProvider } from './locate.js'
 export { NACE_MODELS } from './models.js'
 
 export interface Config {
@@ -42,7 +45,7 @@ export const Config: Schema<ConfigInput, RuntimeConfig> = Schema.object({
 
 export function apply(ctx: Context, config: Config | RuntimeConfig) {
   const logger = ctx.logger('dsh-system1 Nace provider')
-  const provider = createNaceProvider({
+  const options: NaceOptions = {
     apiKey: '',
     resolveApiKey: async () => {
       const ref = config.apiKeyEnv
@@ -55,8 +58,11 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
     resolveBaseURL: () => readConfigValue(config.baseURL),
     resolveTimeoutMs: () => readConfigValue(config.timeoutMs),
     warn: (message) => logger.warn(message),
-  })
-  ctx.effect(() => ctx.system1.registerProvider(config.id, provider))
+  }
+  const decide = createNaceProvider(options)
+  const locate = createNaceLocateProvider(options)
+  ctx.effect(() => ctx.system1.registerImplementation(decideOperation, config.id, decide))
+  ctx.effect(() => ctx.system1.registerImplementation(locateOperation, config.id, locate))
 }
 
 function readConfigValue<T>(value: T | Volatile<T> | undefined): T | undefined {

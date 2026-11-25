@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Liquid AI",
-    "description": "Connects to hosted Liquid AI decision models."
+    "description": "Connects to Liquid AI models for structured decisions and text/image location."
   }
 }

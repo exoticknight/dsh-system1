@@ -1,3 +1,4 @@
+import { decideOperation } from '../../src/index.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
@@ -369,7 +370,7 @@ test('Nace invalidates only malformed answers and preserves valid siblings', asy
     }),
   })
   const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
-  engine.registerProvider('nace', createNaceProvider({
+  engine.registerImplementation(decideOperation, 'nace', createNaceProvider({
     apiKey: 'fixture-only',
     fetch: fixture.fetch,
   }))
@@ -403,7 +404,7 @@ test('Nace rejects a response whose top-level answers is not an object', async (
     }),
   })
   const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
-  engine.registerProvider('nace', createNaceProvider({
+  engine.registerImplementation(decideOperation, 'nace', createNaceProvider({
     apiKey: 'fixture-only',
     fetch: fixture.fetch,
   }))
@@ -436,7 +437,7 @@ test('Drex rounded choice and score probabilities remain valid DSH distributions
     }),
   })
   const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
-  engine.registerProvider('nace', createNaceProvider({
+  engine.registerImplementation(decideOperation, 'nace', createNaceProvider({
     apiKey: 'fixture-only',
     fetch: fixture.fetch,
   }))
@@ -485,7 +486,7 @@ test('Drex probability totals beyond the rounding bound remain invalid', async (
     }),
   })
   const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-v2.0' } })
-  engine.registerProvider('nace', createNaceProvider({
+  engine.registerImplementation(decideOperation, 'nace', createNaceProvider({
     apiKey: 'fixture-only',
     fetch: fixture.fetch,
   }))
@@ -535,7 +536,10 @@ test('missing credentials and unsupported requests stop before Nace I/O', async 
   assert.equal(calls, 0)
 
   const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-max-v1.1' } })
-  engine.registerProvider('nace', provider)
+  engine.registerImplementation(decideOperation, 'nace', provider)
+  const run = await engine.run(decideOperation, { state: request.state, questions: request.questions })
+  assert.equal(run.status === 'error' && run.reason, 'no_applicable_model')
+  assert.equal(run.meta.attempts[0]?.kind, 'skipped')
   const result = await engine.decide({
     state: null,
     questions: { q: { type: 'box', instructions: 'Find the object.' } },
@@ -658,7 +662,7 @@ test('Max inlines images under 4 MiB and deletes account-level uploads after suc
     },
   })
   const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-max-v1.1' } })
-  engine.registerProvider('nace', createNaceProvider({
+  engine.registerImplementation(decideOperation, 'nace', createNaceProvider({
     apiKey: 'fixture-only',
     fetch: manyImagesFixture.fetch,
   }))

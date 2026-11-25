@@ -14,13 +14,13 @@ import type {
 } from 'nace-sdk'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import type { System1Provider } from '../../contracts/index.js'
 import type { ImageInput, ModelCapabilities, ProviderRequest } from '../../contracts/index.js'
 import { System1ProviderError } from '../../contracts/error.js'
 import { findProviderModel } from '../models.js'
 import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from '../answers.js'
 import { normalizeRoundedDistribution, normalizeRoundedDistributionRecord } from '../probabilities.js'
 import { NACE_MODELS } from './models.js'
+import { decisionImplementation } from '../decision-implementation.js'
 
 const DEFAULT_BASE_URL = 'https://console.nace.ai'
 const MAX_REQUEST_BYTES = 4_194_304
@@ -98,8 +98,8 @@ export interface NaceOptions {
 }
 
 /** Nace Drex adapter: the official SDK owns API and temporary-file transport. */
-export function createNaceProvider(options: NaceOptions): System1Provider {
-  return {
+export function createNaceProvider(options: NaceOptions) {
+  return decisionImplementation(NACE_MODELS, ({ id }) => MODEL_CAPABILITIES[id], {
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     async describe(model) {
       const selected = findProviderModel(NACE_MODELS, model)
@@ -130,13 +130,13 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
         throw new System1ProviderError({
           code: 'unavailable',
           message: 'Nace API key could not be resolved.',
-        })
+        }, 'stop', false)
       }
       if (!apiKey?.trim())
         throw new System1ProviderError({
           code: 'unavailable',
           message: 'Nace API key is not configured.',
-        })
+        }, 'stop', false)
 
       const client = new NaceClient({
         apiKey: apiKey.trim(),
@@ -185,7 +185,7 @@ export function createNaceProvider(options: NaceOptions): System1Provider {
         void deleteTemporaryFiles(client, uploaded, options.warn)
       }
     },
-  }
+  }, 'Nace')
 }
 
 function normalizeNaceResponse(

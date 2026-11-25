@@ -1,4 +1,54 @@
 {
+  "0.7.0": {
+    "id": "0.7.0",
+    "version": "0.7.0",
+    "highlights": {
+      "zh": [
+        {
+          "kind": "migration",
+          "title": "第三方服务商插件需同步升级",
+          "description": "旧服务商注册接口已替换。使用第三方服务商时，先确认有兼容版本再升级。已保存的决策路由和凭据无需迁移。"
+        },
+        {
+          "kind": "added",
+          "title": "定位文本片段和图片区域",
+          "description": "用 Nace Drex 或 Liquid AI 在原文中找片段，或在单张图片中标出匹配区域。启用后可由插件调用，也可单独向 Agent 开放定位工具。"
+        },
+        {
+          "kind": "improved",
+          "title": "为每项操作单独设置模型路由",
+          "description": "决策和定位可独立启停，分别选择主模型和备用顺序。关闭会保留配置；定位设置可按文本和图片预览路由。"
+        },
+        {
+          "kind": "improved",
+          "title": "在服务商子插件查看模型用途",
+          "description": "查看每个模型支持的输入，以及它是已保存路由的主模型、第几个备用，还是未被选用。"
+        }
+      ],
+      "en": [
+        {
+          "kind": "migration",
+          "title": "Upgrade third-party provider plugins together",
+          "description": "The old provider registration API has been replaced. Check for a compatible version of any third-party provider before upgrading. Saved Decision routes and credentials carry over."
+        },
+        {
+          "kind": "added",
+          "title": "Locate passages and image regions",
+          "description": "Use Nace Drex or Liquid AI to find matching passages in the original text or mark matching regions in one image. Enable Locate for plugin calls, and optionally expose it as an Agent tool."
+        },
+        {
+          "kind": "improved",
+          "title": "Set a separate model route for each operation",
+          "description": "Switch Decision and Locate on or off independently, and choose a primary model and ordered fallbacks for each. Switching off keeps the settings. Locate previews routes for text and images separately."
+        },
+        {
+          "kind": "improved",
+          "title": "See model usage in the provider component",
+          "description": "Check each model's supported inputs and whether it is a primary model, a numbered fallback, or not selected in saved routes."
+        }
+      ]
+    }
+  },
   "0.6.0": {
     "id": "0.6.0",
     "version": "0.6.0",

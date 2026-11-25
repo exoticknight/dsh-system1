@@ -2,19 +2,20 @@ import {
   createElement as h,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
-import type { ReactNode } from 'react'
+import type { ChangeEvent, ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import { CLOUDFLARE_MODELS } from '../providers/cloudflare/models.js'
-import { LAYA_MODELS } from '../providers/laya/models.js'
-import { LIQUID_BASE_URL, LIQUID_MODELS } from '../providers/liquid/models.js'
-import { MERAGPT_MODELS } from '../providers/meragpt/models.js'
-import { NACE_MODELS } from '../providers/nace/models.js'
-import { TYPESAFE_MODELS } from '../providers/typesafe/models.js'
+import { LIQUID_BASE_URL } from '../providers/liquid/models.js'
+import type { OperationCatalogEntry } from '../contracts/operation.js'
+import { projectCatalog, settingsRemote } from '../settings-wire.js'
+import type { SettingsCatalog } from '../settings-wire.js'
+import { describeCandidate, previewRoute, routeScope } from './operation-routes.js'
+import { providerComponent, providerModels } from './provider-instance.js'
 import {
   Button,
   IconInfoOutlineRegular,
@@ -23,10 +24,12 @@ import {
   IconPlusOutlineRegular,
   IconTrashOutlineRegular,
   Menu,
+  SegmentedTabs,
   SettingsForm,
   SettingsFormModel,
   SettingsSecretField,
   SettingsValueField,
+  Switch,
   Tag,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -63,14 +66,14 @@ const PACKAGE = 'dsh-system1'
 
 const en = {
   coreSummary: 'Choose a default model and ordered fallbacks, then configure each provider below.',
-  provider: 'Default service',
+  provider: 'Provider',
   providerTypesafe: 'TypeSafe (Jev)',
   providerLaya: 'Laya',
   providerMeraGpt: 'meraGPT',
   providerLiquid: 'Liquid AI',
   providerNace: 'Nace.AI Drex',
   providerCloudflare: 'Cloudflare Clef',
-  providerUnknown: 'Unsupported service',
+  providerUnknown: 'Unavailable provider',
   model: 'Default model',
   fallbackModels: 'Fallback models',
   fallbackHint: 'Tried in order when the default model fails.',
@@ -84,12 +87,43 @@ const en = {
   fallbackRemove: 'Remove',
   timeout: 'Provider timeout (ms)',
   defaultHint: 'Used when a decision request does not specify a model.',
+  operationDefaultHint: 'Used when the caller does not specify a model.',
+  operationDirectory: 'Operations',
+  providerInstanceId: 'Instance ID',
+  providerModels: 'Models and capabilities',
+  providerModelsUnavailable: 'No models are registered for this instance.',
+  providerInstanceUnavailable: 'The running provider instance is unavailable.',
+  routePreview: 'Routing by input',
+  emptyRoute: 'Not configured',
+  directoryUnavailable: 'The live provider directory is unavailable. Reconnecting…',
+  noProviders: 'Enable a provider component below to see its models here.',
+  crossProviderWarning: 'If a request falls back to another provider, that provider may receive the same input.',
+  unavailableModel: 'Unavailable',
+  chooseDeployment: 'Deployment name',
+  declaredSupport: 'Declared support',
+  modelSupports: 'Supports: {inputs}',
+  modelRoutePrimary: '{operation} · Primary model',
+  modelRouteFallback: '{operation} · Fallback {index}',
+  unusedModel: 'Not selected',
+  connectionSettings: 'Connection settings',
+  agentTool: 'Agent tool',
+  agentToolEnabled: 'Available to the agent',
+  agentToolDisabled: 'Off',
+  agentToolUnavailable: 'Enabled in settings · main model unavailable',
+  agentToolUnmounted: 'Enabled in settings · tool not registered',
+  agentToolNeedsPrimary: 'Choose an available main model before turning on the Agent tool.',
+  agentToolLegacy: 'Manage the decision tool in the component list below.',
+  agentToolFeatureOff: 'Operation off · tool preference retained',
+  featureEnable: 'Enable {operation}',
+  featureSwitchHelp: 'Takes effect when you save. Turning it off keeps your model and Agent settings.',
+  featureOff: 'This operation is off. The route stays saved but does not run.',
+  routeVersionMismatch: 'This saved route belongs to a different feature version. Review the models before saving a route for this version.',
+  clearModel: 'Clear main model',
   timeoutTypesafeHint: 'Applies when a request has no timeout. Leave blank to use TypeSafe’s 800 ms default.',
   timeoutLayaHint: 'Applies when a request has no timeout. Leave blank to use Laya’s 800 ms default.',
   timeoutMeraGptHint: 'Applies when a request has no timeout. Leave blank to use meraGPT’s 10,000 ms default.',
   timeoutNaceHint: 'Applies when a request has no timeout. Leave blank to use Nace’s 60,000 ms default.',
   timeoutCloudflareHint: 'Applies when a request has no timeout. Leave blank to use Cloudflare’s 800 ms default.',
-  providerEnabledHint: 'Enable the matching service component in the list below.',
   feedbackPrompt: 'Need help or a provider/model you would like to use?',
   providerFeedbackPrompt: 'Having trouble configuring this provider?',
   reportIssue: 'Report a problem',
@@ -128,8 +162,8 @@ const en = {
   meragptEndpoint: 'meraGPT API base URL',
   meragptEndpointHint: 'Use the meraGPT API root; POST /v1/systemone is appended automatically.',
   naceEndpoint: 'Nace API base URL',
-  naceEndpointHint: 'Use the Nace API root; POST /v1/systemone is appended automatically.',
-  naceImageRetentionHint: 'Drex Max images that exceed the 4 MiB request limit are uploaded as temporary files. DSH attempts deletion after each call; Nace keeps uploads for 24 hours by default, and backup removal can take up to 35 days.',
+  naceEndpointHint: 'Enter the Nace API root. The plugin adds /v1/systemone for Decision, /v1/locate for text Locate, or /v1/box for image Locate.',
+  naceImageRetentionHint: 'For Drex Max decisions above the 4 MiB request limit, the plugin may upload some images as temporary files. DSH attempts deletion after each call; Nace keeps uploads for 24 hours by default, and backup removal can take up to 35 days. Image Locate sends its image inline.',
   cloudflareSummary: 'Configure the Cloudflare API endpoint, account, and API token.',
   cloudflareEndpoint: 'Cloudflare API base URL',
   cloudflareEndpointHint: 'Use the Cloudflare API v4 base URL.',
@@ -155,7 +189,7 @@ const en = {
 
 const zh = {
   coreSummary: '选择默认模型和按顺序尝试的备用模型，再到下方配置各 provider。',
-  provider: '默认服务',
+  provider: '服务商',
   providerTypesafe: 'TypeSafe（Jev）',
   providerLaya: 'Laya',
   providerMeraGpt: 'meraGPT',
@@ -176,12 +210,43 @@ const zh = {
   fallbackRemove: '删除',
   timeout: 'Provider 超时（毫秒）',
   defaultHint: '决策请求未指定模型时使用。',
+  operationDefaultHint: '调用方未指定模型时使用。',
+  operationDirectory: '操作',
+  providerInstanceId: '实例 ID',
+  providerModels: '模型与能力',
+  providerModelsUnavailable: '当前实例未注册模型。',
+  providerInstanceUnavailable: '暂无法读取正在运行的服务商实例。',
+  routePreview: '各类输入的路由顺序',
+  emptyRoute: '未配置',
+  directoryUnavailable: '暂时无法读取运行时目录，正在重新连接…',
+  noProviders: '启用下方相应的服务组件后，可在这里查看模型。',
+  crossProviderWarning: '切换到其他服务商兜底时，该服务商可能接收同一份输入。',
+  unavailableModel: '不可用',
+  chooseDeployment: '部署名称',
+  declaredSupport: '声明支持',
+  modelSupports: '支持：{inputs}',
+  modelRoutePrimary: '{operation} · 主模型',
+  modelRouteFallback: '{operation} · 备用 {index}',
+  unusedModel: '未被选用',
+  connectionSettings: '连接设置',
+  agentTool: 'Agent 工具',
+  agentToolEnabled: 'Agent 可调用',
+  agentToolDisabled: '关闭',
+  agentToolUnavailable: '配置已开启 · 主模型不可用',
+  agentToolUnmounted: '配置已开启 · 工具尚未注册',
+  agentToolNeedsPrimary: '请选择可用的主模型，再开启 Agent 工具。',
+  agentToolLegacy: '请在下方组件列表中管理原有决策工具。',
+  agentToolFeatureOff: '操作已关闭 · 工具偏好保留',
+  featureEnable: '启用{operation}',
+  featureSwitchHelp: '保存设置后生效。关闭会保留模型和 Agent 工具设置。',
+  featureOff: '此操作已关闭。已保存的路由不会执行。',
+  routeVersionMismatch: '已保存的路由属于其他版本。请核对所选模型，再保存当前版本的路由。',
+  clearModel: '清除主模型',
   timeoutTypesafeHint: '请求未单独指定超时时使用。留空采用 TypeSafe 默认值 800 毫秒。',
   timeoutLayaHint: '请求未单独指定超时时使用。留空采用 Laya 默认值 800 毫秒。',
   timeoutMeraGptHint: '请求未单独指定超时时使用。留空采用 meraGPT 默认值 10,000 毫秒。',
   timeoutNaceHint: '请求未单独指定超时时使用。留空采用 Nace 默认值 60,000 毫秒。',
   timeoutCloudflareHint: '请求未单独指定超时时使用。留空采用 Cloudflare 默认值 800 毫秒。',
-  providerEnabledHint: '请在下方组件列表中启用对应的服务组件。',
   feedbackPrompt: '遇到问题，或缺少想用的提供商/模型？',
   providerFeedbackPrompt: '配置此提供商时遇到问题？',
   reportIssue: '反馈问题',
@@ -220,8 +285,8 @@ const zh = {
   meragptEndpoint: 'meraGPT API 根地址',
   meragptEndpointHint: '填写 meraGPT API 根地址；插件会自动拼接 POST /v1/systemone。',
   naceEndpoint: 'Nace API 根地址',
-  naceEndpointHint: '填写 Nace API 根地址；插件会自动拼接 POST /v1/systemone。',
-  naceImageRetentionHint: 'Drex Max 图片请求超过 4 MiB 时会把部分图片作为临时文件上传。DSH 会在每次调用后尝试删除；Nace 默认保留上传文件 24 小时，备份中的数据最长可能需要 35 天清除。',
+  naceEndpointHint: '填写 Nace API 根地址。决策使用 /v1/systemone，文本定位使用 /v1/locate，图片定位使用 /v1/box。',
+  naceImageRetentionHint: 'Drex Max 决策请求超过 4 MiB 时，插件可能将部分图片作为临时文件上传。DSH 会在调用后尝试删除；Nace 默认保留上传文件 24 小时，备份最长可能需要 35 天清除。图片定位在请求中直接传图。',
   cloudflareSummary: '配置 Cloudflare API 地址、账号和 API Token。',
   cloudflareEndpoint: 'Cloudflare API 根地址',
   cloudflareEndpointHint: '填写 Cloudflare API v4 根地址。',
@@ -256,30 +321,25 @@ type PageProps = PluginConfigViewProps & { t: Copy }
 type BoundPageProps = PageProps & { ctx: Context }
 type ConfigValues = Record<string, unknown>
 type ProviderId = 'typesafe' | 'laya' | 'meragpt' | 'nace' | 'cloudflare' | 'liquid'
-type ModelOption = { id: string; label?: keyof typeof en }
 type ProviderSettings = {
   id: ProviderId
   rowId: string
   label: keyof typeof en
   summary: keyof typeof en
-  keyRef: string
   keyHint: keyof typeof en
   endpointLabel: keyof typeof en
   endpointHint: keyof typeof en
   timeoutHint: keyof typeof en
   baseURL: string
-  models: ReadonlyArray<ModelOption>
   note?: keyof typeof en
   accountId?: {
     path: 'accountId'
     label: keyof typeof en
     hint: keyof typeof en
-    defaultValue: string
-    normalize: (value: string) => string | undefined
   }
 }
 
-const LAYA_MODEL_LABELS: Readonly<Record<(typeof LAYA_MODELS)[number]['id'], keyof typeof en>> = {
+const LAYA_MODEL_LABELS: Readonly<Record<string, keyof typeof en>> = {
   auto: 'modelAuto',
   english: 'modelEnglish',
   multilingual: 'modelMultilingual',
@@ -292,39 +352,33 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     rowId: 'system1-typesafe',
     label: 'providerTypesafe',
     summary: 'typesafeSummary',
-    keyRef: 'TYPESAFE_API_KEY',
     keyHint: 'keyHint',
     endpointLabel: 'typesafeEndpoint',
     endpointHint: 'typesafeEndpointHint',
     timeoutHint: 'timeoutTypesafeHint',
     baseURL: 'https://api.typesafe.ai',
-    models: TYPESAFE_MODELS.map(({ id }) => ({ id })),
   },
   {
     id: 'laya',
     rowId: 'system1-laya',
     label: 'providerLaya',
     summary: 'layaSummary',
-    keyRef: 'LAYA_API_KEY',
     keyHint: 'layaKeyHint',
     endpointLabel: 'layaEndpoint',
     endpointHint: 'layaEndpointHint',
     timeoutHint: 'timeoutLayaHint',
     baseURL: 'http://127.0.0.1:8000',
-    models: LAYA_MODELS.map(({ id }) => ({ id, label: LAYA_MODEL_LABELS[id] })),
   },
   {
     id: 'nace',
     rowId: 'system1-nace',
     label: 'providerNace',
     summary: 'naceSummary',
-    keyRef: 'NACE_API_KEY',
     keyHint: 'keyHint',
     endpointLabel: 'naceEndpoint',
     endpointHint: 'naceEndpointHint',
     timeoutHint: 'timeoutNaceHint',
     baseURL: 'https://console.nace.ai',
-    models: NACE_MODELS,
     note: 'naceImageRetentionHint',
   },
   {
@@ -332,45 +386,37 @@ const PROVIDERS: ReadonlyArray<ProviderSettings> = [
     rowId: 'system1-meragpt',
     label: 'providerMeraGpt',
     summary: 'meragptSummary',
-    keyRef: 'MERAGPT_API_KEY',
     keyHint: 'keyHint',
     endpointLabel: 'meragptEndpoint',
     endpointHint: 'meragptEndpointHint',
     timeoutHint: 'timeoutMeraGptHint',
     baseURL: 'https://meragpt.com',
-    models: MERAGPT_MODELS.map(({ id }) => ({ id })),
   },
   {
     id: 'liquid',
     rowId: 'system1-liquid',
     label: 'providerLiquid',
     summary: 'liquidSummary',
-    keyRef: 'LIQUID_API_KEY',
     keyHint: 'keyHint',
     endpointLabel: 'liquidEndpoint',
     endpointHint: 'liquidEndpointHint',
     timeoutHint: 'timeoutLiquidHint',
     baseURL: LIQUID_BASE_URL,
-    models: LIQUID_MODELS,
   },
   {
     id: 'cloudflare',
     rowId: 'system1-cloudflare',
     label: 'providerCloudflare',
     summary: 'cloudflareSummary',
-    keyRef: 'CLOUDFLARE_API_TOKEN',
     keyHint: 'keyHint',
     endpointLabel: 'cloudflareEndpoint',
     endpointHint: 'cloudflareEndpointHint',
     timeoutHint: 'timeoutCloudflareHint',
     baseURL: 'https://api.cloudflare.com/client/v4',
-    models: CLOUDFLARE_MODELS.map(({ id }) => ({ id })),
     accountId: {
       path: 'accountId',
       label: 'cloudflareAccountId',
       hint: 'cloudflareAccountIdHint',
-      defaultValue: '',
-      normalize: normalizeCloudflareAccountId,
     },
   },
 ]
@@ -399,6 +445,10 @@ export function apply(ctx: Context): void {
 }
 
 function registerSettingsPages(ctx: Context): void {
+  ctx.effect(
+    async () => await ctx.remote.$mount(settingsRemote),
+    'dsh-system1 settings directory Remote',
+  )
   ctx.effect(
     () =>
       ctx.slots.inject('plugins.bundle.config', () =>
@@ -514,9 +564,17 @@ const timeoutSpec: SettingsFieldSpec = {
   },
 }
 
-const BUNDLE_SPECS = [defaultModelSpec, fallbackModelsSpec]
+const BUNDLE_SPECS: SettingsFieldSpec[] = [defaultModelSpec, fallbackModelsSpec, {
+  field: 'enabled',
+  format: (value) => typeof value === 'boolean' ? String(value) : '',
+  parse: (text) => text === 'true' || text === 'false' ? { kind: 'set', value: text === 'true' } : undefined,
+}]
+const OPERATION_SPECS: SettingsFieldSpec[] = [...BUNDLE_SPECS, {
+  field: 'agentEnabled',
+  format: (value) => value === true ? 'true' : 'false',
+  parse: (text) => text === 'true' || text === 'false' ? { kind: 'set', value: text === 'true' } : undefined,
+}]
 const NO_SECRETS: SettingsSecretSpec[] = []
-const releaseSettingsPageStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12 }
 const settingsPageStyle = { display: 'flex', flexDirection: 'column', gap: 16 }
 
 const GITHUB_ISSUE_URLS = {
@@ -536,16 +594,196 @@ function BundleSettingsPage(props: BoundPageProps) {
   const { t } = props
   const { scope, status } = useConfigScope(props.ctx, 'system1')
   if (props.view === 'summary') return h('p', null, t('coreSummary'))
-  return h('div', { style: releaseSettingsPageStyle },
+  return h('div', { style: settingsPageStyle },
+    h('div', null,
     h(Button, {
       variant: 'ghost',
       size: 'sm',
       icon: h(IconInfoOutlineRegular, { size: 14 }),
       onClick: requestManualReleaseNotes,
-    }, t('releaseEntry')),
+    }, t('releaseEntry'))),
     h('div', { style: settingsPageStyle },
-      settingsState(t, status) ?? h(BundleSettingsForm, { t, scope }),
+      settingsState(t, status) ?? h(CatalogSettings, { t, ctx: props.ctx, scope }),
       h(IssueLinks, { t, kinds: ['bug', 'provider', 'model'], prompt: 'feedbackPrompt' })))
+}
+
+type CatalogView = { status: 'loading' | 'unavailable' | 'ready'; catalog?: SettingsCatalog }
+
+function useCatalog(ctx: Context) {
+  const [view, setView] = useState<CatalogView>({ status: 'loading' })
+  useEffect(() => {
+    const fiber = ctx.inject(['remote.system1Settings'], (remoteCtx) => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let disposed = false
+      let stop: (() => Promise<void>) | undefined
+      setView({ status: 'loading' })
+      const connect = async () => {
+        try {
+          const stream = remoteCtx.remote.$stream<SettingsCatalog>({
+            name: 'System1 settings directory',
+            open: (signal: AbortSignal) => remoteCtx.remote.system1Settings.watch(signal),
+            ended: () => new Error('System1 settings directory closed'),
+            carrierFailed: () => { if (!disposed) setView((view) => ({ ...view, status: 'unavailable' })) },
+          })
+          stop = () => stream.dispose()
+          for await (const item of stream) {
+            const catalog = projectCatalog(item.value)
+            item.accept()
+            if (!disposed) setView({ status: 'ready', catalog })
+          }
+        } catch {
+          // A service reload can withdraw the endpoint before the new instance
+          // publishes its catalog. Keep the error visible while reattaching.
+        } finally {
+          if (!disposed) {
+            setView((view) => ({ ...view, status: 'unavailable' }))
+            timer = setTimeout(() => { void connect() }, 2000)
+          }
+        }
+      }
+      void connect()
+      return () => {
+        disposed = true
+        clearTimeout(timer)
+        void stop?.()
+      }
+    })
+    return () => { void fiber.dispose() }
+  }, [ctx])
+  return view
+}
+
+function providerLabel(t: Copy, id: string) {
+  const provider = PROVIDERS.find((item) => item.id === id)
+  return provider ? t(provider.label) : id
+}
+
+function modelLabel(t: Copy, provider: string, id: string) {
+  const key = provider === 'laya' && Object.hasOwn(LAYA_MODEL_LABELS, id) ? LAYA_MODEL_LABELS[id] : undefined
+  return key ? `${t(key)} (${id})` : id
+}
+
+function operationTitle(ctx: Context, entry: OperationCatalogEntry) {
+  return localized(ctx, entry.title, Object.entries(entry.translations ?? {}).map(([locale, copy]) => [locale, copy.title]))
+}
+
+function operationDescription(ctx: Context, entry: OperationCatalogEntry) {
+  return localized(ctx, entry.description ?? '', Object.entries(entry.translations ?? {}).flatMap(([locale, copy]) =>
+    copy.description ? [[locale, copy.description]] : []))
+}
+
+function inputLabel(ctx: Context, input: OperationCatalogEntry['inputKinds'][number]) {
+  return localized(ctx, input.title, Object.entries(input.translations ?? {}))
+}
+
+function inputLabels(ctx: Context, entry: OperationCatalogEntry, inputs: readonly string[]) {
+  return inputs.map((id) => {
+    const kind = entry.inputKinds.find((input) => input.id === id)
+    return kind ? inputLabel(ctx, kind) : id
+  }).join(', ')
+}
+
+function localized(ctx: Context, en: string, entries: readonly [string, string][]) {
+  const translations = Object.fromEntries(entries.map(([locale, copy]) => [locale.toLowerCase(), copy]))
+  // DSH's built-in Simplified Chinese id is "zh", not the BCP 47 "zh-CN".
+  return ctx.locale.resolveText({ zh: translations['zh-cn'], ...translations, en })
+}
+
+function CatalogSettings(props: { t: Copy; ctx: Context; scope: SettingsFormScope<ConfigValues> }) {
+  const { t, ctx, scope } = props
+  const view = useCatalog(ctx)
+  const [operation, setOperation] = useState('decide')
+  const tabsId = useId()
+  const operationsHeading = useId()
+  if (!view.catalog) return h('p', { role: 'status', style: settingsHintStyle },
+    t(view.status === 'loading' ? 'loading' : 'directoryUnavailable'))
+  const entries = view.catalog.operations
+  return h('div', { style: settingsPageStyle },
+    view.status !== 'ready' && h('p', { role: 'status', style: settingsHintStyle }, t('directoryUnavailable')),
+    h('section', { style: settingsPageStyle, 'aria-labelledby': operationsHeading },
+      h('h3', { id: operationsHeading, style: directoryTitleStyle }, t('operationDirectory')),
+      h(OperationDirectory, {
+        t, ctx, scope, entries, id: tabsId, operation, onChange: setOperation, directoryReady: view.status === 'ready',
+      })))
+}
+
+function OperationDirectory(props: {
+  t: Copy; ctx: Context; scope: SettingsFormScope<ConfigValues>; entries: readonly OperationCatalogEntry[];
+  id: string; operation: string; onChange: (value: string) => void; directoryReady: boolean;
+}) {
+  const { t, ctx, scope, entries, id, operation, onChange, directoryReady } = props
+  const items = entries.map((entry) => ({
+    value: entry.id, label: operationTitle(ctx, entry),
+    render: () => h(OperationSettings, { key: entry.version, t, ctx, scope, entry, directoryReady }),
+  }))
+  return h(SettingsTabs, { id, label: t('operationDirectory'), items, value: operation, onChange })
+}
+
+interface SettingsTab {
+  value: string
+  label: string
+  render: () => ReactNode
+}
+
+function tabDomId(prefix: string, value: string) {
+  return `${prefix}-tab-${encodeURIComponent(value)}`
+}
+
+/** Keep visited panels mounted so tab navigation does not discard form drafts. */
+function SettingsTabs(props: {
+  id: string; label: string; items: readonly SettingsTab[];
+  value: string; onChange: (value: string) => void;
+}) {
+  const { id, label, items, value, onChange } = props
+  const selected = items.find((item) => item.value === value)?.value ?? items[0]?.value
+  const visited = useRef(new Set<string>())
+  useEffect(() => { if (selected) visited.current.add(selected) }, [selected])
+  const [first, ...rest] = items.map(({ value, label }) => ({
+    value, label, id: tabDomId(id, value), panelId: `${tabDomId(id, value)}-panel`,
+  }))
+  if (!selected || !first) return null
+  const minTabWidth = Math.max(...items.map(({ label }) => label.length * 7 + 28), 72)
+  return h('div', { style: settingsPageStyle },
+    h('div', { style: scrollTabsStyle },
+      h('div', { style: { minWidth: minTabWidth * items.length } },
+        h(SegmentedTabs<string>, { label, value: selected, onChange, items: [first, ...rest] }))),
+    ...items.map(({ value, render }) => {
+      const tabId = tabDomId(id, value)
+      return h('section', {
+        key: value, id: `${tabId}-panel`, role: 'tabpanel', 'aria-labelledby': tabId, hidden: selected !== value,
+      }, selected === value || visited.current.has(value) ? render() : null)
+    }))
+}
+
+function ProviderModelList(props: {
+  t: Copy; ctx: Context; instanceId: string | undefined; provider: ProviderSettings; view: CatalogView;
+}) {
+  const { t, ctx, instanceId, provider, view } = props
+  const heading = useId()
+  const models = instanceId ? providerModels(view.catalog?.operations ?? [], instanceId) : undefined
+  return h('section', { style: settingsPageStyle, 'aria-labelledby': heading },
+    h('h4', { id: heading, style: directoryTitleStyle }, t('providerModels')),
+    view.status !== 'ready' && h('p', { role: 'status', style: settingsHintStyle },
+      t(view.status === 'loading' ? 'loading' : 'directoryUnavailable')),
+    view.status === 'ready' && !models?.size && h('p', { style: settingsHintStyle },
+      t(instanceId ? 'providerModelsUnavailable' : 'providerInstanceUnavailable')),
+    ...[...models ?? []].map(([id, usage]) => {
+      const labels = usage.flatMap(({ entry, positions }) => {
+        const operation = operationTitle(ctx, entry)
+        return positions.map((position) => h(Tag, {
+          key: `${entry.id}:${position.kind === 'primary' ? 0 : position.index}`, tone: 'neutral',
+        }, position.kind === 'primary' ? t('modelRoutePrimary', { operation })
+          : t('modelRouteFallback', { operation, index: position.index })))
+      })
+      return h('section', { key: id, style: directoryCardStyle },
+        h('h5', { style: sectionTitleStyle }, id ? modelLabel(t, provider.id, id) : t('chooseDeployment')),
+        h('ul', { style: catalogListStyle, 'aria-label': t('declaredSupport') },
+          ...usage.map(({ entry, inputs }) => h('li', { key: entry.id },
+            operationTitle(ctx, entry),
+            inputs.length ? ` · ${inputLabels(ctx, entry, inputs)}` : ''))),
+        labels.length ? h('div', { style: modelUsageStyle }, ...labels)
+          : h('p', { style: settingsHintStyle }, t('unusedModel')))
+    }))
 }
 
 function IssueLinks(props: {
@@ -565,29 +803,62 @@ function IssueLinks(props: {
       }, props.t(issueLinkLabels[kind]), h('span', { 'aria-hidden': true }, ' ↗')))))
 }
 
-function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigValues> }) {
-  const { t } = props
-  const { view, actions } = useSettingsForm(props.scope, BUNDLE_SPECS, NO_SECRETS)
-  const disabled = !view.shell.writable || view.shell.saving
+function OperationSettings(props: {
+  t: Copy; ctx: Context; entry: OperationCatalogEntry; scope: SettingsFormScope<ConfigValues>
+  directoryReady: boolean
+}) {
+  const { t, ctx, entry } = props
+  const prefix = useId()
+  const decide = entry.id === 'decide'
+  const scope = useMemo(() => routeScope(props.scope, entry.id, entry.version), [props.scope, entry.id, entry.version])
+  const { view, actions } = useSettingsForm(scope, decide || !entry.tool ? BUNDLE_SPECS : OPERATION_SPECS, NO_SECRETS)
+  const disabled = !props.directoryReady || !view.shell.writable || view.shell.saving
+  const enabled = view.fields.enabled?.text === 'true'
   const defaultField = view.fields.defaultModel!
-  const defaultRow = parseModelRow(defaultField.text) ?? { provider: '', model: '' }
+  const defaultRow = readFallbackModels([parseJson(defaultField.text)])[0]!
   const fallbackField = view.fields.fallbackModels!
   const fallbacks = readFallbackModels(parseJson(fallbackField.text))
   const editFallbacks = (rows: FallbackModelDraft[]) =>
     actions.edit('fallbackModels', JSON.stringify(rows))
-  const firstProvider = PROVIDERS[0]!
+  const agentEnabled = view.fields.agentEnabled?.text === 'true'
+  const primaryAvailable = !!describeCandidate(entry, defaultRow)
+  const savedPrimaryAvailable = entry.route.compatible && entry.route.defaultModel &&
+    !!describeCandidate(entry, entry.route.defaultModel)
+  const changedPrimary = defaultRow.provider !== (entry.route.defaultModel?.provider ?? '') ||
+    defaultRow.model !== (entry.route.defaultModel?.model ?? '')
+  const missingPrimary = enabled && agentEnabled && !primaryAvailable && (
+    !entry.route.agentEnabled || changedPrimary || !entry.route.compatible
+  )
+  const configuredProviders = new Set([defaultRow, ...fallbacks].map(({ provider }) => provider).filter(Boolean))
+  const description = operationDescription(ctx, entry)
+  const title = operationTitle(ctx, entry)
+  const enableLabel = t('featureEnable', { operation: title })
 
-  return h(SettingsForm, {
+  return h('div', { style: settingsPageStyle },
+    h('header', { style: catalogHeadingStyle },
+      h('h3', { style: sectionTitleStyle }, title),
+      description && h('p', { style: settingsHintStyle }, description)),
+    !entry.route.compatible && h('p', { role: 'note', style: warningStyle }, t('routeVersionMismatch')),
+    h(SettingsForm, {
     labels: settingsFormLabels(t),
-    state: view.shell,
+    state: missingPrimary || !props.directoryReady ? { ...view.shell, invalid: true } : view.shell,
     onSave: actions.save,
     onDiscard: actions.discard,
     children: [
+      h('section', { key: 'enable', style: featureSwitchCardStyle },
+        h('div', { style: catalogHeadingStyle },
+          h('h4', { style: sectionTitleStyle }, enableLabel),
+          h('p', { style: settingsHintStyle }, t('featureSwitchHelp')),
+          !enabled && h('p', { style: warningStyle }, t('featureOff'))),
+        h(Switch, {
+          checked: enabled, label: enableLabel, disabled,
+          onChange: (checked: boolean) => actions.edit('enabled', String(checked)),
+        })),
       h(SelectField, {
         key: 'default',
-        id: 'dsh-system1-default-model',
+        id: `${prefix}-default-model`,
         label: t('model'),
-        hint: t('defaultHint'),
+        hint: t(decide ? 'defaultHint' : 'operationDefaultHint'),
         overridden: defaultField.overridden,
         invalid: defaultField.invalid,
         invalidLabel: t('required'),
@@ -595,11 +866,15 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
         t,
         onReset: () => actions.resetField('defaultModel'),
       }, h('div', { style: modelPairStyle },
-        modelSelectors(t, 'dsh-system1-default', defaultRow, disabled, defaultField.invalid,
-          (row) => actions.edit('defaultModel', JSON.stringify(row))))),
+        modelSelectors(t, ctx, entry, `${prefix}-default`, 'model', defaultRow, disabled, defaultField.invalid,
+          (row) => actions.edit('defaultModel', JSON.stringify(row)))),
+        !decide && defaultField.text && h('button', {
+          type: 'button', style: textLinkStyle, disabled,
+          onClick: () => actions.edit('defaultModel', ''),
+        }, t('clearModel'))),
       h(SelectField, {
         key: 'fallbacks',
-        id: 'dsh-system1-fallback-models',
+        id: `${prefix}-fallback-models`,
         label: t('fallbackModels'),
         hint: t('fallbackHint'),
         overridden: fallbackField.overridden,
@@ -611,7 +886,7 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
       },
       fallbacks.map((row, index) => h('div', { key: index, style: fallbackRowStyle },
         h('div', { style: modelPairStyle },
-          modelSelectors(t, `dsh-system1-fallback-${index}`, row, disabled, fallbackField.invalid,
+          modelSelectors(t, ctx, entry, `${prefix}-fallback-${index}`, 'fallbackModel', row, disabled, fallbackField.invalid,
             (next) => editFallbacks(updateFallbackModel(fallbacks, index, next)))),
         h(Button, {
           variant: 'ghost', size: 'sm', icon: h(IconChevronUpOutlineRegular, { size: 13 }),
@@ -633,40 +908,66 @@ function BundleSettingsForm(props: { t: Copy; scope: SettingsFormScope<ConfigVal
         }))),
       h('div', null, h(Button, {
         variant: 'outline', size: 'sm', icon: h(IconPlusOutlineRegular, { size: 13 }),
-        disabled,
-        onClick: () => editFallbacks(addFallbackModel(fallbacks, {
-          provider: firstProvider.id,
-          model: firstProvider.models[0]?.id ?? '',
-        })),
+        disabled: disabled || entry.providers.length === 0,
+        onClick: () => editFallbacks(addFallbackModel(fallbacks, { provider: '', model: '' })),
       }, t('fallbackAdd')))),
-      h('p', { key: 'note', style: settingsHintStyle }, t('providerEnabledHint')),
+      entry.providers.length === 0 && h('p', { key: 'no-providers', style: settingsHintStyle }, t('noProviders')),
+      configuredProviders.size > 1 && h('p', { key: 'transfer-warning', style: warningStyle }, t('crossProviderWarning')),
+      !decide && h('section', { key: 'preview', style: routeCardStyle, 'aria-label': t('routePreview') },
+        h('h4', { style: sectionTitleStyle }, t('routePreview')),
+        h('dl', { style: previewStyle }, ...previewRoute(entry, [defaultRow, ...fallbacks]).flatMap(({ input, candidates }) => [
+          h('dt', { key: `${input.id}-label`, style: previewLabelStyle }, inputLabel(ctx, input)),
+          h('dd', { key: `${input.id}-route`, style: previewValueStyle },
+            candidates.length === 0 ? t('emptyRoute') : candidates.map(({ provider, model }) =>
+              `${providerLabel(t, provider)} / ${modelLabel(t, provider, model)}`).join(' → ')),
+        ]))),
+      entry.tool && h('section', { key: 'agent', style: routeCardStyle },
+        h('div', { style: fieldHeadStyle },
+          h('h4', { style: { ...sectionTitleStyle, ...fieldLabelStyle } }, t('agentTool')),
+          h(Tag, { tone: 'neutral' },
+            t(!entry.route.agentEnabled ? 'agentToolDisabled' : !entry.route.enabled ? 'agentToolFeatureOff'
+              : entry.agentAvailable ? 'agentToolEnabled'
+              : savedPrimaryAvailable ? 'agentToolUnmounted' : 'agentToolUnavailable'))),
+        decide
+          ? h('p', { style: settingsHintStyle }, t('agentToolLegacy'))
+          : h('label', { style: checkboxStyle },
+            h('input', {
+              type: 'checkbox', checked: agentEnabled,
+              disabled: disabled || (!agentEnabled && !primaryAvailable),
+              onChange: (event) => actions.edit('agentEnabled', String(event.currentTarget.checked)),
+            }), entry.tool.name),
+        !decide && !primaryAvailable && h('p', { style: missingPrimary ? warningStyle : settingsHintStyle }, t('agentToolNeedsPrimary'))),
     ],
-  })
+  }))
 }
 
 function modelSelectors(
   t: Copy,
+  ctx: Context,
+  entry: OperationCatalogEntry,
   idPrefix: string,
+  modelField: 'model' | 'fallbackModel',
   row: FallbackModelDraft,
   disabled: boolean,
   invalid: boolean,
   onChange: (row: FallbackModelDraft) => void,
 ) {
-  const info = PROVIDERS.find((candidate) => candidate.id === row.provider)
-  const models = info?.models ?? []
+  const info = entry.providers.find((candidate) => candidate.id === row.provider)
+  const supported = describeCandidate(entry, row)?.inputs
+  const models = info?.models.kind === 'fixed' ? info.models.models : []
   const providerOptions = [
     ...(!info && row.provider
       ? [{ id: row.provider, label: `${t('providerUnknown')}: ${row.provider}` }]
       : []),
-    ...PROVIDERS.map((entry) => ({ id: entry.id, label: t(entry.label) })),
+    ...entry.providers.map(({ id }) => ({ id, label: providerLabel(t, id) })),
   ]
   const modelOptions = [
     ...(row.model && !models.some((candidate) => candidate.id === row.model)
-      ? [{ id: row.model, label: row.model }]
+      ? [{ id: row.model, label: describeCandidate(entry, row) ? row.model : `${row.model} · ${t('unavailableModel')}` }]
       : []),
-    ...models.map((entry) => ({
-      id: entry.id,
-      label: entry.label ? t(entry.label) : entry.id,
+    ...models.map(({ id }) => ({
+      id,
+      label: modelLabel(t, row.provider, id),
     })),
   ]
   return [
@@ -677,17 +978,29 @@ function modelSelectors(
       value: row.provider,
       placeholder: t('fallbackChooseService'),
       options: providerOptions,
-      disabled,
+      disabled: disabled || providerOptions.length === 0,
       invalid,
       onChange: (provider: string) => {
-        const next = PROVIDERS.find((candidate) => candidate.id === provider)
-        onChange({ provider, model: next?.models[0]?.id ?? '' })
+        const next = entry.providers.find((candidate) => candidate.id === provider)?.models
+        onChange({ provider, model: next?.kind === 'fixed' ? next.models[0]?.id ?? '' : '' })
       },
     }),
-    h(Dropdown, {
+    info?.models.kind === 'deployment' ? h('input', {
       key: 'model',
       id: `${idPrefix}-model`,
-      label: t('fallbackModel'),
+      type: 'text',
+      style: deploymentInputStyle,
+      autoComplete: 'off',
+      'aria-label': t('chooseDeployment'),
+      'aria-invalid': invalid || undefined,
+      placeholder: t('chooseDeployment'),
+      value: row.model,
+      disabled,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => onChange({ ...row, model: event.currentTarget.value }),
+    }) : h(Dropdown, {
+      key: 'model',
+      id: `${idPrefix}-model`,
+      label: t(modelField),
       value: row.model,
       placeholder: t('fallbackChooseModel'),
       options: modelOptions,
@@ -695,6 +1008,8 @@ function modelSelectors(
       invalid,
       onChange: (model: string) => onChange({ ...row, model }),
     }),
+    !!supported?.length && h('p', { key: 'supported', style: modelSupportStyle },
+      t('modelSupports', { inputs: inputLabels(ctx, entry, supported) })),
   ]
 }
 
@@ -729,6 +1044,7 @@ function Dropdown(props: {
       id: props.id,
       type: 'button',
       'aria-label': props.label,
+      'aria-description': current?.label,
       'aria-haspopup': 'menu',
       'aria-expanded': open,
       ...(props.invalid ? { 'aria-invalid': true } : {}),
@@ -779,31 +1095,45 @@ function SelectField(props: {
 }
 
 function ProviderSettingsPage(props: BoundPageProps & { provider: ProviderSettings }) {
-  const { t, provider } = props
-  const { scope, status } = useConfigScope(props.ctx, provider.rowId)
-  if (props.view === 'summary') return h('p', null, t(provider.summary))
+  if (props.view === 'summary') return h('p', null, props.t(props.provider.summary))
+  return h(ProviderSettingsDetail, props)
+}
+
+function ProviderSettingsDetail(props: BoundPageProps & { provider: ProviderSettings }) {
+  const { t, provider, ctx } = props
+  const { scope, status } = useConfigScope(ctx, provider.rowId)
+  const connectionHeading = useId()
+  const view = useCatalog(ctx)
+  const instance = providerComponent(view.catalog?.providerComponents, provider.rowId, `${PACKAGE}/providers/${provider.id}`)
+  const keyRef = view.status === 'ready' ? instance?.keyRef : undefined
   return h('div', { style: settingsPageStyle },
-    settingsState(t, status) ??
-      h(ProviderSettingsForm, { t, provider, scope, ctx: props.ctx }),
+    h('section', { 'aria-labelledby': connectionHeading },
+      h('h4', { id: connectionHeading, style: directoryTitleStyle }, t('connectionSettings')),
+      instance && h('p', { style: settingsHintStyle }, t('providerInstanceId'), ': ', h('code', null, instance.providerId)),
+      settingsState(t, status) ??
+        h(ProviderSettingsForm, { key: keyRef ?? 'unavailable', t, provider, keyRef, scope, ctx })),
+    status === 'ready' && h(ProviderModelList, { t, ctx, instanceId: instance?.providerId, provider, view }),
     h(IssueLinks, { t, kinds: ['bug'], prompt: 'providerFeedbackPrompt' }))
 }
 
 function ProviderSettingsForm(props: {
   t: Copy
   provider: ProviderSettings
+  keyRef: string | undefined
   scope: SettingsFormScope<ConfigValues>
   ctx: Context
 }) {
-  const { t, provider, ctx } = props
-  const [credential, setCredential] = useState({ available: true, configured: false, writable: true })
+  const { t, provider, ctx, keyRef } = props
+  const [credential, setCredential] = useState({ available: keyRef !== undefined, configured: false, writable: true })
   const refresh = useCallback(async () => {
+    if (keyRef === undefined) return
     try {
-      const response = await ctx.remote.credentials.describe([provider.keyRef])
+      const response = await ctx.remote.credentials.describe([keyRef])
       if (!response.ok) {
         setCredential((current) => ({ ...current, available: false }))
         return
       }
-      const info = response.value[provider.keyRef]
+      const info = response.value[keyRef]
       setCredential({
         available: true,
         configured: info?.configured ?? false,
@@ -812,13 +1142,13 @@ function ProviderSettingsForm(props: {
     } catch {
       setCredential((current) => ({ ...current, available: false }))
     }
-  }, [ctx, provider.keyRef])
+  }, [ctx, keyRef])
   useEffect(() => {
     void refresh()
     return ctx.remote.$on('credentials/reference-updated', (ref: string) => {
-      if (ref === provider.keyRef) void refresh()
+      if (ref === keyRef) void refresh()
     })
-  }, [ctx, provider.keyRef, refresh])
+  }, [ctx, keyRef, refresh])
   const specs = useMemo(
     () => provider.accountId
       ? [endpointSpec, accountIdSpec, timeoutSpec]
@@ -828,11 +1158,12 @@ function ProviderSettingsForm(props: {
   const secrets = useMemo((): SettingsSecretSpec[] => [{
     field: 'apiKey',
     write: async (text) => {
-      const response = await ctx.remote.credentials.set(provider.keyRef, text)
+      if (keyRef === undefined) return false
+      const response = await ctx.remote.credentials.set(keyRef, text)
       await refresh()
       return response.ok
     },
-  }], [ctx, provider.keyRef, refresh])
+  }], [ctx, keyRef, refresh])
   const { view, actions } = useSettingsForm(props.scope, specs, secrets)
   const disabled = !view.shell.writable
   const accountId = provider.accountId
@@ -1044,10 +1375,50 @@ const settingsHintStyle = {
   lineHeight: 1.5,
   color: 'var(--dsw-alias-label-tertiary)',
 }
+const modelSupportStyle = { ...settingsHintStyle, gridColumn: '1 / -1' }
 const issueLinksSectionStyle = { display: 'flex', flexDirection: 'column', gap: 8 }
 const issueLinksStyle = { display: 'flex', flexWrap: 'wrap', gap: '8px 16px', fontSize: 13, lineHeight: 1.5 }
 const issueLinkStyle = {
   color: 'var(--dsw-alias-label-secondary)',
   textDecoration: 'underline',
   textUnderlineOffset: 3,
+}
+const scrollTabsStyle = { overflowX: 'auto' as const, minWidth: 0 }
+const directoryTitleStyle = {
+  margin: 0, flex: 1, fontSize: 16, fontWeight: 600, lineHeight: 1.5,
+  color: 'var(--dsw-alias-label-primary)',
+}
+const catalogHeadingStyle = { display: 'flex', flexDirection: 'column' as const, gap: 5 }
+const sectionTitleStyle = {
+  margin: 0, fontSize: 14, fontWeight: 600, lineHeight: 1.5,
+  color: 'var(--dsw-alias-label-primary)',
+}
+const directoryCardStyle = {
+  display: 'grid', gap: 8, padding: '12px 14px',
+  borderRadius: 'var(--dsw-radius-md)',
+  background: 'var(--dsw-alias-bg-module-platform)',
+}
+const routeCardStyle = { ...directoryCardStyle, marginTop: 8 }
+const featureSwitchCardStyle = {
+  ...directoryCardStyle, gridTemplateColumns: '1fr auto', alignItems: 'center',
+  padding: '14px 16px',
+}
+const catalogListStyle = { margin: 0, paddingInlineStart: 18, fontSize: 13, lineHeight: 1.7 }
+const modelUsageStyle = { display: 'flex', flexWrap: 'wrap' as const, gap: 6 }
+const textLinkStyle = {
+  border: 0, padding: 0, background: 'none', font: 'inherit', fontSize: 13, textAlign: 'start' as const,
+  color: 'var(--dsw-alias-label-primary)', textDecoration: 'underline', textUnderlineOffset: 3,
+  cursor: 'pointer',
+}
+const warningStyle = { ...settingsHintStyle, color: 'var(--dsw-alias-label-secondary)', paddingInlineStart: 10,
+  borderInlineStart: '2px solid currentColor' }
+const previewStyle = {
+  display: 'grid', gridTemplateColumns: 'minmax(2ch, auto) 1fr', margin: 0, gap: '5px 14px',
+  fontSize: 13, lineHeight: 1.5,
+}
+const previewLabelStyle = { fontWeight: 500 }
+const previewValueStyle = { margin: 0, overflowWrap: 'anywhere' as const }
+const checkboxStyle = { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }
+const deploymentInputStyle = {
+  ...dropdownTriggerStyle, boxSizing: 'border-box' as const, border: '1px solid currentColor', cursor: 'text',
 }

@@ -1,3 +1,4 @@
+import { decideOperation } from '../../src/index.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createServer } from 'node:http'
@@ -132,7 +133,7 @@ test('TypeSafe sanitizes HTTP errors and missing credentials', async (t) => {
     calls++
     return new Response('secret server body', { status: 429 })
   }
-  let remove = ctx.system1.registerProvider(
+  let remove = ctx.system1.registerImplementation(decideOperation,
     'test',
     typesafe.createTypesafeProvider({ apiKey: '', fetch: fetchFn }),
   )
@@ -147,7 +148,7 @@ test('TypeSafe sanitizes HTTP errors and missing credentials', async (t) => {
   )
   assert.equal(calls, 0)
   remove()
-  remove = ctx.system1.registerProvider(
+  remove = ctx.system1.registerImplementation(decideOperation,
     'test',
     typesafe.createTypesafeProvider({ apiKey: 'fixture-only', fetch: fetchFn }),
   )
@@ -163,7 +164,7 @@ test('TypeSafe sanitizes HTTP errors and missing credentials', async (t) => {
   })
   assert.ok(!JSON.stringify(error).includes('secret'))
   remove()
-  ctx.system1.registerProvider(
+  ctx.system1.registerImplementation(decideOperation,
     'test',
     typesafe.createTypesafeProvider({
       apiKey: 'fixture-only',
@@ -186,7 +187,7 @@ test('preserves selected choice independently of ranking and rejects mismatched 
     await fiber.dispose()
   })
   let calls = 0
-  ctx.system1.registerProvider(
+  ctx.system1.registerImplementation(decideOperation,
     'test',
     typesafe.createTypesafeProvider({
       apiKey: 'fixture-only',

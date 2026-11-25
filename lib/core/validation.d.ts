@@ -5,6 +5,14 @@ export declare const MAX_ATTACHMENT_COUNT_PER_TYPE = 16;
 export declare const MAX_ATTACHMENT_BYTES: number;
 export declare const MAX_TOTAL_ATTACHMENT_BYTES: number;
 export declare const MAX_ATTACHMENT_BASE64_LENGTH: number;
+export declare const imageInputSchema: z.ZodObject<{
+    mediaType: z.ZodEnum<{
+        "image/jpeg": "image/jpeg";
+        "image/png": "image/png";
+        "image/webp": "image/webp";
+    }>;
+    data: z.ZodString;
+}, z.core.$strict>;
 export declare const modelSchema: z.ZodObject<{
     provider: z.ZodString;
     model: z.ZodString;

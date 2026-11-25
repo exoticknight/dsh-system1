@@ -4,7 +4,7 @@ import {
   credentialRef,
   isCredentialRefName,
 } from '@deepseek-ai/dsh-credentials'
-import type {} from '../../index.js'
+import { decideOperation } from '../../index.js'
 import { createLayaProvider } from './adapter.js'
 export { createLayaProvider, type LayaOptions } from './adapter.js'
 export { LAYA_MODELS } from './models.js'
@@ -52,7 +52,7 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
     resolveBaseURL: () => readConfigValue(config.baseURL),
     resolveTimeoutMs: () => readConfigValue(config.timeoutMs),
   })
-  ctx.effect(() => ctx.system1.registerProvider(config.id, provider))
+  ctx.effect(() => ctx.system1.registerImplementation(decideOperation, config.id, provider))
 }
 
 function readConfigValue<T>(value: T | Volatile<T> | undefined): T | undefined {

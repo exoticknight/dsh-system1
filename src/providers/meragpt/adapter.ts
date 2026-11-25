@@ -1,6 +1,5 @@
-import type { System1Provider } from '../../contracts/index.js'
 import { findProviderModel } from '../models.js'
-import { createSystemOneHttpProvider } from '../systemone.js'
+import { createSystemOneDecisionImplementation } from '../systemone.js'
 import { MERAGPT_MODELS } from './models.js'
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -16,8 +15,8 @@ export interface MeraGptOptions {
 }
 
 /** Hosted meraGPT Decider 1.1, which speaks the shared System One wire contract. */
-export function createMeraGptProvider(options: MeraGptOptions = {}): System1Provider {
-  return createSystemOneHttpProvider({
+export function createMeraGptProvider(options: MeraGptOptions = {}) {
+  return createSystemOneDecisionImplementation(MERAGPT_MODELS, {
     providerName: 'meraGPT',
     defaultBaseURL: options.baseURL ?? 'https://meragpt.com',
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,

@@ -6,11 +6,19 @@
 
 `decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` 接受具名问题集合。`model` 为 `{ provider, model }`；省略时按顺序尝试服务的 `defaultModel` 和 `fallbackModels`。没有可用模型时会抛出 `System1InputError`。`timeoutMs` 为正整数毫秒，优先级为：调用显式值、所选 provider 的 `timeoutMs` 配置、provider 自身默认值。TypeSafe、Laya 和 Cloudflare 默认 800 ms，meraGPT 和 Liquid AI 默认 10,000 ms，Nace 默认 60,000 ms。每次模型尝试都会获得完整预算，覆盖能力查询和后端调用。
 
-0.4.0 迁移：服务级 `timeoutMs` 已移除，旧配置中残留的服务级值会被忽略；请将自定义超时移到对应 provider 设置页。第三方 `System1Provider` 需实现 `timeoutMs(): number`，以替代 `defaultTimeoutMs`；`ModelCapabilities` 现在要求显式声明题目限制和所支持附件的数量、字节上限。
+如果旧配置还有服务级 `timeoutMs`，请将需要的值移到对应 provider 设置页。维护第三方 provider 时请阅读[升级 provider 插件](#升级-provider-插件)。要获取文本片段或一张图中的多个框，请用[定位](locate.md)。
 
 根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出公开类型（含 `ProviderModel`）；`dsh-system1/providers` 导出 `findProviderModel`。内置 provider 的子路径 `dsh-system1/providers/<id>` 导出 Cordis 插件、`create…Provider` 工厂和模型目录；`<id>` 可用 `typesafe`、`laya`、`nace`、`meragpt`、`liquid` 或 `cloudflare`。连接参数与模型选择见[模型服务配置](providers.md)。
 
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
+
+### 启用操作
+
+决策、定位及已安装的扩展操作在 **System One** 设置里各有一个标签页。启用开关控制该操作的新请求，显式选模的请求也受它控制。切换时保留已存路由、服务商连接和 Agent 工具开关偏好，正在运行的请求继续执行。调用已关闭的操作会抛出带 `operationId` 的 `System1OperationDisabledError`，请求不会发给服务商。
+
+在无界面 profile 中，可设置服务的 `operations.<id>.enabled`。省略该字段时，决策默认启用；已有主模型、备用模型或已开启 Agent 工具的新操作保留启用状态，未配置的新操作默认关闭。决策路由仍在服务顶层；例如，设置 `operations.decide.enabled: false` 可暂停决策，无需移动 `defaultModel` 或 `fallbackModels`。
+
+### 调用决策
 
 ```ts
 const result = await ctx.system1.decide({
@@ -78,7 +86,7 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 
 ## Agent 工具
 
-`dsh-system1/tool` 组件注入 `system1` 和 DSH `tools`，注册模型可调用的 `system1_decide` 工具。组件只依赖宿主已有的工具注册表，不引入 `@deepseek-ai/dsh-tools` 运行时依赖。
+`dsh-system1/tool` 组件注入 `system1` 和 DSH `tools`，在决策启用时提供模型可调用的 `system1_decide` 工具。组件只依赖宿主已有的工具注册表，不引入 `@deepseek-ai/dsh-tools` 运行时依赖。
 
 参数：
 
@@ -91,31 +99,46 @@ TypeSafe 的 confidence 原样保留，可通过 `meta.executed` 确认 provider
 
 返回 `{ answers, model?, fallbacks? }`。`answers` 按 `id` 给出 `{ status: 'ok', answer }` 或 `{ status: 'error', error: { code, message } }`。有 provider 成功时，`model` 是实际执行的 provider 和模型；没有 provider 成功时省略。发生非取消的失败尝试时，`fallbacks` 按顺序列出 `{ provider, model, error: { code, message } }`。工具把调用取消信号传给 `decide()`，超时采用所选 provider 的配置或默认值。结构错误使整次工具调用失败，单题运行故障只体现在该题结果中。
 
-工具描述的数值含义是：概率在 0–1；`score.value` 是从 0 开始、对应 criteria 位置的期望等级下标；`box` 的 `top`、`bottom`、`left`、`right` 是 0–1 图片比例；`confidence` 由后端定义，不能当作概率或跨后端比较。不同模型返回的概率也未相互校准。
+定位及带工具的扩展操作使用单独的 `agentEnabled` 控制是否向 Agent 发布工具。操作启用时，即使该开关关闭，插件仍可调用 API。发布工具还需要可用的主模型及已挂载的工具组件。参见[定位](locate.md)。
+
+决策工具描述的数值含义是：概率在 0–1；`score.value` 是从 0 开始、对应 criteria 位置的期望等级下标；`box` 的 `top`、`bottom`、`left`、`right` 是 0–1 图片比例；`confidence` 由后端定义，不能当作概率或跨后端比较。不同模型返回的概率也未相互校准。
 
 ## 实现 provider
 
-每个 provider 在自己的模型数组中声明规范 ID 和可选别名，不需要维护跨 provider 的总目录。`ProviderModel` 使用 `id` 表示规范模型 ID，`aliases` 表示该 provider 也接受的输入名称；设置页使用数组中的规范 ID，别名不会成为单独的菜单项。`findProviderModel(models, input)` 可按规范 ID 或别名查找模型定义，匹配成功后的 `id` 用于能力查询和上游请求。内置 provider 会先检查模型 ID，未知模型返回 `unsupported`，然后再解析凭据。能力限制由 provider adapter 声明；设置页的本地化显示文案由 client locale 维护。
-
-从 `dsh-system1/contracts` 导入类型，从包根入口导入 `System1ProviderError`；别名解析可从 `dsh-system1/providers` 导入 `findProviderModel`。错误消息必须安全可展示。实现 `describe(model, signal)` 和 `evaluate(request, signal)`，并返回标准逐题答案。请求参数按只读处理。参见[provider 示例](../examples/provider.ts)。
+Provider 只注册自己支持的操作。先从 `dsh-system1` 导入对应的操作定义，再在 provider 插件的作用域中注册实现：
 
 ```ts
-import { findProviderModel } from 'dsh-system1/providers'
-import type { ProviderModel } from 'dsh-system1/contracts'
+import { decideOperation } from 'dsh-system1'
+import { createCloudflareProvider } from 'dsh-system1/providers/cloudflare'
 
-const MODELS = [
-  { id: 'example-v2', aliases: ['example-latest'] },
-] as const satisfies readonly ProviderModel[]
-
-const selected = findProviderModel(MODELS, requestedModel)
-// selected?.id 是供能力查询和上游请求使用的规范 ID
+const backend = createCloudflareProvider({ accountId, apiKey })
+ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare', backend))
 ```
 
-```ts
-ctx.effect(() => ctx.system1.registerProvider('custom', backend))
-```
+自定义实现须声明操作的主版本 `version`、模型选择方式、`timeoutMs()` 和 `execute(input, { model, requestId, signal })`。返回 `{ model, result, revision? }`，其中 `model` 是实际回答的模型。把输入视为只读，将信号传给上游 I/O。操作定义负责输入和结果校验，provider 负责上游协议与限制。错误消息应可安全展示。对于新操作，只有允许把同一份材料发送给下一家时，才给 `System1ProviderError` 指定 `'fallback'`；留存等策略拒绝使用 `'stop'`。决策沿用原来的错误路由。
 
-同一个服务中的 provider id 必须唯一。注册返回幂等 disposer。注销会取消该实例的在途调用，服务释放时会清理全部注册。`System1Provider` 必须提供 `timeoutMs(): number`；每次调用时，服务先采用请求显式值，否则调用该 provider 的方法，并以 `invalid_response` 拒绝非正整数。附件和问题数量限制全部属于 provider 声明：`maxQuestions`、`maxChoiceOptions`、`maxScoreLevels` 必须填写正整数或显式 `null`（表示由上游执行，不预检）。有图片能力时必须声明 `maxCount`、`maxBytesPerImage`、`maxTotalBytes`；有音频或视频能力时，必须声明 `maxCount`、`maxBytesPerItem`。附件声明不得高于通用资源安全上限：每类 16 项、单项 16 MiB、合计 64 MiB。漏写或运行时返回不完整能力会以 `invalid_response` 结束尝试，并由 provider logger 记录一次警告。扩展上下文通过 `longContext.maxTokens` 声明；context token 数仅供参考，实际 token 预算由后端执行。`ProviderRequest` 会收到公共媒体附件与 `longContext` 选项。
+- 固定目录使用 `models: { kind: 'fixed', models: [...] }`。每个模型声明规范 `id`、可选 `aliases`、支持的 `inputs` 及该操作的 `capabilities`。菜单显示规范 ID。
+- 部署目录使用 `models: { kind: 'deployment', inputs, resolve(model, signal) }`。设置页接受用户填写的部署名。解析时不要发送任务材料，返回同样的模型描述；解析和执行共用本次超时预算。
+
+决策实现用 `DecideImplementation`：在结果中返回标准逐题 `answers`，可带 `usage`、`approximate` 和 `degraded`。用 `ModelCapabilities` 声明题数、选项或等级限制（`maxQuestions`、`maxChoiceOptions`、`maxScoreLevels`）：填写正整数可在本地预检，填 `null` 交给后端。对支持的附件声明数量和字节上限。通用上限仍为每类 16 项、单项 16 MiB、解码后共 64 MiB；`audioVideo` 可收紧音视频的共用预算，`longContext.maxTokens` 声明扩展上下文。Token 数仅供参考，精确预算由后端执行。参见[自定义 provider 示例](../examples/provider.ts)。
+
+操作 ID 必须唯一；同一操作下的 provider ID 也必须唯一。注册返回幂等的注销函数，交给 `ctx.effect`，插件卸载时目录会移除该项并取消在途调用。同一个 provider ID 可以分别注册决策和定位，共用连接设置与凭据。
+
+### 新增独立操作
+
+用 `defineOperation` 描述新操作，再依次注册定义和实现。运行时目录提供操作标签页和可选的 Agent 工具。在标签页或 `operations.<id>.enabled` 启用操作，保存路由时用 `version` 固定主版本。消费插件可调用 `service.run(operation, input, { model, signal, timeoutMs })`，结果为 `{ status: 'ok', value, meta }` 或 `{ status: 'error', reason, error, meta }`。参见[独立操作示例](../examples/operation.ts)。
+
+## 升级 provider 插件
+
+调用 `decide()` 或 `system1_decide` 的插件和 Agent 不必改变请求和结果的用法。六个内置 provider 已使用新注册接口，连接设置和凭据仍存放在原处。打开设置页不用迁移原有决策路由。
+
+调用 `registerProvider(id, backend)` 的第三方 provider 必须和服务一起升级：
+
+1. 导入 `decideOperation`，或该 provider 实现的其他操作定义。决策实现用 `DecideImplementation` 替代 `System1Provider`。
+2. 声明固定模型目录或部署解析器，并为各模型声明能力。把原 `evaluate` 的执行逻辑移到 `execute`。从第二个参数读取选定模型、请求 ID 和取消信号，原答案字段放进 `result`。
+3. 用 `ctx.effect(() => ctx.system1.registerImplementation(decideOperation, id, implementation))` 注册。保留原 provider ID、模型名、连接设置和凭据引用，已保存的路由就能继续解析。
+
+旧注册入口已移除。第三方 provider 尚无兼容版本时，请保留旧服务和旧 provider 一起使用。未注册的候选会被跳过，升级前请检查原有备用项是否会将请求发给另一家。回退时恢复配套的服务与 provider 版本及升级前的配置快照；关闭定位不会恢复旧注册接口。
 
 ## TypeSafe 能力与限制
 
@@ -125,7 +148,7 @@ provider 插件接受 `id`、`apiKeyEnv` 和可选的 `baseURL`；前两者默�
 
 ## Nace.AI Drex 能力与限制
 
-`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions` 和 `NACE_MODELS`（`drex-v2.0`、`drex-max-v1.1`、`drex-max-finance`）。Nace 支持 `noul`、`choice`、`score`。适配器将结构化描述序列化为紧凑 JSON 文本，保留 `choice` 描述中的 `null`，并按原顺序返回评分等级的概率。
+`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions`、`createNaceLocateProvider` 和决策目录 `NACE_MODELS`（`drex-v2.0`、`drex-max-v1.1`、`drex-max-finance`）。Nace 支持 `noul`、`choice`、`score`。适配器将结构化描述序列化为紧凑 JSON 文本，保留 `choice` 描述中的 `null`，并按原顺序返回评分等级的概率。
 
 三款模型每次最多接受 512 道题。图片请求使用 Max v1.1 或 Finance；两者每题最多 255 个选项或等级，整份请求最多 262,144 tokens。插件在 4 MiB JSON 请求预算内优先内联图片，超过时只上传足够数量的图片以缩小请求体。[Nace 模型服务配置](providers.md#naceai-drex)列出各模型的上下文、图片和留存限制。调用已退役的 ID 会在发出 HTTP 请求前返回 `unsupported`。Nace 返回的 token 或其他请求限制错误映射为 `provider_error`。
 
@@ -137,7 +160,7 @@ provider 插件接受 `id`、`apiKeyEnv` 和可选的 `baseURL`；前两者默�
 
 ## Liquid AI 能力与限制
 
-`dsh-system1/providers/liquid` 导出 Cordis 插件、`createLiquidProvider`、`LiquidOptions` 和 `LIQUID_MODELS`（`d1.2`、`d1.2-ultra`）。两款模型在本插件中支持 `noul`、`choice`、`score`，每次最多 128 道题。state、共享媒体与任一单题合计最多 65,536 tokens。候选数量和评分等级由后端校验。
+`dsh-system1/providers/liquid` 导出 Cordis 插件、`createLiquidProvider`、`LiquidOptions`、`createLiquidLocateProvider` 和 `LIQUID_MODELS`（`d1.2`、`d1.2-ultra`）。两款模型在本插件中支持 `noul`、`choice`、`score`，每次最多 128 道题。state、共享媒体与任一单题合计最多 65,536 tokens。候选数量和评分等级由后端校验。
 
 用公共 `images` 和 `audio` 字段附加媒体。适配器在请求体达到 4.5 MB（含编码后的附件）时返回 `limit_exceeded`。连接参数与媒体限制见 [Liquid AI 模型服务配置](providers.md#liquid-ai)；两款模型的结果见[真实文本、图片和音频验证](testing.md#liquid-ai-真实探针)。
 

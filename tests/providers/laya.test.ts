@@ -1,3 +1,4 @@
+import { decideOperation } from '../../src/index.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createServer, type IncomingHttpHeaders } from 'node:http'
@@ -78,7 +79,7 @@ test('Laya plugin speaks /v1/systemone without a key and reports the routed chec
 test('Laya sends explicit models and optional keys, and falls back to the top-level model', async (t) => {
   const ctx = await setup(t)
   let request: { headers: Headers; body: unknown } | undefined
-  ctx.system1.registerProvider('laya-test', laya.createLayaProvider({
+  ctx.system1.registerImplementation(decideOperation, 'laya-test', laya.createLayaProvider({
     apiKey: 'fixture-only',
     fetch: async (_input, init) => {
       request = {
@@ -106,7 +107,7 @@ test('Laya rejects unknown models before I/O and sanitizes HTTP errors', async (
   const ctx = await setup(t)
   let calls = 0
   let status = 503
-  ctx.system1.registerProvider('laya-test', laya.createLayaProvider({
+  ctx.system1.registerImplementation(decideOperation, 'laya-test', laya.createLayaProvider({
     fetch: async () => {
       calls++
       return new Response('sensitive server body', { status })

@@ -1,3 +1,6 @@
+import { decideOperation, defineOperation, locateOperation, System1OperationDisabledError } from '../../src/index.js'
+import type { DecisionTransport } from '../../src/providers/decision-implementation.js'
+import { decisionFixture } from '../shared/decision-fixture.js'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
@@ -5,7 +8,6 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import System1Service, {
   type ModelCapabilities,
   type System1Options,
-  type System1Provider,
 } from '../../src/index.js'
 import {
   MAX_ATTACHMENT_BYTES,
@@ -31,6 +33,8 @@ class FakeTools extends Service {
     super(ctx, 'tools')
   }
   register(definition: Registered) {
+    if (definition.name === 'run_code' || this.registered.has(definition.name))
+      throw new Error('Tool name is reserved or already registered')
     this.registered.set(definition.name, definition)
     return () => {
       this.registered.delete(definition.name)
@@ -38,7 +42,7 @@ class FakeTools extends Service {
   }
 }
 
-const provider: System1Provider = {
+const provider: DecisionTransport = {
   timeoutMs: () => 800,
   async describe() {
     return capabilitiesFor(['noul', 'choice', 'score'])
@@ -82,7 +86,7 @@ function capabilitiesFor(
 async function setup(
   t: { after(fn: () => Promise<void>): void },
   options: Partial<System1Options> = {},
-  preferred: System1Provider = provider,
+  preferred: DecisionTransport = provider,
 ) {
   const ctx = new Context()
   const fibers = [
@@ -92,13 +96,13 @@ async function setup(
     }),
     await ctx.plugin(FakeTools),
   ]
-  ctx.system1.registerProvider('test', preferred)
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(preferred))
   fibers.push(await ctx.plugin(tool))
   t.after(async () => {
     for (const fiber of fibers.reverse()) await fiber.dispose()
   })
   const tools = ctx.get('tools') as unknown as FakeTools
-  return { ctx, tools, fiber: fibers[2]! }
+  return { ctx, tools, service: fibers[0]!, fiber: fibers[2]! }
 }
 
 const args = {
@@ -119,6 +123,76 @@ const args = {
     },
   ],
 }
+
+test('committed per-operation switches gate API calls and only withdraw the affected Agent tool', async (t) => {
+  const locateModel = { provider: 'local', model: 'fixture' }
+  const decisionModel = { provider: 'test', model: 'requested' }
+  const fallback = { provider: 'backup', model: 'saved' }
+  const locateRoute = { defaultModel: locateModel, fallbackModels: [fallback], agentEnabled: true }
+  let decisionCalls = 0
+  const { ctx, tools, service } = await setup(t, {
+    defaultModel: decisionModel, fallbackModels: [fallback], operations: { locate: locateRoute },
+  }, {
+    ...provider,
+    evaluate(request, signal) {
+      decisionCalls++
+      return provider.evaluate(request, signal)
+    },
+  })
+  let locateCalls = 0
+  ctx.system1.registerImplementation(locateOperation, 'local', {
+    version: 1,
+    models: { kind: 'fixed', models: [{ id: locateModel.model, inputs: ['text'], capabilities: {} }] },
+    timeoutMs: () => 800,
+    async execute(_input, { model }) { locateCalls++; return { model, result: { matches: [] } } },
+  })
+  const locateInput = { source: { type: 'text', text: 'abc' }, instructions: 'Locate a.' } as const
+  const decisionInput = { state: args.state, questions: { refund: { type: 'noul', instructions: 'Refund?' } } } as const
+  const locateTool = tools.registered.get('system1_locate')!
+  const decisionTool = tools.registered.get('system1_decide')!
+  assert.ok(locateTool && decisionTool)
+  const catalog = (id: string) => ctx.system1.getCatalog().operations.find((entry) => entry.id === id)!
+  const write = Symbol.for('cosmokit.volatile.write')
+  const update = (operations: System1Options['operations']) => {
+    // Advance the same validated reference and emit the same notification as the Cordis loader.
+    const config = service.config as { operations: { [key: symbol]: (value: unknown) => void } }
+    config.operations[write]!(operations)
+    service.ctx.emit('loader/volatile-update', [['operations']])
+  }
+  assert.equal(catalog('decide').route.enabled, true)
+  assert.equal(catalog('locate').route.enabled, true, 'a legacy configured route stays on')
+  update({ decide: { enabled: false }, locate: locateRoute })
+  assert.equal(tools.registered.has('system1_decide'), false)
+  assert.equal(tools.registered.get('system1_locate'), locateTool)
+  assert.deepEqual(catalog('decide').route, {
+    enabled: false, defaultModel: decisionModel, fallbackModels: [fallback], agentEnabled: true, version: 1, compatible: true,
+  })
+  assert.equal(catalog('decide').agentAvailable, false)
+  await assert.rejects(ctx.system1.decide({ ...decisionInput, model: decisionModel }), System1OperationDisabledError)
+  await assert.rejects(ctx.system1.run(decideOperation, decisionInput), System1OperationDisabledError)
+  await assert.rejects(decisionTool.execute(args, { signal: new AbortController().signal }), System1OperationDisabledError)
+  assert.equal(decisionCalls, 0)
+  await locateTool.execute(locateInput, { signal: new AbortController().signal })
+  assert.equal(locateCalls, 1)
+
+  update({ decide: { enabled: true }, locate: { ...locateRoute, enabled: false } })
+  assert.ok(tools.registered.has('system1_decide'))
+  assert.equal(tools.registered.has('system1_locate'), false)
+  assert.equal(catalog('locate').route.agentEnabled, true)
+  assert.equal(catalog('locate').agentAvailable, false)
+  await assert.rejects(ctx.system1.locate(locateInput, { model: locateModel }), System1OperationDisabledError)
+  await assert.rejects(ctx.system1.run(locateOperation, locateInput), System1OperationDisabledError)
+  await assert.rejects(locateTool.execute(locateInput, { signal: new AbortController().signal }), System1OperationDisabledError)
+  assert.equal(locateCalls, 1)
+  assert.equal((await ctx.system1.decide(decisionInput)).answers.refund.status, 'ok')
+  assert.equal(decisionCalls, 1)
+
+  update({ decide: { enabled: true }, locate: { ...locateRoute, enabled: true } })
+  assert.equal(catalog('locate').agentAvailable, true)
+  assert.deepEqual(catalog('locate').route.fallbackModels, locateRoute.fallbackModels)
+  assert.equal((await ctx.system1.locate(locateInput)).meta.executed?.model, locateModel.model)
+  assert.equal(locateCalls, 2)
+})
 
 test('agent tool is registered by default and unregistered on dispose', async (t) => {
   const { tools, fiber } = await setup(t)
@@ -167,6 +241,72 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   assert.ok(outputProperties.fallbacks?.items?.properties?.error)
   await fiber.dispose()
   assert.equal(tools.registered.has(tool.TOOL_NAME), false)
+})
+
+test('a rejected extension tool does not block healthy tools during startup or refresh', async (t) => {
+  const ctx = new Context()
+  const model = { provider: 'test', model: 'requested' }
+  const route = { defaultModel: model, agentEnabled: true }
+  const fibers = [
+    await ctx.plugin(System1Service, {
+      defaultModel: model,
+      operations: { 'test.start': route, 'test.next': route, 'test.hot': route, 'test.tail': route },
+    }),
+    await ctx.plugin(FakeTools),
+  ]
+  t.after(async () => {
+    for (const fiber of fibers.reverse()) await fiber.dispose()
+  })
+  const service = ctx.system1
+  service.registerImplementation(decideOperation, 'test', decisionFixture(provider))
+  const tools = ctx.get('tools') as unknown as FakeTools
+  const ownTool: Registered = {
+    name: 'host_owned',
+    description: 'Host tool',
+    parameters: {},
+    output: { schema: {}, render: () => [] },
+    execute: async () => null,
+  }
+  tools.register(ownTool)
+  const registerEcho = (id: string, name: string) => {
+    const operation = defineOperation({
+      id, version: 1, title: 'Echo', inputKinds: [{ id: 'text', title: 'Text' }],
+      parseInput: (value) => String(value),
+      parseOutput: (value) => String(value),
+      checkCapabilities: () => undefined,
+      tool: { name, description: 'Echo text', parameters: { type: 'string' }, toOutput: (result) =>
+        result.status === 'ok' ? result.value : result.error.message },
+    })
+    const remove = service.registerOperation(operation)
+    service.registerImplementation(operation, 'test', {
+      version: 1, timeoutMs: () => 800,
+      models: { kind: 'fixed', models: [{ id: model.model, inputs: ['text'], capabilities: null }] },
+      async execute(input, { model }) { return { model, result: input } },
+    })
+    return remove
+  }
+  const available = (id: string) => service.getCatalog().operations.find((entry) => entry.id === id)?.agentAvailable
+  const execution = { signal: new AbortController().signal }
+  const removeStart = registerEcho('test.start', 'run_code')
+  registerEcho('test.next', 'test_next')
+  fibers.push(await ctx.plugin(tool))
+  assert.equal(available('test.start'), false)
+  assert.equal(available('test.next'), true)
+  assert.ok(await tools.registered.get('system1_decide')!.execute(args, execution))
+  assert.equal(await tools.registered.get('test_next')!.execute('next', execution), 'next')
+  removeStart()
+  registerEcho('test.start', 'test_start')
+  assert.equal(available('test.start'), true)
+
+  const removeHot = registerEcho('test.hot', 'host_owned')
+  registerEcho('test.tail', 'test_tail')
+  assert.equal(available('test.hot'), false)
+  assert.equal(tools.registered.get('host_owned'), ownTool)
+  assert.equal(await tools.registered.get('test_tail')!.execute('tail', execution), 'tail')
+  removeHot()
+  registerEcho('test.hot', 'test_hot')
+  assert.equal(available('test.hot'), true)
+  assert.equal(await tools.registered.get('test_hot')!.execute('hot', execution), 'hot')
 })
 
 test('agent tool forwards audio and video attachments to decide', async (t) => {
@@ -253,7 +393,7 @@ test('agent tool returns the executed model and failed fallbacks', async (t) => 
       },
     },
   )
-  ctx.system1.registerProvider('backup', provider)
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture(provider))
   const definition = tools.registered.get(tool.TOOL_NAME)!
 
   const value = (await definition.execute(args, {

@@ -1,22 +1,29 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { ProviderModel, System1Provider } from 'dsh-system1/contracts'
-import { findProviderModel } from 'dsh-system1/providers'
-import type {} from 'dsh-system1'
+import { decideOperation } from 'dsh-system1'
+import type { DecideImplementation, ModelCapabilities } from 'dsh-system1/contracts'
 
-const EXAMPLE_MODELS = [
-  { id: 'example-v2', aliases: ['example-latest'] },
-] as const satisfies readonly ProviderModel[]
-
-export function resolveExampleModel(model: string) {
-  return findProviderModel(EXAMPLE_MODELS, model)
+const capabilities: ModelCapabilities = {
+  primitives: ['noul'],
+  maxQuestions: 1,
+  maxChoiceOptions: null,
+  maxScoreLevels: null,
 }
 
 /** Wrap an independently implemented backend in its owning plugin lifecycle. */
-export function providerPlugin(id: string, backend: System1Provider) {
+export function providerPlugin(id: string, execute: DecideImplementation['execute']) {
+  const implementation: DecideImplementation = {
+    version: decideOperation.version,
+    models: {
+      kind: 'fixed',
+      models: [{ id: 'example-v2', aliases: ['example-latest'], inputs: ['text'], capabilities }],
+    },
+    timeoutMs: () => 800,
+    execute,
+  }
   return {
     inject: ['system1'],
     apply(ctx: Context) {
-      ctx.effect(() => ctx.system1.registerProvider(id, backend))
+      ctx.effect(() => ctx.system1.registerImplementation(decideOperation, id, implementation))
     },
   }
 }

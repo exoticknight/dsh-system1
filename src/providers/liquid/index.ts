@@ -4,11 +4,14 @@ import {
   credentialRef,
   isCredentialRefName,
 } from '@deepseek-ai/dsh-credentials'
-import type {} from '../../index.js'
+import { decideOperation, locateOperation } from '../../index.js'
 import { createLiquidProvider } from './adapter.js'
+import type { LiquidOptions } from './adapter.js'
+import { createLiquidLocateProvider } from './locate.js'
 import { LIQUID_BASE_URL } from './models.js'
 
 export { createLiquidProvider, type LiquidOptions } from './adapter.js'
+export { createLiquidLocateProvider } from './locate.js'
 export { LIQUID_MODELS } from './models.js'
 
 export interface Config {
@@ -42,7 +45,7 @@ export const Config: Schema<ConfigInput, RuntimeConfig> = Schema.object({
 })
 
 export function apply(ctx: Context, config: Config | RuntimeConfig) {
-  const provider = createLiquidProvider({
+  const options: LiquidOptions = {
     resolveApiKey: async () => {
       const ref = config.apiKeyEnv
       if (!isCredentialRefName(ref)) return undefined
@@ -53,8 +56,11 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
     },
     resolveBaseURL: () => readConfigValue(config.baseURL),
     resolveTimeoutMs: () => readConfigValue(config.timeoutMs),
-  })
-  ctx.effect(() => ctx.system1.registerProvider(config.id, provider))
+  }
+  const decide = createLiquidProvider(options)
+  const locate = createLiquidLocateProvider(options)
+  ctx.effect(() => ctx.system1.registerImplementation(decideOperation, config.id, decide))
+  ctx.effect(() => ctx.system1.registerImplementation(locateOperation, config.id, locate))
 }
 
 function readConfigValue<T>(value: T | Volatile<T> | undefined): T | undefined {

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Agent tool",
-    "description": "Gives the agent the system1_decide tool."
+    "description": "Gives the agent system1_decide and exposes system1_locate when enabled for the Locate route."
   }
 }

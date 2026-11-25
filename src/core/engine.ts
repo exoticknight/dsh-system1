@@ -8,14 +8,14 @@ import type {
   System1Options,
 } from '../contracts/request.js'
 import type { Questions } from '../contracts/question.js'
-import type {
-  System1Provider,
-  ModelCapabilities,
-} from '../contracts/provider.js'
+import type { DecideInput, DecideOutput } from '../contracts/provider.js'
+import { decideOperation, decideOutputSchema } from '../contracts/decide.js'
+import type { OperationAttempt, OperationDefinition, OperationImplementation, OperationResult, OperationRunOptions } from '../contracts/operation.js'
 import type { QuestionResult } from '../contracts/answer.js'
 import type { DecisionError } from '../contracts/error.js'
 import { System1InputError, System1ProviderError } from '../contracts/error.js'
-import { ProviderRegistry } from './registry.js'
+import { findFixedModel } from './registry.js'
+import { modelChain, OperationRuntime } from './operations.js'
 import { execute } from './execution.js'
 import {
   parseRequest,
@@ -25,20 +25,21 @@ import {
   responseSchema,
   errorSchema,
   validateAnswer,
-  decodedBase64Length,
 } from './validation.js'
 
 export class System1Engine {
-  private readonly registry = new ProviderRegistry()
+  readonly operations: OperationRuntime
   private readonly resolveOptions: () => System1Options
   constructor(options: System1Options | (() => System1Options) = {}) {
     if (typeof options === 'function') {
       this.resolveOptions = options
-      return
+    } else {
+      this.validateOptions(options)
+      const snapshot = structuredClone(options)
+      this.resolveOptions = () => snapshot
     }
-    this.validateOptions(options)
-    const snapshot = structuredClone(options)
-    this.resolveOptions = () => snapshot
+    this.operations = new OperationRuntime(this.resolveOptions)
+    this.operations.registry.registerOperation(decideOperation)
   }
   private validateOptions(
     options: System1Options,
@@ -59,25 +60,62 @@ export class System1Engine {
     )
       throw new System1InputError('Invalid fallback models.')
   }
-  registerProvider(
+  registerImplementation<I, O, C>(
+    operation: OperationDefinition<I, O, C>,
     id: string,
-    provider: System1Provider,
+    provider: OperationImplementation<NoInfer<I>, NoInfer<O>, NoInfer<C>>,
     warn?: (message: string) => void,
   ): () => void {
-    return this.registry.register(id, provider, warn)
+    return this.operations.registry.registerImplementation(operation, id, provider, warn)
   }
   dispose(): void {
-    this.registry.dispose()
+    this.operations.registry.dispose()
+  }
+
+  async run<I, O, C>(
+    operation: OperationDefinition<I, O, C>,
+    input: NoInfer<I>,
+    options?: OperationRunOptions,
+  ): Promise<OperationResult<O>> {
+    if (operation !== decideOperation as unknown)
+      return this.operations.run(operation, input, options)
+    // Keep the established per-question answers and routing policy for the built-in decision contract.
+    const attempts: OperationAttempt[] = []
+    const decision = await this.decide({ ...(input as DecideInput), ...options }, attempts)
+    const { requestId, requested, executed, durationMs, usage, approximate, degraded } = decision.meta
+    const meta = { requestId, requested, ...(executed ? { executed } : {}), durationMs, attempts }
+    if (executed) {
+      const value: DecideOutput = {
+        answers: decision.answers,
+        ...(usage ? { usage } : {}),
+        ...(approximate !== undefined ? { approximate } : {}),
+        ...(degraded !== undefined ? { degraded } : {}),
+      }
+      return { status: 'ok', value: value as O, meta }
+    }
+    const first = Object.values(decision.answers)[0]!
+    const error: DecisionError = first.status === 'error' ? first.error : {
+      code: 'provider_error', message: 'Provider evaluation failed.',
+    }
+    return {
+      status: 'error',
+      reason: error.code === 'cancelled' ? 'cancelled'
+        : attempts.some(({ kind }) => kind === 'executed') ? 'upstream_execution_failed' : 'no_applicable_model',
+      error,
+      meta,
+    }
   }
 
   async decide<const Q extends Questions>(
     input: DecideRequest<Q>,
+    operationAttempts?: OperationAttempt[],
   ): Promise<DecideResponse<Q>> {
     const start = performance.now()
-    const req = parseRequest(input)
     const options = structuredClone(this.resolveOptions())
+    this.operations.assertOperationEnabled(decideOperation.id, options)
+    const req = parseRequest(input)
     this.validateOptions(options, req.model === undefined)
-    const chain = modelChain(req.model, options)
+    const chain = req.model ? [{ ...req.model }] : modelChain(options.defaultModel, options.fallbackModels ?? [])
     if (chain.length === 0)
       throw new System1InputError(
         'Select a model or configure a default model.',
@@ -108,12 +146,12 @@ export class System1Engine {
         ),
         extra,
       )
-    if (req.signal?.aborted)
+    if (req.signal?.aborted || this.operations.registry.disposed)
       return failure({ code: 'cancelled', message: 'Decision cancelled.' })
     const attempts: FallbackAttempt[] = []
     let lastError: DecisionError | undefined
     for (const model of chain) {
-      if (req.signal?.aborted) {
+      if (req.signal?.aborted || this.operations.registry.disposed) {
         const error = {
           code: 'cancelled',
           message: 'Decision cancelled.',
@@ -127,6 +165,11 @@ export class System1Engine {
       )
       if ('error' in outcome) {
         lastError = outcome.error
+        operationAttempts?.push({
+          ...model,
+          kind: outcome.sent ? 'executed' : 'skipped',
+          error: { code: outcome.error.code, message: outcome.error.message },
+        })
         if (outcome.error.code === 'cancelled')
           return failure(
             outcome.error,
@@ -139,6 +182,7 @@ export class System1Engine {
         continue
       }
       const { result } = outcome
+      operationAttempts?.push({ ...model, kind: 'executed' })
       const answers = Object.fromEntries(
         Object.entries(req.questions).map(([id, q]) => [
           id,
@@ -182,14 +226,16 @@ export class System1Engine {
     model: ModelRef,
     requestId: string,
   ): Promise<AttemptOutcome> {
-    const entry = this.registry.get(model.provider)
+    const entry = this.operations.registry.get(decideOperation)?.implementations.get(model.provider)
     if (!entry)
       return {
         error: {
           code: 'unavailable',
           message: 'Requested provider is not registered.',
         },
+        sent: false,
       }
+    let sent = false
     try {
       const timeoutMs = req.timeoutMs ?? entry.provider.timeoutMs()
       if (!timeoutSchema.safeParse(timeoutMs).success)
@@ -198,14 +244,22 @@ export class System1Engine {
             code: 'invalid_response',
             message: 'Provider returned an invalid timeout.',
           },
+          sent: false,
         }
       const result = await execute(
         [entry.controller.signal, ...(req.signal ? [req.signal] : [])],
         timeoutMs,
         async (signal) => {
-          const described = capabilitiesSchema.safeParse(
-            await entry.provider.describe(model.model, signal),
-          )
+          const selected = entry.provider.models.kind === 'deployment'
+            ? await entry.provider.models.resolve(model.model, signal)
+            : findFixedModel(entry.provider.models, model.model)
+          if (!selected)
+            throw new System1ProviderError({
+              code: 'unsupported',
+              message: (entry.provider.models.kind === 'fixed' && entry.provider.models.unknownModelMessage)
+                || 'Provider model is not supported.',
+            })
+          const described = capabilitiesSchema.safeParse(selected.capabilities)
           if (!described.success) {
             if (!entry.warnedInvalidCapabilities) {
               entry.warnedInvalidCapabilities = true
@@ -222,24 +276,28 @@ export class System1Engine {
               message: 'Provider returned invalid model capabilities.',
             })
           }
-          const limitation = checkCapabilities(described.data, req)
+          const limitation = decideOperation.checkCapabilities(req, described.data)
           if (limitation) throw new System1ProviderError(limitation)
           signal.throwIfAborted()
-          const raw = await entry.provider.evaluate(
+          sent = true
+          const raw = await entry.provider.execute(
             structuredClone({
-              model: model.model,
               state: req.state,
               questions: req.questions,
               ...(req.images ? { images: req.images } : {}),
               ...(req.audio ? { audio: req.audio } : {}),
               ...(req.videos ? { videos: req.videos } : {}),
               ...(req.longContext ? { longContext: true } : {}),
-              requestId,
             }),
-            signal,
+            { model: selected.id, signal, requestId },
           )
           signal.throwIfAborted()
-          const parsed = responseSchema.safeParse(raw)
+          const output = decideOutputSchema.safeParse(raw?.result)
+          const parsed = output.success ? responseSchema.safeParse({
+            ...output.data,
+            model: raw.model,
+            ...(raw.revision !== undefined ? { revision: raw.revision } : {}),
+          }) : output
           if (!parsed.success)
             throw new System1ProviderError({
               code: 'invalid_response',
@@ -252,13 +310,14 @@ export class System1Engine {
     } catch (error) {
       if (error instanceof System1ProviderError) {
         const detail = errorSchema.safeParse(error.detail)
-        if (detail.success) return { error: detail.data }
+        if (detail.success) return { error: detail.data, sent: sent && error.requestSent !== false }
       }
       return {
         error: {
           code: 'provider_error',
           message: 'Provider evaluation failed.',
         },
+        sent,
       }
     }
   }
@@ -267,159 +326,4 @@ type ParsedResponse = ReturnType<typeof responseSchema.parse>
 
 type AttemptOutcome =
   | { result: ParsedResponse }
-  | { error: DecisionError }
-
-function modelChain(
-  explicit: ModelRef | undefined,
-  options: System1Options,
-): ModelRef[] {
-  if (explicit) return [{ ...explicit }]
-  const candidates = [
-    ...(options.defaultModel ? [options.defaultModel] : []),
-    ...(options.fallbackModels ?? []),
-  ]
-  const seen = new Set<string>()
-  return candidates.flatMap((candidate) => {
-    const key = JSON.stringify([candidate.provider, candidate.model])
-    if (seen.has(key)) return []
-    seen.add(key)
-    return [{ ...candidate }]
-  })
-}
-
-function checkCapabilities(
-  c: ModelCapabilities,
-  request: DecideRequest,
-): DecisionError | undefined {
-  const all = Object.values(request.questions)
-  if (request.longContext && !c.longContext)
-    return {
-      code: 'unsupported',
-      message: 'Model does not support extended context.',
-    }
-  if (request.images?.length) {
-    const imageCapabilities = c.images
-    if (!imageCapabilities)
-      return {
-        code: 'unsupported',
-        message: 'Model does not support image input.',
-      }
-    if (request.images.length > imageCapabilities.maxCount)
-      return {
-        code: 'limit_exceeded',
-        message: 'Too many images for this model.',
-      }
-    if (
-      request.images.some(
-        (image) => !imageCapabilities.formats.includes(image.mediaType),
-      )
-    )
-      return {
-        code: 'unsupported',
-        message: 'Image format is not supported by this model.',
-      }
-    const imageBytes = request.images.map((image) => decodedBase64Length(image.data))
-    if (imageBytes.some((size) => size > imageCapabilities.maxBytesPerImage))
-      return {
-        code: 'limit_exceeded',
-        message: 'An image exceeds this model’s per-image size limit.',
-      }
-    if (
-      imageBytes.reduce((sum, size) => sum + size, 0) >
-      imageCapabilities.maxTotalBytes
-    )
-      return {
-        code: 'limit_exceeded',
-        message: 'Image attachments exceed this model’s size limit.',
-      }
-  }
-  const audioError = checkMediaCapabilities(
-    request.audio,
-    c.audio,
-    'audio',
-  )
-  if (audioError) return audioError
-  const videoError = checkMediaCapabilities(
-    request.videos,
-    c.videos,
-    'video',
-  )
-  if (videoError) return videoError
-  if (request.audio?.length || request.videos?.length) {
-    const maxTotalBytes = c.audioVideo?.maxTotalBytes
-    const totalBytes = [
-      ...(request.audio ?? []),
-      ...(request.videos ?? []),
-    ].reduce((sum, item) => sum + decodedBase64Length(item.data), 0)
-    if (maxTotalBytes !== undefined && totalBytes > maxTotalBytes)
-      return {
-        code: 'limit_exceeded',
-        message: 'Audio and video attachments exceed this model’s size limit.',
-      }
-  }
-  if (c.maxQuestions !== null && all.length > c.maxQuestions)
-    return {
-      code: 'limit_exceeded',
-      message: 'Too many questions for this model.',
-    }
-  for (const q of all) {
-    if (!c.primitives.includes(q.type))
-      return {
-        code: 'unsupported',
-        message: `Model does not support ${q.type}.`,
-      }
-    if (
-      q.type === 'choice' &&
-      c.maxChoiceOptions !== null &&
-      Object.keys(q.criteria).length > c.maxChoiceOptions
-    )
-      return {
-        code: 'limit_exceeded',
-        message: 'Too many choice options for this model.',
-      }
-    if (
-      q.type === 'score' &&
-      c.maxScoreLevels !== null &&
-      q.criteria.length > c.maxScoreLevels
-    )
-      return {
-        code: 'limit_exceeded',
-        message: 'Too many score levels for this model.',
-      }
-  }
-}
-
-function checkMediaCapabilities<TMediaType extends string>(
-  inputs: readonly { readonly mediaType: TMediaType; readonly data: string }[] | undefined,
-  capabilities: {
-    readonly formats: readonly TMediaType[]
-    readonly maxCount: number
-    readonly maxBytesPerItem: number
-  } | undefined,
-  modality: 'audio' | 'video',
-): DecisionError | undefined {
-  if (!inputs?.length) return undefined
-  const label = modality === 'audio' ? 'Audio' : 'Video'
-  if (!capabilities)
-    return {
-      code: 'unsupported',
-      message: `Model does not support ${modality} input.`,
-    }
-  if (inputs.length > capabilities.maxCount)
-    return {
-      code: 'limit_exceeded',
-      message: `Too many ${modality} attachments for this model.`,
-    }
-  if (inputs.some(({ mediaType }) => !capabilities.formats.includes(mediaType)))
-    return {
-      code: 'unsupported',
-      message: `${label} format is not supported by this model.`,
-    }
-  if (
-    inputs.some(({ data }) => decodedBase64Length(data) > capabilities.maxBytesPerItem)
-  )
-    return {
-      code: 'limit_exceeded',
-      message: `A ${modality} attachment exceeds this model’s size limit.`,
-    }
-}
+  | { error: DecisionError; sent: boolean }

@@ -1,4 +1,3 @@
-import type { System1Provider } from '../../contracts/index.js';
 export interface TypesafeOptions {
     apiKey: string;
     baseURL?: string;
@@ -8,5 +7,5 @@ export interface TypesafeOptions {
     resolveBaseURL?: () => string | undefined;
     fetch?: typeof fetch;
 }
-export declare function createTypesafeProvider(options: TypesafeOptions): System1Provider;
+export declare function createTypesafeProvider(options: TypesafeOptions): import("../../index.js").DecideImplementation & import("../decision-implementation.js").DecisionTransport;
 //# sourceMappingURL=adapter.d.ts.map

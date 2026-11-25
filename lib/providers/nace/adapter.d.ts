@@ -1,4 +1,3 @@
-import type { System1Provider } from '../../contracts/index.js';
 export interface NaceOptions {
     apiKey: string;
     baseURL?: string;
@@ -10,5 +9,5 @@ export interface NaceOptions {
     warn?: (message: string) => void;
 }
 /** Nace Drex adapter: the official SDK owns API and temporary-file transport. */
-export declare function createNaceProvider(options: NaceOptions): System1Provider;
+export declare function createNaceProvider(options: NaceOptions): import("../../contracts/provider.js").DecideImplementation & import("../decision-implementation.js").DecisionTransport;
 //# sourceMappingURL=adapter.d.ts.map

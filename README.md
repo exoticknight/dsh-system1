@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**Connect to multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider 1.1 via meraGPT, d1.2 via Liquid AI, self-hosted Laya, and compatible custom providers.** Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their own workflows. Requests can include text, images, audio, and video where the provider and model support them. The agent can call the built-in `system1_decide` tool, and plugins can use the same service through `ctx.system1.decide()`.
+**Structured decisions and evidence location for DSH agents and plugins.** Use `ctx.system1.decide()` or the `system1_decide` Agent tool to classify, filter, or score. Use [Locate](docs/locate.en.md) to highlight matching text or draw boxes over objects in one image, through `ctx.system1.locate()` or the opt-in `system1_locate` tool. System1 connects TypeSafe Jev, Cloudflare Clef, Nace Drex, meraGPT Decider 1.1, Liquid AI d1.2, self-hosted Laya, and compatible custom providers.
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm version](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -56,7 +56,9 @@ dsh plugin --profile <profile> add dsh-system1
 
 The dsh plugin command requires a profile; installing into one profile does not activate the bundle in other profiles. To use the GitHub repository as the package source, replace `dsh-system1` in that command with `github:exoticknight/dsh-system1`.
 
-The bundled patch mounts the service and built-in providers. The service defaults to model `jev-latest` on provider `typesafe`. Each attempt uses a request-level `timeoutMs` when supplied, then that provider's configured timeout or its own default: 800 ms for TypeSafe, Laya, and Cloudflare; 10,000 ms for meraGPT and Liquid AI; 60,000 ms for Nace. Set a provider timeout in that provider's settings page. Use plugin settings to choose the service and model, add fallbacks in order, configure connections, and store keys in DSH credentials; environment variables are also supported. Each fallback gets the full timeout budget, so total request time can grow with the chain length. Adjust the selected provider's `timeoutMs` for backend latency, especially local CPU inference.
+The bundled patch mounts the service and built-in providers. In **System One** settings, open **Decision** or **Locate** to enable the operation and choose its primary model and ordered fallbacks. Open the provider component from DSH's **Components** list to see that instance's models and edit its endpoint, credentials, or timeout. Saving a disabled operation keeps its settings for next time.
+
+Decision defaults to TypeSafe `jev-latest`; unconfigured Locate starts off. Each attempt uses the request's `timeoutMs` when supplied, then the provider's configured timeout or its own default: 800 ms for TypeSafe, Laya, and Cloudflare; 10,000 ms for meraGPT and Liquid AI; 60,000 ms for Nace. Each fallback gets the full budget, so total request time can grow with the chain length. For connection and credential details, see [provider setup](docs/providers.en.md).
 
 The Web settings page and agent tool have been verified on DSH `0.2.3-alpha.2`. To run that host from npm, use Node.js 24.22.3 or later in the 24.x series, or 26.13.1 or later in the 26.x series. See [DSH runtime requirements](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.3-alpha.2/docs/upgrade-guide/v0.2.3-alpha.1/node-24-22-3/guide.md).
 
@@ -70,7 +72,7 @@ The current browser stores only the last shown notice ID for the current DSH ori
 
 Once installed, the agent can call the `system1_decide` tool without a consumer plugin. The main model can hand yes/no checks, classification, and scoring to System One and decide the next step from the returned probabilities. The tool uses the default service and model configured above.
 
-The bundle's `system1-tool` component provides the tool and is enabled by default. Turn the component off on the Plugins page to remove the tool, or set `disabled: true` on its entry in a headless profile. See [the API reference](docs/api.en.md#agent-tool) for arguments and results.
+The bundled `system1-tool` component is on by default and exposes `system1_decide` while Decision is enabled. To expose `system1_locate`, enable Locate, configure its primary model, and turn on its **Agent tool** switch. That switch leaves plugin calls available. Disable the shared component on the Plugins page, or set `disabled: true` on its entry in a headless profile, to remove the Agent tools without turning off the operations. See the [Decision tool API](docs/api.en.md#agent-tool) and [Locate setup](docs/locate.en.md).
 
 ## Use from a consumer plugin
 

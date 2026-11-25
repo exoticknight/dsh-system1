@@ -5,6 +5,7 @@ export async function execute<T>(
   signals: readonly AbortSignal[],
   timeoutMs: number,
   operation: (signal: AbortSignal) => Promise<T>,
+  label = 'Decision',
 ): Promise<T> {
   const controller = new AbortController()
   const deadline = performance.now() + timeoutMs
@@ -15,7 +16,7 @@ export async function execute<T>(
     controller.abort(
       new System1ProviderError({
         code: 'cancelled',
-        message: 'Decision cancelled.',
+        message: `${label} cancelled.`,
       }),
     )
   try {
@@ -32,8 +33,8 @@ export async function execute<T>(
       controller.abort(
         new System1ProviderError({
           code: 'timeout',
-          message: 'Decision exceeded its total time budget.',
-        }),
+          message: `${label} exceeded its total time budget.`,
+        }, 'fallback'),
       )
     timer = setTimeout(timeout, timeoutMs)
     const interrupted = new Promise<never>((_, reject) => {

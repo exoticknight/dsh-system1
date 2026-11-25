@@ -1,6 +1,7 @@
 import type { Context, Volatile } from '@deepseek-ai/cordis';
 import Schema from '@deepseek-ai/schemastery';
 export { createLiquidProvider, type LiquidOptions } from './adapter.js';
+export { createLiquidLocateProvider } from './locate.js';
 export { LIQUID_MODELS } from './models.js';
 export interface Config {
     id: string;

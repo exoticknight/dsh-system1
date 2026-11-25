@@ -1,3 +1,6 @@
+import { decideOperation } from '../../src/index.js'
+import type { DecisionTransport } from '../../src/providers/decision-implementation.js'
+import { decisionFixture } from '../shared/decision-fixture.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
@@ -7,7 +10,6 @@ import { capabilitiesSchema } from '../../src/core/validation.js'
 import System1Service, {
   System1InputError,
   System1ProviderError,
-  type System1Provider,
   type System1Options,
 } from '../../src/index.js'
 
@@ -30,7 +32,7 @@ function capabilitiesFor(
     ...overrides,
   }
 }
-const provider: System1Provider = {
+const provider: DecisionTransport = {
   timeoutMs: () => 800,
   async describe() {
     return capabilitiesFor(['noul'])
@@ -57,7 +59,7 @@ async function setup(
 
 test('public service returns provider metadata and validates caller input', async (t) => {
   const { ctx } = await setup(t)
-  ctx.system1.registerProvider('test', provider)
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(provider))
   const result = await ctx.system1.decide({ state: { text: 'hi' }, questions })
   assert.equal(result.answers.q.status, 'ok')
   assert.equal(result.meta.executed?.model, 'actual')
@@ -76,7 +78,7 @@ test('public service returns provider metadata and validates caller input', asyn
     System1InputError,
   )
   assert.throws(
-    () => ctx.system1.registerProvider('test', provider),
+    () => ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(provider)),
     System1InputError,
   )
 })
@@ -126,7 +128,7 @@ test('runtime capability declarations require all count and attachment limits an
     defaultModel: { provider: 'invalid', model: 'one' },
     fallbackModels: [{ provider: 'invalid', model: 'two' }],
   })
-  engine.registerProvider('invalid', {
+  engine.registerImplementation(decideOperation, 'invalid', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return { primitives: ['noul'] } as unknown as ModelCapabilities
@@ -135,7 +137,7 @@ test('runtime capability declarations require all count and attachment limits an
       evaluations++
       return ok
     },
-  }, (message) => warnings.push(message))
+  }), (message) => warnings.push(message))
   try {
     const result = await engine.decide({ state: null, questions })
     assert.equal(
@@ -153,14 +155,14 @@ test('invalid provider timeout fails as invalid_response, while a request overri
   let timeoutReads = 0
   let evaluations = 0
   const engine = new System1Engine({ defaultModel: { provider: 'timed', model: 'fixture' } })
-  engine.registerProvider('timed', {
+  engine.registerImplementation(decideOperation, 'timed', decisionFixture({
     timeoutMs() {
       timeoutReads++
       return 0
     },
     async describe() { return capabilitiesFor(['noul']) },
     async evaluate() { evaluations++; return ok },
-  })
+  }))
   try {
     const invalid = await engine.decide({ state: null, questions })
     assert.equal(invalid.answers.q.status === 'error' && invalid.answers.q.error.code, 'invalid_response')
@@ -184,7 +186,7 @@ test('request timeout overrides provider timeout; residual service timeout is ig
     const engine = new System1Engine({
       defaultModel: { provider: 'timed', model: 'fixture' },
     })
-    engine.registerProvider('timed', {
+    engine.registerImplementation(decideOperation, 'timed', decisionFixture({
       ...provider,
       timeoutMs: () => options.providerTimeoutMs ?? 800,
       evaluate(_request, signal) {
@@ -196,7 +198,7 @@ test('request timeout overrides provider timeout; residual service timeout is ig
           }, { once: true })
         })
       },
-    })
+    }))
     try {
       return await engine.decide({
         state: null,
@@ -227,7 +229,7 @@ test('request timeout overrides provider timeout; residual service timeout is ig
     timeoutMs: 1,
   } as unknown as System1Options)
   t.after(async () => { await fiber.dispose() })
-  ctx.system1.registerProvider('legacy', {
+  ctx.system1.registerImplementation(decideOperation, 'legacy', decisionFixture({
     timeoutMs: () => 100,
     async describe() { return capabilitiesFor(['noul']) },
     async evaluate(_request, signal) {
@@ -239,7 +241,7 @@ test('request timeout overrides provider timeout; residual service timeout is ig
         }, { once: true })
       })
     },
-  })
+  }))
   const legacyCall = await ctx.system1.decide({ state: null, questions })
   assert.equal(legacyCall.answers.q.status, 'ok')
 })
@@ -248,7 +250,7 @@ test('unavailable preferred model falls back and records the failed attempt', as
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'model-b' }],
   })
-  ctx.system1.registerProvider('backup', provider)
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture(provider))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -278,13 +280,13 @@ test('fallback chain skips a missing provider after an ordinary provider error',
       { provider: 'backup', model: 'model-b' },
     ],
   })
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       throw new Error('private backend detail')
     },
-  })
-  ctx.system1.registerProvider('backup', provider)
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture(provider))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -312,14 +314,14 @@ test('partial malformed answers do not discard valid siblings', async (t) => {
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
   let fallbackCalls = 0
-  ctx.system1.registerProvider('backup', {
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
-  ctx.system1.registerProvider('test', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       return {
@@ -331,7 +333,7 @@ test('partial malformed answers do not discard valid siblings', async (t) => {
         },
       }
     },
-  })
+  }))
   const result = await ctx.system1.decide({
     state: null,
     questions: { ...questions, bad: questions.q, missing: questions.q },
@@ -346,13 +348,13 @@ test('partial malformed answers do not discard valid siblings', async (t) => {
 test('total budget bounds non-cooperating capability discovery', async (t) => {
   const { ctx } = await setup(t)
   let signal: AbortSignal | undefined
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     describe(_model, s) {
       signal = s
       return new Promise(() => {})
     },
-  })
+  }))
   const result = await ctx.system1.decide({
     state: null,
     questions,
@@ -375,25 +377,25 @@ test('unregister cancels in-flight work; stale disposer cannot remove new regist
   })
   let signal: AbortSignal | undefined
   let fallbackCalls = 0
-  ctx.system1.registerProvider('backup', {
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
-  const remove = ctx.system1.registerProvider('test', {
+  }))
+  const remove = ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate(_req, s) {
       signal = s
       entered()
       return new Promise(() => {})
     },
-  })
+  }))
   const pending = ctx.system1.decide({ state: null, questions })
   await started
   remove()
-  ctx.system1.registerProvider('test', provider)
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(provider))
   remove()
   assert.equal(signal?.aborted, true)
   const result = await pending
@@ -414,19 +416,19 @@ test('service unload cancels calls and removes ctx service', async (t) => {
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
   let fallbackCalls = 0
-  ctx.system1.registerProvider('backup', {
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
-  ctx.system1.registerProvider('test', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       return new Promise(() => {})
     },
-  })
+  }))
   const service = ctx.system1
   const pending = service.decide({ state: null, questions })
   await fiber.dispose()
@@ -443,13 +445,13 @@ test('service unload cancels calls and removes ctx service', async (t) => {
 test('pre-cancel avoids backend; unsupported model capability avoids evaluation', async (t) => {
   const { ctx } = await setup(t)
   let calls = 0
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       calls++
       return ok
     },
-  })
+  }))
   const cancelled = await ctx.system1.decide({
     state: null,
     questions,
@@ -477,7 +479,7 @@ test('unsupported preferred model falls back to a capable model', async (t) => {
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'capable' }],
   })
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return capabilitiesFor(['noul'])
@@ -485,8 +487,8 @@ test('unsupported preferred model falls back to a capable model', async (t) => {
     async evaluate() {
       throw new Error('unsupported model must not be evaluated')
     },
-  })
-  ctx.system1.registerProvider('backup', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return capabilitiesFor(['score'])
@@ -507,7 +509,7 @@ test('unsupported preferred model falls back to a capable model', async (t) => {
         },
       }
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({
     state: null,
@@ -528,17 +530,17 @@ test('audio/video requests fall back past models that do not declare those capab
     fallbackModels: [{ provider: 'backup', model: 'clef-omni' }],
   })
   let preferredCalls = 0
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       preferredCalls++
       throw new Error('a text-only model must not receive media')
     },
-  })
+  }))
   const audio = [{ mediaType: 'audio/mpeg', data: 'QUJD' }] as const
   const videos = [{ mediaType: 'video/mp4', data: 'REVG' }] as const
   let backupCalls = 0
-  ctx.system1.registerProvider('backup', {
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return capabilitiesFor(['noul'], {
@@ -553,7 +555,7 @@ test('audio/video requests fall back past models that do not declare those capab
       assert.deepEqual(request.videos, videos)
       return ok
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({
     state: 'sample',
@@ -581,7 +583,7 @@ test('audio/video capability preflight checks format, count, item size, and shar
     }),
   }
   let evaluateCalls = 0
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return capabilities
@@ -590,7 +592,7 @@ test('audio/video capability preflight checks format, count, item size, and shar
       evaluateCalls++
       return ok
     },
-  })
+  }))
   const base = { state: 'sample', questions }
   const cases = [
     {
@@ -635,7 +637,7 @@ test('model question limit falls back to a model with sufficient capacity', asyn
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'high-capacity' }],
   })
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return capabilitiesFor(['noul'], { maxQuestions: 1 })
@@ -643,8 +645,8 @@ test('model question limit falls back to a model with sufficient capacity', asyn
     async evaluate() {
       throw new Error('limited model must not be evaluated')
     },
-  })
-  ctx.system1.registerProvider('backup', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     timeoutMs: () => 800,
     async describe() {
       return capabilitiesFor(['noul'])
@@ -658,7 +660,7 @@ test('model question limit falls back to a model with sufficient capacity', asyn
         },
       }
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({
     state: null,
@@ -679,13 +681,13 @@ test('invalid response envelope falls back before returning per-question answers
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       return { model: 'requested', answers: null } as never
     },
-  })
-  ctx.system1.registerProvider('backup', provider)
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture(provider))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -700,7 +702,7 @@ test('caller timeout budget is available independently to each model attempt', a
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
-  const delayedProvider = (delayMs: number): System1Provider => ({
+  const delayedProvider = (delayMs: number): DecisionTransport => ({
     ...provider,
     evaluate(_request, signal) {
       return new Promise((resolve, reject) => {
@@ -716,8 +718,8 @@ test('caller timeout budget is available independently to each model attempt', a
       })
     },
   })
-  ctx.system1.registerProvider('test', delayedProvider(400))
-  ctx.system1.registerProvider('backup', delayedProvider(15))
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(delayedProvider(400)))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture(delayedProvider(15)))
 
   const result = await ctx.system1.decide({
     state: null,
@@ -736,18 +738,18 @@ test('all failed attempts return the last error and preserve their order', async
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       throw new Error('private failure')
     },
-  })
-  ctx.system1.registerProvider('backup', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       return { model: 'backup-model', answers: null } as never
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -770,7 +772,7 @@ test('all failed attempts return the last error and preserve their order', async
 
 test('final provider failure retains retry and HTTP status metadata', async (t) => {
   const { ctx } = await setup(t)
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       throw new System1ProviderError({
@@ -780,7 +782,7 @@ test('final provider failure retains retry and HTTP status metadata', async (t) 
         httpStatus: 503,
       })
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -807,7 +809,7 @@ test('provider-reported cancellation ends the chain without recording an attempt
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
   let fallbackCalls = 0
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       throw new System1ProviderError({
@@ -815,14 +817,14 @@ test('provider-reported cancellation ends the chain without recording an attempt
         message: 'Provider cancelled the request.',
       })
     },
-  })
-  ctx.system1.registerProvider('backup', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -843,14 +845,14 @@ test('model chain deduplicates identical provider and model pairs', async (t) =>
     ],
   })
   const calls: string[] = []
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate(request) {
       calls.push(request.model)
       if (request.model === 'requested') throw new Error('try next model')
       return { ...ok, model: 'second-actual' }
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({ state: null, questions })
 
@@ -890,16 +892,16 @@ test('changing configuration during a call does not rewrite its model chain', as
   const failing = new Promise<never>((_resolve, reject) => {
     fail = () => reject(new Error('try the configured fallback'))
   })
-  engine.registerProvider('test', {
+  engine.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       entered()
       await failing
       return ok
     },
-  })
-  engine.registerProvider('backup', provider)
-  engine.registerProvider('replacement', provider)
+  }))
+  engine.registerImplementation(decideOperation, 'backup', decisionFixture(provider))
+  engine.registerImplementation(decideOperation, 'replacement', decisionFixture(provider))
 
   const pending = engine.decide({ state: null, questions })
   await started
@@ -916,7 +918,7 @@ test('changing configuration during a call does not rewrite its model chain', as
 
 test('provider mutation cannot rewrite the validation snapshot', async (t) => {
   const { ctx } = await setup(t)
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate(request) {
       const mutable = request.questions as Record<string, unknown>
@@ -931,7 +933,7 @@ test('provider mutation cannot rewrite the validation snapshot', async (t) => {
         },
       }
     },
-  })
+  }))
   const result = await ctx.system1.decide({ state: 'sample', questions })
   assert.equal(
     result.answers.q.status === 'error' && result.answers.q.error.code,
@@ -950,14 +952,14 @@ test('caller cancellation aborts provider I/O after evaluation starts', async (t
   })
   let aborted = false
   let fallbackCalls = 0
-  ctx.system1.registerProvider('backup', {
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
-  ctx.system1.registerProvider('test', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     evaluate(_req, signal) {
       return new Promise((_resolve, reject) => {
@@ -972,7 +974,7 @@ test('caller cancellation aborts provider I/O after evaluation starts', async (t
         enter()
       })
     },
-  })
+  }))
   const controller = new AbortController()
   const pending = ctx.system1.decide({
     state: 'sample',
@@ -996,19 +998,19 @@ test('explicit model failure does not try configured fallback models', async (t)
     fallbackModels: [{ provider: 'backup', model: 'backup-model' }],
   })
   let fallbackCalls = 0
-  ctx.system1.registerProvider('test', {
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture({
     ...provider,
     async evaluate() {
       throw new Error('explicit model failed')
     },
-  })
-  ctx.system1.registerProvider('backup', {
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
+  }))
 
   const result = await ctx.system1.decide({
     state: null,
@@ -1031,7 +1033,7 @@ test('explicit per-call model ignores malformed unused fallback options', async 
   const { ctx } = await setup(t, {
     fallbackModels: [{ provider: '', model: '' }],
   })
-  ctx.system1.registerProvider('test', provider)
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(provider))
 
   const result = await ctx.system1.decide({
     state: null,
@@ -1053,14 +1055,14 @@ test('service without a default model accepts an explicit per-call model', async
     await fiber.dispose()
   })
   let fallbackCalls = 0
-  ctx.system1.registerProvider('backup', {
+  ctx.system1.registerImplementation(decideOperation, 'backup', decisionFixture({
     ...provider,
     async evaluate() {
       fallbackCalls++
       return ok
     },
-  })
-  ctx.system1.registerProvider('test', provider)
+  }))
+  ctx.system1.registerImplementation(decideOperation, 'test', decisionFixture(provider))
   const result = await ctx.system1.decide({
     state: 'sample',
     questions,

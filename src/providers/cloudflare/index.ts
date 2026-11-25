@@ -4,7 +4,7 @@ import {
   credentialRef,
   isCredentialRefName,
 } from '@deepseek-ai/dsh-credentials'
-import type {} from '../../index.js'
+import { decideOperation } from '../../index.js'
 import { createCloudflareProvider } from './adapter.js'
 export { createCloudflareProvider, type CloudflareOptions } from './adapter.js'
 export { CLOUDFLARE_MODELS } from './models.js'
@@ -59,7 +59,7 @@ export function apply(ctx: Context, config: Config | RuntimeConfig) {
     resolveBaseURL: () => readConfigValue<string>(config.baseURL),
     resolveTimeoutMs: () => readConfigValue(config.timeoutMs),
   })
-  ctx.effect(() => ctx.system1.registerProvider(config.id, provider))
+  ctx.effect(() => ctx.system1.registerImplementation(decideOperation, config.id, provider))
 }
 
 function readConfigValue<T>(value: T | Volatile<T> | undefined): T | undefined {

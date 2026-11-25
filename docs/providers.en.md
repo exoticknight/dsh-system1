@@ -2,7 +2,11 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-Choose the default provider and model in DSH plugin settings, and add fallback models in the order they should be tried. Save connection details, credentials, and an optional `timeoutMs` on the matching provider component. Individual calls can override the default with `model: { provider, model }`. Each model attempt receives the full timeout budget, including capability checks and HTTP requests, so a fallback chain can take up to its number of models multiplied by that budget. Timeout precedence is per-call `timeoutMs`, the selected provider's settings-page `timeoutMs`, then that provider's own default. Leave the field blank to use the default. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
+In **System One** settings, use an operation's tab in **Operations** to choose its primary model and fallback order. Open the provider component from DSH's **Components** list. Set its endpoint, credentials, and optional `timeoutMs` in **Connection settings**, or check **Models and capabilities** for supported inputs and saved routes. The same connection settings apply wherever that instance is used.
+
+Each model shows where it appears in saved routes, for example **Locate · Primary model** or **Locate · Fallback 2**. Fallback numbers follow the full route across providers. Models absent from saved routes show **Not selected**. The bundled component rows provide these settings pages. Changing a row's provider instance `id` keeps the same page; a separately added component row needs its own settings contribution.
+
+An enabled operation can use a per-call `model: { provider, model }` instead of its route. Each model gets its full timeout budget, including capability checks and HTTP requests. Timeout precedence is per-call `timeoutMs`, the selected provider's timeout setting, then that provider's default. Leave the setting blank to use the default. Allow more time for local CPU inference and cold starts. See [Fallback models](api.en.md#fallback-models).
 
 | Provider | Models | Default timeout | Default base URL | Credential reference |
 | --- | --- | ---: | --- | --- |
@@ -76,6 +80,10 @@ const result = await ctx.system1.decide({
 
 See [testing and live model validation](testing.en.md#nace-credentials-and-live-probe) before sending a real request.
 
+### Locate text or image regions
+
+The same connection supports [Locate](locate.en.md): `drex-max-locate` finds text passages (up to 28,000 Unicode code points), and `drex-max-box` finds regions in one PNG, JPEG, or WebP (up to 4,000,000 characters in its inline data URL). Both allow up to 4,000 code points of instructions after trimming. Nace enforces the 32,768-token encoded-input limit. The dedicated endpoints do not upload temporary files. Availability depends on the deployment and account. The endpoints return `403` for Zero-retention accounts or missing inference permission; either refusal stops fallback as soon as the HTTP status arrives. See the [Nace Locate and Box guide](https://console.nace.ai/docs/drex/guides/locate-and-box).
+
 ## meraGPT Decider 1.1
 
 Save your API key on the `meragpt` settings page under `MERAGPT_API_KEY`. The default API root is `https://meragpt.com`; override it with `baseURL`. Choose `decider-1` to follow the latest 1.x release, or `decider-1.1` to pin the model. The provider also accepts `sd-1` and `state-decider-1` as aliases for `decider-1`.
@@ -91,6 +99,10 @@ Save your API key on the `liquid` settings page under `LIQUID_API_KEY`. The defa
 Both models support `noul`, `choice`, and `score`. Send up to 128 questions; the shared state and media plus any one question can use up to 65,536 tokens. A request can include up to eight PNG/JPEG/WebP images and up to eight WAV/MP3 clips, with up to 300 seconds of audio total. Keep the whole JSON body, including encoded attachments, under 4.5 MB (4,500,000 bytes). For formats and backend limits, see the [Liquid API reference](https://docs.liquid.ai/lfm/models/d1).
 
 Both models passed live text scoring, image classification, and audio checks. See [the probe and live example results](testing.en.md#liquid-ai-live-probe).
+
+### Locate text or image regions
+
+Both `d1.2` and `d1.2-ultra` support text and image [Locate](locate.en.md). A Locate request returns up to 16 matches and reports when there may be more. The text portion is limited to 250,000 UTF-8 bytes and the complete encoded JSON must stay under 4.5 MB. For one image, Liquid also enforces an aspect ratio of at most 100:1 and at most 10,000 patches of 32 × 32 pixels. Locate uses the same Liquid credentials, endpoint, and timeout as Decision. See the [Liquid Locate protocol](https://docs.liquid.ai/lfm/models/d1#typed-answers).
 
 ## Cloudflare Clef
 
@@ -120,13 +132,14 @@ The Omni capabilities above target Cloudflare's hosted API. A custom `baseURL` m
 For embedding, create the provider directly. An optional `fetch` implementation supports custom transport or local protocol fixtures:
 
 ```ts
+import { decideOperation } from 'dsh-system1'
 import { createCloudflareProvider } from 'dsh-system1/providers/cloudflare'
 
 const backend = createCloudflareProvider({
   accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? '',
   apiKey: process.env.CLOUDFLARE_API_TOKEN ?? '',
 })
-ctx.effect(() => ctx.system1.registerProvider('cloudflare', backend))
+ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare', backend))
 ```
 
 See [testing and live model validation](testing.en.md#cloudflare-credentials) for creating credentials and running the live probe.

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Nace.AI Drex",
-    "description": "Connects to Nace.AI hosted Drex decision models."
+    "description": "Connects to Nace.AI hosted Drex decision and text/image location models."
   }
 }

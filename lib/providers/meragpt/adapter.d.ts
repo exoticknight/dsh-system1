@@ -1,4 +1,3 @@
-import type { System1Provider } from '../../contracts/index.js';
 export interface MeraGptOptions {
     apiKey?: string;
     baseURL?: string;
@@ -9,5 +8,5 @@ export interface MeraGptOptions {
     fetch?: typeof fetch;
 }
 /** Hosted meraGPT Decider 1.1, which speaks the shared System One wire contract. */
-export declare function createMeraGptProvider(options?: MeraGptOptions): System1Provider;
+export declare function createMeraGptProvider(options?: MeraGptOptions): import("../../index.js").DecideImplementation & import("../decision-implementation.js").DecisionTransport;
 //# sourceMappingURL=adapter.d.ts.map
