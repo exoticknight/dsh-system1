@@ -1,7 +1,7 @@
 {
   "name": "dsh-system1",
   "version": "0.7.0",
-  "description": "Structured decisions and evidence location for DSH agents and plugins. Classify, filter, and score with multiple providers, or find matching passages in text and regions in an image with Nace Drex or Liquid AI.",
+  "description": "Let agents and plugins apply your criteria to content—for example, to filter for matching items or find passages that support a judgment. Enable features as needed and choose models for different tasks.",
   "icon": "./icon.png",
   "license": "Apache-2.0",
   "keywords": [
