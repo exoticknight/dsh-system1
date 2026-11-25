@@ -1,4 +1,3 @@
-import type { System1Provider } from '../../contracts/index.js';
 export interface CloudflareOptions {
     apiKey?: string;
     accountId?: string;
@@ -11,5 +10,5 @@ export interface CloudflareOptions {
     fetch?: typeof fetch;
 }
 /** Cloudflare REST transport for the native System One Clef models. */
-export declare function createCloudflareProvider(options?: CloudflareOptions): System1Provider;
+export declare function createCloudflareProvider(options?: CloudflareOptions): import("../../contracts/provider.js").DecideImplementation & import("../decision-implementation.js").DecisionTransport;
 //# sourceMappingURL=adapter.d.ts.map

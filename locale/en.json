@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "System One",
-    "description": "Connect multiple decision providers and models through one interface: Jev via TypeSafe, Clef via Cloudflare, Drex via Nace, Decider via meraGPT, d1.2 via Liquid AI, self-hosted Laya, and compatible custom providers. Agents and plugins can classify content, filter candidates, score against criteria, or locate objects in images, then use structured results in their workflows."
+    "description": "Decision classifies, filters, and scores content across providers. Locate finds matching passages in text or regions in one image with Nace Drex or Liquid AI. Agents and plugins use the same structured results."
   }
 }

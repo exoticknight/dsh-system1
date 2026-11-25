@@ -1,3 +1,4 @@
+import { decideOperation } from '../../src/index.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { System1Engine } from '../../src/core/engine.js'
@@ -199,7 +200,7 @@ test('Decider 1.1 sends the fixed ID and embeds attachments without changing the
   const state = { images: 'existing state field', message: 'Receipt attached' }
   const levels = ['Can wait a week', 'Within a few days', 'Today', 'Immediately']
   const engine = new System1Engine({ defaultModel: { provider: 'meragpt', model: 'decider-1.1' } })
-  engine.registerProvider('meragpt', createMeraGptProvider({
+  engine.registerImplementation(decideOperation, 'meragpt', createMeraGptProvider({
     apiKey: 'fixture-only',
     fetch: async (_input, init) => {
       const body = JSON.parse(String(init?.body))
@@ -240,7 +241,7 @@ test('Decider reconciles valid 32-level rounded scores and rejects invalid ones'
   const firstLevel = Object.fromEntries(levels.map((level, i) => [level, i === 0 ? 1 : 0]))
   const question = { type: 'score', instructions: 'Select a level', criteria: levels } as const
   const engine = new System1Engine({ defaultModel: { provider: 'meragpt', model: 'decider-1.1' } })
-  engine.registerProvider('meragpt', createMeraGptProvider({
+  engine.registerImplementation(decideOperation, 'meragpt', createMeraGptProvider({
     apiKey: 'fixture-only',
     fetch: async () => Response.json({ answers: {
       valid: { type: 'score', score: 30.9757, probabilities },

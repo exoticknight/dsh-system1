@@ -1,6 +1,7 @@
 import type { Context, Volatile } from '@deepseek-ai/cordis';
 import Schema from '@deepseek-ai/schemastery';
 export { createNaceProvider, type NaceOptions } from './adapter.js';
+export { createNaceLocateProvider } from './locate.js';
 export { NACE_MODELS } from './models.js';
 export interface Config {
     id: string;

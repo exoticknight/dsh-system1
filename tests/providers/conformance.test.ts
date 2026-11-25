@@ -1,6 +1,8 @@
+import { decideOperation } from '../../src/index.js'
+import type { DecisionTransport } from '../../src/providers/decision-implementation.js'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { Primitive, ProviderRequest, System1Provider } from '../../src/contracts/index.js'
+import type { Primitive, ProviderRequest, DecideImplementation } from '../../src/contracts/index.js'
 import type { ProviderModel } from '../../src/contracts/provider.js'
 import { System1Engine } from '../../src/core/engine.js'
 import {
@@ -28,7 +30,7 @@ const allPrimitives: readonly Primitive[] = ['noul', 'choice', 'score', 'box']
 interface ProviderSuite {
   id: string
   models: readonly ProviderModel[]
-  create(fetch: typeof globalThis.fetch): System1Provider
+  create(fetch: typeof globalThis.fetch): DecideImplementation & DecisionTransport
   supports(model: string, primitive: Primitive): boolean
 }
 
@@ -100,7 +102,7 @@ test('built-in provider catalogs conform to required declarations and round-trip
       const engine = new System1Engine({
         defaultModel: { provider: suite.id, model: model.id },
       })
-      engine.registerProvider(suite.id, provider)
+      engine.registerImplementation(decideOperation, suite.id, provider)
       try {
         for (const primitive of capabilities.primitives) {
           const question = fixtureQuestion(primitive)
@@ -180,7 +182,7 @@ test('resource-safety ceilings keep their accepted values', () => {
 function assertSafeLimits(
   provider: string,
   model: string,
-  capabilities: Awaited<ReturnType<System1Provider['describe']>>,
+  capabilities: Awaited<ReturnType<DecisionTransport['describe']>>,
 ): void {
   for (const [name, media] of Object.entries({
     images: capabilities.images,

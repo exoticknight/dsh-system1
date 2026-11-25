@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import type { ProviderRequest } from '../../src/contracts/index.js'
 import { System1ProviderError } from '../../src/contracts/error.js'
-import System1Service from '../../src/index.js'
+import { System1Engine } from '../../src/core/engine.js'
+import System1Service, { decideOperation } from '../../src/index.js'
 import { createCloudflareProvider } from '../../src/providers/cloudflare/adapter.js'
 import * as cloudflare from '../../src/providers/cloudflare/index.js'
 
@@ -293,7 +294,15 @@ test('Cloudflare rejects incomplete credentials and unsuccessful REST envelopes 
     (error: unknown) =>
       error instanceof System1ProviderError && error.detail.code === 'unavailable',
   )
+  const engine = new System1Engine({
+    defaultModel: { provider: 'cloudflare', model: request.model },
+  })
+  engine.registerImplementation(decideOperation, 'cloudflare', missing)
+  const run = await engine.run(decideOperation, { state: request.state, questions: request.questions })
+  assert.equal(run.status === 'error' && run.reason, 'no_applicable_model')
+  assert.equal(run.meta.attempts[0]?.kind, 'skipped')
   assert.equal(calls, 0)
+  engine.dispose()
 
   const provider = createCloudflareProvider({
     apiKey: 'fixture-token',

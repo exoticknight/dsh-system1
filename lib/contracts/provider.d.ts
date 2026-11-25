@@ -1,5 +1,7 @@
 import type { JsonValue, Primitive, Questions } from './question.js';
 import type { AudioInput, AudioMediaType, ImageInput, ImageMediaType, Usage, VideoInput, VideoMediaType } from './request.js';
+import type { DecideRequest } from './request.js';
+import type { OperationImplementation } from './operation.js';
 /** A selectable model ID and provider-owned alternate IDs accepted at runtime. */
 export interface ProviderModel {
     readonly id: string;
@@ -56,10 +58,7 @@ export interface ProviderResponse {
     readonly approximate?: boolean | undefined;
     readonly degraded?: boolean | undefined;
 }
-export interface System1Provider {
-    /** Timeout for this provider when the caller does not set one. */
-    timeoutMs(): number;
-    describe(model: string, signal: AbortSignal): Promise<ModelCapabilities>;
-    evaluate(request: ProviderRequest, signal: AbortSignal): Promise<ProviderResponse>;
-}
+export type DecideInput = Omit<DecideRequest, 'model' | 'signal' | 'timeoutMs'>;
+export type DecideOutput = Omit<ProviderResponse, 'model' | 'revision'>;
+export type DecideImplementation = OperationImplementation<DecideInput, DecideOutput, ModelCapabilities>;
 //# sourceMappingURL=provider.d.ts.map

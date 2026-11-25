@@ -11,7 +11,9 @@ const result = await build({
   entryPoints: [resolve(root, 'src/client/index.ts')],
   outfile: resolve(root, '.client-build/client.cjs'),
   bundle: true,
-  packages: 'external',
+  // DSH supplies its own Client modules and React. The directory's wire
+  // schema is bundled because hosts do not expose Zod as a Client module.
+  external: ['react', 'react-dom', '@deepseek-ai/*'],
   format: 'cjs',
   platform: 'browser',
   target: 'es2022',

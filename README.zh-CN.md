@@ -2,7 +2,7 @@
 
 # dsh-system1
 
-**用同一接口接入多种决策提供商与模型：在线可选 TypeSafe 提供的 Jev、Cloudflare 提供的 Clef、Nace 提供的 Drex、meraGPT 提供的 Decider 1.1、Liquid AI 提供的 d1.2；本地可连接 Laya，也支持兼容的自定义 provider。** Agent 和插件可用它进行内容分类、候选筛选、按标准评分或图片定位，再用结构化结果继续自己的流程。Provider 和模型支持时，请求也可包含文本、图片、音频和视频。Agent 可以调用内置的 `system1_decide` 工具，插件也能通过 `ctx.system1.decide()` 使用同一服务。
+**为 DSH Agent 和插件提供结构化决策与证据定位。** 插件可调用 `ctx.system1.decide()`，Agent 可用 `system1_decide` 做分类、筛选或评分。[定位](docs/locate.md)能高亮原文或框出单张图片里的匹配对象，可通过 `ctx.system1.locate()` 调用，也可单独启用 `system1_locate` 工具。系统接入 TypeSafe Jev、Cloudflare Clef、Nace Drex、meraGPT Decider 1.1、Liquid AI d1.2、本地 Laya，以及兼容的自定义 provider。
 
 [![CI](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml/badge.svg)](https://github.com/exoticknight/dsh-system1/actions/workflows/check.yml) [![npm 版本](https://img.shields.io/npm/v/dsh-system1)](https://www.npmjs.com/package/dsh-system1) [![License](https://img.shields.io/github/license/exoticknight/dsh-system1)](LICENSE) [![Maintained with RED](https://img.shields.io/badge/maintained_with-RED-C1121F)](https://github.com/exoticknight/red)
 
@@ -56,7 +56,9 @@ dsh plugin --profile <profile> add dsh-system1
 
 `dsh plugin` 命令必须指定 profile；安装到一个 profile 不会在其他 profile 中启用该插件。如需从 GitHub 仓库安装，在上述命令中把 `dsh-system1` 替换为 `github:exoticknight/dsh-system1`。
 
-随包提供的 patch 会挂载服务及内置 provider。服务默认使用 `typesafe` 的 `jev-latest`。每次尝试优先采用调用显式指定的 `timeoutMs`，否则使用该 provider 的配置值或自身默认值：TypeSafe、Laya、Cloudflare 为 800 ms，meraGPT 和 Liquid AI 为 10,000 ms，Nace 为 60,000 ms。请在对应 provider 的设置页配置超时。可在插件设置页选择默认服务和模型，并按顺序添加备用模型；在对应服务组件中填写连接参数，将密钥保存到 DSH 凭据存储，也可在启动前配置对应环境变量。每个备用模型都会获得完整超时预算，因此总耗时可随链长增加。根据后端延迟调整所选 provider 的 `timeoutMs`，本地 CPU 推理通常需要更长预算。
+随包提供的 patch 会挂载服务及内置 provider。在 **System One** 设置里，打开**决策**或**定位**标签页，分别启用操作、选择主模型并排列备用模型。从 DSH 的**组件**列表打开对应服务商子插件，可查看实例的模型，配置端点、密钥和超时。关闭操作并保存会保留配置，重新启用后可直接复用。
+
+决策默认使用 TypeSafe `jev-latest`；未配置的定位默认关闭。每次尝试优先使用调用指定的 `timeoutMs`，否则使用 provider 的配置值或默认值：TypeSafe、Laya、Cloudflare 为 800 ms，meraGPT 和 Liquid AI 为 10,000 ms，Nace 为 60,000 ms。每个备用模型都获得完整超时预算，因此总耗时会随链长增加。连接和密钥见[模型服务配置](docs/providers.md)。
 
 已验证 DSH `0.2.3-alpha.2` 的 Web 设置页与 Agent 工具。从 npm 启动该宿主时，请使用 Node.js 24.22.3 或更高的 24.x，或 26.13.1 或更高的 26.x。参见 [DSH 运行时要求](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.3-alpha.2/docs/upgrade-guide/v0.2.3-alpha.1/node-24-22-3/guide.zh.md)。
 
@@ -70,7 +72,7 @@ dsh plugin --profile <profile> add dsh-system1
 
 安装后 agent 可以直接使用 `system1_decide` 工具，无需编写消费插件。主模型可以把是否判断、分类和打分交给 System One，再根据返回的概率决定下一步。该工具使用上面配置的默认服务和模型。
 
-此功能由 bundle 中的 `system1-tool` 组件提供，默认开启。在插件页关闭该组件即可移除工具；headless profile 中可在对应条目上设置 `disabled: true`。参数和返回值见 [API 文档](docs/api.md#agent-工具)。
+随包提供的 `system1-tool` 组件默认开启，启用决策时会提供 `system1_decide`。要提供 `system1_locate`，先启用定位，再配置它的主模型并打开**Agent 工具**开关；仅关闭该开关时，插件仍可调用定位。在插件页关闭共用组件，或在无界面 profile 的对应条目设置 `disabled: true`，即可移除 Agent 工具而保留操作本身。参见[决策工具 API](docs/api.md#agent-工具)和[定位配置](docs/locate.md)。
 
 ## 消费插件调用
 

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Liquid AI",
-    "description": "接入 Liquid AI 托管决策模型。"
+    "description": "接入 Liquid AI 模型，用于结构化决策及文本、图片定位。"
   }
 }

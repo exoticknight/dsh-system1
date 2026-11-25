@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js';
+import type { ProviderRequest, ProviderResponse } from '../contracts/index.js';
 import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js';
+import type { JsonProviderConnection } from './http.js';
 declare const wireResponse: z.ZodObject<{
     model: z.ZodOptional<z.ZodString>;
     answers: z.ZodRecord<z.ZodString, z.ZodUnknown>;
@@ -9,13 +10,8 @@ declare const wireResponse: z.ZodObject<{
         output_tokens: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strip>>;
 }, z.core.$loose>;
-export interface SystemOneHttpProviderOptions {
-    readonly providerName: string;
-    readonly defaultBaseURL: string;
+export interface SystemOneHttpProviderOptions extends JsonProviderConnection {
     readonly timeoutMs: () => number;
-    readonly resolveApiKey: () => string | undefined | Promise<string | undefined>;
-    readonly resolveBaseURL?: () => string | undefined;
-    readonly apiKeyRequired?: boolean;
     readonly resolveModel: (model: string) => ProviderModel | undefined;
     readonly requestModel?: (model: string) => string | undefined;
     readonly capabilities?: ModelCapabilities | ((model: string) => ModelCapabilities);
@@ -25,13 +21,17 @@ export interface SystemOneHttpProviderOptions {
     };
     readonly roundedProbabilities?: boolean;
     readonly selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined;
-    readonly fetch?: typeof fetch;
 }
 /**
  * Shared transport for providers that implement the TypeSafe System One wire
  * contract. Provider identity, URL, key policy and model mapping stay separate.
  */
-export declare function createSystemOneHttpProvider(options: SystemOneHttpProviderOptions): System1Provider;
+export declare function createSystemOneHttpProvider(options: SystemOneHttpProviderOptions): {
+    timeoutMs: () => number;
+    describe(model: string, _signal: AbortSignal): Promise<ModelCapabilities>;
+    evaluate(request: ProviderRequest, signal: AbortSignal): Promise<ProviderResponse>;
+};
+export declare function createSystemOneDecisionImplementation(models: readonly ProviderModel[], options: SystemOneHttpProviderOptions): import("../contracts/provider.js").DecideImplementation & import("./decision-implementation.js").DecisionTransport;
 /** Shared response normalization for providers that return the System One payload. */
 export declare function normalizeSystemOneResponse(request: ProviderRequest, raw: unknown, providerName: string, selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined, roundedProbabilities?: boolean): ProviderResponse;
 export {};

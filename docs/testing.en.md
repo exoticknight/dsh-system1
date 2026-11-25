@@ -144,3 +144,9 @@ On CPU, loading takes about a minute and one inference about a minute; the probe
 ## TypeSafe
 
 The [official documentation](https://docs.typesafe.ai/introduction/quickstart) offers a hosted API only, with no deployable local Jev release. Set `TYPESAFE_API_KEY` in `.env.local` and run `pnpm probe typesafe`.
+
+## Locate validation
+
+Run `pnpm test locate` to replay the Nace and Liquid text and image fixtures without credentials. The suite checks repeated text after non-BMP characters, pixel coordinates for two boxes, empty versus missing result arrays, cancellation, fallback, and Agent tool withdrawal. These fixtures verify the plugin contract; hosted Locate inference requires a separate check on your account.
+
+Before sending hosted probes, confirm that the source can be sent to the provider and that the account has approved credit or quota. Nace's free model-list request checks credentials, but does not run either Locate endpoint. For a small live check, enable Locate, select the intended model explicitly and run the [Locate plugin example](../examples/locate.ts) with synthetic text or one raster image.

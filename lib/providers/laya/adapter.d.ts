@@ -1,4 +1,3 @@
-import type { System1Provider } from '../../contracts/index.js';
 export interface LayaOptions {
     apiKey?: string;
     baseURL?: string;
@@ -8,5 +7,5 @@ export interface LayaOptions {
     resolveBaseURL?: () => string | undefined;
     fetch?: typeof fetch;
 }
-export declare function createLayaProvider(options: LayaOptions): System1Provider;
+export declare function createLayaProvider(options: LayaOptions): import("../../index.js").DecideImplementation & import("../decision-implementation.js").DecisionTransport;
 //# sourceMappingURL=adapter.d.ts.map

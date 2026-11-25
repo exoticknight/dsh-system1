@@ -2,7 +2,11 @@
 
 [简体中文](providers.md) | [English](providers.en.md)
 
-在 DSH 插件设置中选择默认服务与模型，并按顺序添加备用模型；在对应服务组件中保存连接参数、密钥和可选的 `timeoutMs`。调用方也可通过 `model: { provider, model }` 逐次选择。每次模型尝试都会获得完整超时预算（包括能力检查与 HTTP 调用），因此兜底链总时长可达到模型数乘以预算。超时优先级为：调用显式 `timeoutMs`、所选 provider 设置页中的 `timeoutMs`、provider 自身默认值。留空使用 provider 默认值。本地模型首次加载和 CPU 推理应使用更长的预算。详见 [备用模型](api.md#备用模型)。
+在 **System One** 设置的**操作**区，选择某项操作的标签页来设置主模型和备用顺序。从 DSH 的**组件**列表打开对应服务商子插件，在**连接设置**中修改端点、密钥和可选的 `timeoutMs`，或在**模型与能力**中查看该实例支持的输入及已使用它的路由。使用同一实例的操作共享连接设置。
+
+模型按已保存的路由显示「定位 · 主模型」「定位 · 备用 2」等位置；备用序号按整条路由计算，不因更换服务商而重新编号。没有加入任何已保存路由的模型显示「未被选用」。这些专用页面对应随包提供的组件行；修改行内的实例 `id` 仍可用原入口，另行添加的组件行由其插件自行提供设置页。
+
+操作启用后，调用方可通过 `model: { provider, model }` 临时选模。每个模型都获得完整超时预算，包括能力检查和 HTTP 调用。超时依次取调用指定的 `timeoutMs`、所选 provider 的超时设置及其默认值。留空即用默认值。本地模型首次加载和 CPU 推理需要更长的预算时，可调高超时。详见[备用模型](api.md#备用模型)。
 
 | Provider | 模型 | 默认超时 | 默认服务地址 | 凭据引用 |
 | --- | --- | ---: | --- | --- |
@@ -76,6 +80,10 @@ const result = await ctx.system1.decide({
 
 发送真实请求前，先查看[测试与真实模型验证](testing.md#nace-凭据与真实探针)。
 
+### 文本与图片定位
+
+同一连接也可用于[定位](locate.md)：`drex-max-locate` 查找文本片段（原文最多 28,000 个 Unicode 码点）；`drex-max-box` 查找一张 PNG、JPEG 或 WebP 上的区域（内联 data URL 最多 4,000,000 字符）。两者都将去掉首尾空白后的指令限制在 4,000 个码点；编码输入的 32,768-token 预算由 Nace 执行。定位专用端点不会上传临时文件，能否调用取决于部署和账号。账号启用 Zero retention 或缺少推理权限时，端点返回 `403`；收到该状态后会立即停止兜底。见 [Nace Locate 与 Box 指南](https://console.nace.ai/docs/drex/guides/locate-and-box)。
+
 ## meraGPT Decider 1.1
 
 在 `meragpt` 设置页保存 API Key，凭据引用为 `MERAGPT_API_KEY`。默认 API 根地址为 `https://meragpt.com`，可通过 `baseURL` 覆盖。`decider-1` 跟随最新 1.x，也接受旧别名 `sd-1`、`state-decider-1`；要固定版本，请选择 `decider-1.1`。
@@ -91,6 +99,10 @@ API 使用预付费额度。发起探针或推理前请确认账户余额；额�
 两款模型均支持 `noul`、`choice` 和 `score`。单次最多 128 道题；共享 state、媒体和任一单题合计最多 65,536 tokens。可以在同一请求中附带最多 8 张 PNG/JPEG/WebP 图片与最多 8 段 WAV/MP3 音频，音频总长最多 300 秒。完整 JSON 请求体（含编码后的附件）须小于 4.5 MB（4,500,000 字节）；大附件宜先压缩。格式和后端限制见 [Liquid 接口文档](https://docs.liquid.ai/lfm/models/d1)。
 
 两款模型都已通过真实接口的文本评分、图片分类和音频判断。见[运行探针与实测样例](testing.md#liquid-ai-真实探针)。
+
+### 文本与图片定位
+
+`d1.2` 和 `d1.2-ultra` 均支持[定位](locate.md)的文本与图片输入。每次定位最多返回 16 个匹配；达到上限时会提示可能还有结果。文本部分最多 250,000 个 UTF-8 字节，编码后的整份 JSON 仍须小于 4.5 MB。图片定位只接收一张图片，Liquid 还校验每张图的长宽比（最长边不超过最短边的 100 倍）以及 32 × 32 像素图块数（最多 10,000）。复用原有 Liquid 凭据、端点和超时。详见 [Liquid 定位协议](https://docs.liquid.ai/lfm/models/d1#typed-answers)。
 
 ## Cloudflare Clef
 
@@ -120,13 +132,14 @@ Cloudflare 的公开示例明确展示 `audio/mpeg` 与 `video/mp4`；本包把 
 嵌入使用时可直接创建 provider；`fetch` 可选，用于替换传输或本地协议 fixture：
 
 ```ts
+import { decideOperation } from 'dsh-system1'
 import { createCloudflareProvider } from 'dsh-system1/providers/cloudflare'
 
 const backend = createCloudflareProvider({
   accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? '',
   apiKey: process.env.CLOUDFLARE_API_TOKEN ?? '',
 })
-ctx.effect(() => ctx.system1.registerProvider('cloudflare', backend))
+ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare', backend))
 ```
 
 凭据申请和真实调用探针见[测试与真实模型验证](testing.md#cloudflare-凭据)。

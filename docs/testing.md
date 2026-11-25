@@ -144,3 +144,9 @@ CPU 加载约 1 分钟，单次推理约 1 分钟，探针最长等待 300 秒�
 ## TypeSafe
 
 [官方文档](https://docs.typesafe.ai/introduction/quickstart)只提供托管 API，没有可部署的 Jev 本地发行版。在 `.env.local` 中设置 `TYPESAFE_API_KEY` 后运行 `pnpm probe typesafe`。
+
+## 定位验证
+
+运行 `pnpm test locate` 即可在无凭据的环境重放 Nace 和 Liquid 的文本、图片响应样例。测试覆盖非 BMP 字符后的重复原文、两个框的像素坐标、合法空结果与缺失结果列表、取消与兜底以及撤下 Agent 工具。样例用于验证插件契约；托管定位推理仍需用实际账户单独验证。
+
+发送托管探针前，先确认材料允许发给该 provider，且账号有授权的额度。Nace 的免费模型列表请求可检查凭据，但不会运行定位端点。要做一次小型实测，请先启用定位，再显式选定模型，用[定位消费插件示例](../examples/locate.ts)发送合成文本或一张栅格图片。

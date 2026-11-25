@@ -1,9 +1,9 @@
-import type { System1Provider } from '../../contracts/index.js'
 import type { ModelCapabilities } from '../../contracts/provider.js'
 import { System1ProviderError } from '../../contracts/error.js'
 import { findProviderModel } from '../models.js'
 import { normalizeSystemOneResponse } from '../systemone.js'
 import { CLOUDFLARE_MODELS } from './models.js'
+import { decisionImplementation } from '../decision-implementation.js'
 
 export interface CloudflareOptions {
   apiKey?: string
@@ -61,9 +61,14 @@ const OMNI_CAPABILITIES: Pick<ModelCapabilities, 'audio' | 'videos' | 'audioVide
 /** Cloudflare REST transport for the native System One Clef models. */
 export function createCloudflareProvider(
   options: CloudflareOptions = {},
-): System1Provider {
+) {
   const fetchFn = options.fetch ?? globalThis.fetch
-  return {
+  const capabilitiesFor = (id: CloudflareModelId): ModelCapabilities => ({
+    ...CAPABILITIES,
+    ...(id === 'clef-omni' ? OMNI_CAPABILITIES : {}),
+    context: { maxTokens: MAX_TOKENS_BY_MODEL[id], includesQuestions: true },
+  })
+  return decisionImplementation(CLOUDFLARE_MODELS, ({ id }) => capabilitiesFor(id), {
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     async describe(model) {
       const selectedModel = resolveCloudflareModel(model)
@@ -72,11 +77,7 @@ export function createCloudflareProvider(
           code: 'unsupported',
           message: 'Cloudflare model is not supported.',
         })
-      return {
-        ...CAPABILITIES,
-        ...(selectedModel.id === 'clef-omni' ? OMNI_CAPABILITIES : {}),
-        context: { maxTokens: selectedModel.maxTokens, includesQuestions: true },
-      }
+      return capabilitiesFor(selectedModel.id)
     },
     async evaluate(request, signal) {
       const selectedModel = resolveCloudflareModel(request.model)
@@ -99,13 +100,13 @@ export function createCloudflareProvider(
         throw new System1ProviderError({
           code: 'unavailable',
           message: 'Cloudflare credentials could not be resolved.',
-        })
+        }, 'stop', false)
       }
       if (!apiKey?.trim() || !accountId?.trim())
         throw new System1ProviderError({
           code: 'unavailable',
           message: 'Cloudflare API token and account ID are required.',
-        })
+        }, 'stop', false)
 
       const baseURL = options.resolveBaseURL?.() ?? options.baseURL ?? 'https://api.cloudflare.com/client/v4'
       let response: Response
@@ -182,7 +183,7 @@ export function createCloudflareProvider(
       const result = unwrapCloudflareResult(raw)
       return normalizeSystemOneResponse(canonicalRequest, result, 'Cloudflare')
     },
-  }
+  }, 'Cloudflare')
 }
 
 function unwrapCloudflareResult(raw: unknown): unknown {

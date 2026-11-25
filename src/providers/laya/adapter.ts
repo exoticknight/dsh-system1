@@ -1,6 +1,5 @@
-import type { System1Provider } from '../../contracts/index.js'
 import { findProviderModel } from '../models.js'
-import { createSystemOneHttpProvider } from '../systemone.js'
+import { createSystemOneDecisionImplementation } from '../systemone.js'
 import { LAYA_MODELS } from './models.js'
 
 const DEFAULT_TIMEOUT_MS = 800
@@ -15,8 +14,8 @@ export interface LayaOptions {
   fetch?: typeof fetch
 }
 
-export function createLayaProvider(options: LayaOptions): System1Provider {
-  return createSystemOneHttpProvider({
+export function createLayaProvider(options: LayaOptions) {
+  return createSystemOneDecisionImplementation(LAYA_MODELS, {
     providerName: 'Laya',
     defaultBaseURL: options.baseURL ?? 'http://127.0.0.1:8000',
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,

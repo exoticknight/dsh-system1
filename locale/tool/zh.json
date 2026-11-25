@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Agent 工具",
-    "description": "为 agent 提供 system1_decide 工具。"
+    "description": "为 Agent 提供 system1_decide；启用定位工具后也提供 system1_locate。"
   }
 }

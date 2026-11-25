@@ -6,11 +6,19 @@
 
 `decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds. Its precedence is the per-call value, the selected provider's `timeoutMs` setting, then that provider's own default. TypeSafe, Laya, and Cloudflare default to 800 ms; meraGPT and Liquid AI default to 10,000 ms, and Nace to 60,000 ms. Each model attempt gets the full budget, including capability checks and the backend call.
 
-0.4.0 migration: service-level `timeoutMs` has been removed, and residual values in older service configuration are ignored. Move custom timeouts to the matching provider settings page. Third-party `System1Provider` implementations must replace `defaultTimeoutMs` with `timeoutMs(): number`; `ModelCapabilities` now requires explicit question limits and count/byte limits for every supported attachment type.
+Move any legacy service-level `timeoutMs` to the corresponding provider settings. If you maintain a third-party provider, see [upgrading provider plugins](#upgrading-provider-plugins). For text passages or multiple boxes in one image, use [Locate](locate.en.md).
 
 The package root exports the service, error classes, and types. `dsh-system1/contracts` exports the public types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. Each `dsh-system1/providers/<id>` subpath exports the Cordis plugin, a `create…Provider` factory, and its model catalog. Use `typesafe`, `laya`, `nace`, `meragpt`, `liquid`, or `cloudflare` for `<id>`. See [provider setup](providers.en.md) for connection details and model selection.
 
 Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
+
+### Enable an operation
+
+Decision, Locate, and installed extension operations each have a tab in **System One** settings. The enable switch controls new calls to that operation, including calls with an explicit model. Changing it keeps the saved route, provider connections, and Agent tool preference. Requests already running continue. A disabled call rejects with `System1OperationDisabledError` carrying `operationId` before reaching a provider.
+
+In a headless profile, set `operations.<id>.enabled` on the service. When omitted, Decision is enabled and a newer operation stays enabled if it already has a primary model, fallbacks, or Agent tool enabled. An unconfigured newer operation starts off. Decision's route remains at the top level; for example, `operations.decide.enabled: false` pauses Decision without moving `defaultModel` or `fallbackModels`.
+
+### Call Decision
 
 ```ts
 const result = await ctx.system1.decide({
@@ -81,7 +89,7 @@ The service moves to the next model when a whole attempt fails because the provi
 
 ## Agent tool
 
-The `dsh-system1/tool` component injects `system1` and the DSH `tools` registry and registers the model-facing `system1_decide` tool. It relies only on the host's tool registry and adds no runtime dependency on `@deepseek-ai/dsh-tools`.
+The `dsh-system1/tool` component injects `system1` and the DSH `tools` registry and exposes the model-facing `system1_decide` tool while Decision is enabled. It relies only on the host's tool registry and adds no runtime dependency on `@deepseek-ai/dsh-tools`.
 
 Arguments:
 
@@ -94,31 +102,46 @@ Arguments:
 
 The tool returns `{ answers, model?, fallbacks? }`. `answers` maps each `id` to `{ status: 'ok', answer }` or `{ status: 'error', error: { code, message } }`. When a provider succeeds, `model` identifies the provider and actual model that ran; it is omitted when none succeeds. `fallbacks`, when present, lists non-cancelled failed attempts as `{ provider, model, error: { code, message } }` in order. The tool forwards the call's cancellation signal to `decide()` and uses the selected provider's configured or default timeout. A malformed structure fails the whole tool call; a runtime failure appears only in the affected question's result.
 
-The tool description tells models that probabilities range from 0 to 1, `score.value` is a zero-based expected criteria index, `box` edges are normalized image coordinates, confidence is backend-defined and not comparable across backends, and probabilities from different models are not calibrated against each other.
+For Locate and extension operations with a tool, `agentEnabled` controls publication to agents separately from execution. While the operation is enabled, a plugin can use the API even when `agentEnabled` is off. Publishing also requires an available primary model and the mounted tool component. See [Locate](locate.en.md).
+
+The Decision tool description tells models that probabilities range from 0 to 1, `score.value` is a zero-based expected criteria index, `box` edges are normalized image coordinates, confidence is backend-defined and not comparable across backends, and probabilities from different models are not calibrated against each other.
 
 ## Implementing a provider
 
-Each provider declares canonical IDs and optional aliases in its own model array; there is no cross-provider catalog to maintain. `ProviderModel` uses `id` for the canonical model ID and `aliases` for other input names accepted by that provider. Settings use the canonical IDs; aliases do not appear as separate menu options. `findProviderModel(models, input)` resolves a definition by canonical ID or alias. Use the matched `id` for capability checks and upstream requests. Built-in providers validate the model ID first, returning `unsupported` for an unknown model before resolving credentials. Capability limits remain provider-adapter-owned; localized settings labels live in the client locale strings.
-
-Import types from `dsh-system1/contracts`, `System1ProviderError` from the package root, and `findProviderModel` from `dsh-system1/providers` when resolving aliases. Error messages must be safe to display. Implement `describe(model, signal)` and `evaluate(request, signal)` and return standard per-question answers. Treat request parameters as read-only. See the [provider example](../examples/provider.ts).
+A provider plugs into an operation, not into every System1 feature. Import the corresponding operation definition from `dsh-system1` and register an implementation in the provider plugin scope:
 
 ```ts
-import { findProviderModel } from 'dsh-system1/providers'
-import type { ProviderModel } from 'dsh-system1/contracts'
+import { decideOperation } from 'dsh-system1'
+import { createCloudflareProvider } from 'dsh-system1/providers/cloudflare'
 
-const MODELS = [
-  { id: 'example-v2', aliases: ['example-latest'] },
-] as const satisfies readonly ProviderModel[]
-
-const selected = findProviderModel(MODELS, requestedModel)
-// selected?.id is the canonical ID for capability checks and upstream requests
+const backend = createCloudflareProvider({ accountId, apiKey })
+ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare', backend))
 ```
 
-```ts
-ctx.effect(() => ctx.system1.registerProvider('custom', backend))
-```
+For a custom implementation, declare the operation's major `version`, the model selection method, `timeoutMs()`, and `execute(input, { model, requestId, signal })`. Return `{ model, result, revision? }` using the actual model that answered. Treat input as read-only and forward the signal to upstream I/O. The operation definition owns input and output validation; the implementation owns its upstream protocol and limits. Keep provider errors safe to display. For new operations, pass `'fallback'` to `System1ProviderError` only when sending the source to the next configured provider is acceptable. Use `'stop'` for policy refusals. Decision retains its existing error routing.
 
-Provider ids must be unique within a service. Registration returns an idempotent disposer. Unregistering cancels in-flight calls for that instance, and service disposal removes all registrations. `System1Provider` must implement `timeoutMs(): number`. Each attempt uses a request-level value when present; otherwise it calls the provider method, and rejects anything other than a positive integer as `invalid_response`. Providers must declare their count limits: `maxQuestions`, `maxChoiceOptions`, and `maxScoreLevels` are required as a positive integer or explicit `null` (delegate preflight to the upstream). If images are supported, declare `maxCount`, `maxBytesPerImage`, and `maxTotalBytes`; if audio or video is supported, declare `maxCount` and `maxBytesPerItem`. Attachment declarations must stay within shared resource-safety ceilings of 16 items per type, 16 MiB per item, and 64 MiB total. Missing runtime declarations fail the attempt as `invalid_response` and produce one provider-logger warning. Use `audioVideo` for any tighter shared audio/video byte limit. `longContext.maxTokens` declares extended context. Context token counts are informational; the backend enforces its actual token budget. `ProviderRequest` receives the shared media attachments and `longContext` option.
+- A fixed catalog uses `models: { kind: 'fixed', models: [...] }`. Each entry declares canonical `id`, optional `aliases`, supported `inputs`, and operation-specific `capabilities`. Menus show canonical IDs.
+- A deployment catalog uses `models: { kind: 'deployment', inputs, resolve(model, signal) }`. Settings accept a deployment name. Resolve it to the same model descriptor without sending task input, and use the selected model within the shared attempt timeout.
+
+For Decision, implement `DecideImplementation`: the result carries standard per-question `answers` and may include `usage`, `approximate`, and `degraded`. Use `ModelCapabilities` to declare question limits (`maxQuestions`, `maxChoiceOptions`, `maxScoreLevels`); a positive integer enables local checks, or `null` delegates to the backend. Declare count and byte limits for supported media. The shared ceilings remain 16 items per type, 16 MiB per item, and 64 MiB decoded in total. `audioVideo` can tighten the combined audio and video limit; `longContext.maxTokens` declares extended context. Token counts are informational; the backend enforces its tokenizer budget. See the [custom provider example](../examples/provider.ts).
+
+An operation ID must be unique; an implementation is unique for its operation and provider ID. Registration returns an idempotent disposer. Use it with `ctx.effect` so unload removes the catalog entry and cancels its in-flight calls. A provider can register Decision and Locate under the same ID while sharing its connection and credentials.
+
+### Add a distinct operation
+
+Define it with `defineOperation`, then register the definition and its implementation in that order. The runtime catalog adds an operation tab and its optional Agent tool. Enable the operation on its tab or at `operations.<id>.enabled`, and pin its major `version` when saving a route. Consumers call `service.run(operation, input, { model, signal, timeoutMs })`. The result is `{ status: 'ok', value, meta }` or `{ status: 'error', reason, error, meta }`. See the [standalone operation example](../examples/operation.ts).
+
+## Upgrading provider plugins
+
+Applications that call `decide()` or `system1_decide` keep their request and result contracts. The six bundled providers use the new registration interface; their connection settings and credentials stay where they were. Opening the settings page does not require migrating the existing Decision route.
+
+Third-party providers using `registerProvider(id, backend)` must be upgraded alongside the service:
+
+1. Import `decideOperation` (or the definition of another operation your provider implements). Replace `System1Provider` with `DecideImplementation` for Decision.
+2. Declare a fixed model catalog or a deployment resolver, and include each model's capabilities. Move the execution logic from `evaluate` to `execute`; take the chosen model, request ID and signal from the second argument, and put the old answer fields inside `result`.
+3. Register with `ctx.effect(() => ctx.system1.registerImplementation(decideOperation, id, implementation))`. Keep the existing provider ID, model names, connection settings and credential references so saved routes still resolve.
+
+The old registration method was removed. If a third-party provider has no compatible build, keep the earlier service and provider together. An unregistered candidate is skipped, so check whether a saved fallback sends the request to another provider. To roll back, restore matching service and provider versions and the pre-upgrade configuration snapshot; turning off Locate does not restore the old API.
 
 ## TypeSafe capabilities and limits
 
@@ -128,7 +151,7 @@ The provider plugin accepts `id`, `apiKeyEnv`, and optional `baseURL`; the first
 
 ## Nace.AI Drex capabilities and limits
 
-`dsh-system1/providers/nace` exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, and `NACE_MODELS` (`drex-v2.0`, `drex-max-v1.1`, `drex-max-finance`). Nace supports `noul`, `choice`, and `score`. The adapter serializes structured descriptions as compact JSON text, preserves `null` choice descriptions, and returns score probabilities in level order.
+`dsh-system1/providers/nace` exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, `createNaceLocateProvider`, and the Decision catalog `NACE_MODELS` (`drex-v2.0`, `drex-max-v1.1`, `drex-max-finance`). Nace supports `noul`, `choice`, and `score`. The adapter serializes structured descriptions as compact JSON text, preserves `null` choice descriptions, and returns score probabilities in level order.
 
 All three models accept up to 512 questions. Use Max v1.1 or Finance for images; both allow 255 options or levels per question and 262,144 tokens per packed request. The adapter keeps images inline within the 4 MiB JSON request budget and uploads only as many as needed to fit. See [Nace setup](providers.en.md#naceai-drex) for context, image limits, and retention. Requests naming retired IDs return `unsupported` before sending HTTP requests. Token and other request-limit errors from Nace map to `provider_error`.
 
@@ -140,7 +163,7 @@ Send up to 64 `noul`, `choice`, or `score` questions. The maximums are 255 choic
 
 ## Liquid AI capabilities and limits
 
-`dsh-system1/providers/liquid` exports the Cordis plugin, `createLiquidProvider`, `LiquidOptions`, and `LIQUID_MODELS` (`d1.2`, `d1.2-ultra`). The plugin supports `noul`, `choice`, and `score` on both models, up to 128 questions. The state, shared media, and any one question can use up to 65,536 tokens. The backend enforces option and level counts.
+`dsh-system1/providers/liquid` exports the Cordis plugin, `createLiquidProvider`, `LiquidOptions`, `createLiquidLocateProvider`, and `LIQUID_MODELS` (`d1.2`, `d1.2-ultra`). The plugin supports `noul`, `choice`, and `score` on both models, up to 128 questions. The state, shared media, and any one question can use up to 65,536 tokens. The backend enforces option and level counts.
 
 Pass media in `images` and `audio`. The adapter returns `limit_exceeded` if the encoded JSON body reaches 4.5 MB. See [Liquid AI setup](providers.en.md#liquid-ai) for connection and media limits, and [live text, image, and audio results](testing.en.md#liquid-ai-live-probe) for both models.
 

@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import type { System1Provider } from '../../contracts/index.js'
 import { findProviderModel } from '../models.js'
 import { TYPESAFE_MODELS } from './models.js'
-import { createSystemOneHttpProvider } from '../systemone.js'
+import { createSystemOneDecisionImplementation } from '../systemone.js'
 
 const DEFAULT_TIMEOUT_MS = 800
 
@@ -18,8 +17,8 @@ export interface TypesafeOptions {
 
 export function createTypesafeProvider(
   options: TypesafeOptions,
-): System1Provider {
-  return createSystemOneHttpProvider({
+) {
+  return createSystemOneDecisionImplementation(TYPESAFE_MODELS, {
     providerName: 'TypeSafe',
     defaultBaseURL: options.baseURL ?? 'https://api.typesafe.ai',
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,

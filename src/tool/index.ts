@@ -204,18 +204,24 @@ interface ToolRegistry {
   register(definition: object): () => void
 }
 
+// An empty JSON Schema accepts any JSON result. DSH still requires output
+// schema and renderer slots even when an operation does not refine its result.
+const DEFAULT_OUTPUT_SCHEMA = {}
+const renderJsonOutput = (_args: unknown, value: unknown) => [
+  { type: 'text', text: JSON.stringify(value) },
+]
+
 export function apply(ctx: Context) {
   const tools = ctx.get('tools') as unknown as ToolRegistry
-  ctx.effect(() =>
-    tools.register({
+  ctx.effect(() => {
+    const service = ctx.system1
+    const decisionTool = {
       name: TOOL_NAME,
       description: DESCRIPTION,
       parameters: PARAMETERS,
       output: {
         schema: OUTPUT_SCHEMA,
-        render: (_args: unknown, value: unknown) => [
-          { type: 'text', text: JSON.stringify(value) },
-        ],
+        render: renderJsonOutput,
       },
       isConcurrencySafe: () => true,
       async execute(raw: unknown, exec: { signal: AbortSignal }) {
@@ -232,8 +238,83 @@ export function apply(ctx: Context) {
         })
         return toOutput(response)
       },
-    }),
-  )
+    }
+    const mounted = new Map<string, () => void>()
+    const warned = new Set<string>()
+    let reconciling = false
+    const reconcile = () => {
+      if (reconciling) return
+      reconciling = true
+      try {
+        reconcileTools()
+      } finally {
+        reconciling = false
+      }
+    }
+    const reconcileTools = () => {
+      const desired = [
+        ...(service.isOperationEnabled('decide') ? [decisionTool] : []),
+        ...service.getAgentTools().map(({ name, description, parameters, output, execute }) => ({
+          name, description, parameters,
+          output: { schema: output ?? DEFAULT_OUTPUT_SCHEMA, render: renderJsonOutput },
+          isConcurrencySafe: () => true,
+          execute: (args: unknown, execution: { signal: AbortSignal }) => execute(args, execution.signal),
+        })),
+      ]
+      const names = new Set(desired.map(({ name }) => name))
+      for (const name of warned) if (!names.has(name)) warned.delete(name)
+      for (const [name, remove] of mounted) {
+        if (!names.has(name)) {
+          mounted.delete(name)
+          remove()
+        }
+      }
+      for (const definition of desired) {
+        const { name } = definition
+        if (mounted.has(name)) continue
+        let remove: () => void
+        try {
+          remove = tools.register(definition)
+        } catch (error) {
+          if (name === TOOL_NAME) throw error
+          // A rejected extension must not prevent the remaining tools from mounting.
+          if (!warned.has(name)) {
+            warned.add(name)
+            ctx.logger('dsh-system1 tools').warn(
+              `DSH rejected operation tool ${JSON.stringify(name)}; check its name and schema.`,
+            )
+          }
+          continue
+        }
+        warned.delete(name)
+        mounted.set(name, () => {
+          try {
+            remove()
+          } finally {
+            service.setOperationToolMounted(name, false)
+          }
+        })
+        service.setOperationToolMounted(name, true)
+      }
+    }
+    service.setDecisionToolAttached(true)
+    const unsubscribe = service.subscribeCatalog(reconcile)
+    const dispose = () => {
+      unsubscribe()
+      try {
+        for (const remove of mounted.values()) remove()
+      } finally {
+        service.setDecisionToolAttached(false)
+      }
+    }
+    try {
+      reconcile()
+    } catch (error) {
+      dispose()
+      throw error
+    }
+    return dispose
+  })
 }
 
 function toQuestions(list: ToolArgs['questions']): Questions {

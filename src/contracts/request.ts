@@ -1,6 +1,7 @@
 import type { JsonValue, Questions } from './question.js'
 import type { QuestionResult } from './answer.js'
 import type { DecisionError } from './error.js'
+import type { OperationRouteConfig } from './operation.js'
 export interface ModelRef {
   readonly provider: string
   readonly model: string
@@ -71,4 +72,5 @@ export interface DecideResponse<Q extends Questions = Questions> {
 export interface System1Options {
   readonly defaultModel?: ModelRef | undefined
   readonly fallbackModels?: readonly ModelRef[]
+  readonly operations?: Readonly<Record<string, OperationRouteConfig>> | undefined
 }

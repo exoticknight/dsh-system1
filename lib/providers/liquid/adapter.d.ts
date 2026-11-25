@@ -1,4 +1,3 @@
-import type { System1Provider } from '../../contracts/index.js';
 export interface LiquidOptions {
     apiKey?: string;
     baseURL?: string;
@@ -8,5 +7,5 @@ export interface LiquidOptions {
     resolveBaseURL?: () => string | undefined;
     fetch?: typeof fetch;
 }
-export declare function createLiquidProvider(options?: LiquidOptions): System1Provider;
+export declare function createLiquidProvider(options?: LiquidOptions): import("../../index.js").DecideImplementation & import("../decision-implementation.js").DecisionTransport;
 //# sourceMappingURL=adapter.d.ts.map

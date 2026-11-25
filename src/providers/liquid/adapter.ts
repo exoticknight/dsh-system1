@@ -1,7 +1,6 @@
-import type { System1Provider } from '../../contracts/index.js'
 import { System1ProviderError } from '../../contracts/error.js'
 import { findProviderModel } from '../models.js'
-import { createSystemOneHttpProvider } from '../systemone.js'
+import { createSystemOneDecisionImplementation } from '../systemone.js'
 import { LIQUID_BASE_URL, LIQUID_MODELS, LIQUID_TIMEOUT_MS } from './models.js'
 
 const MAX_BODY_BYTES = 4_500_000
@@ -18,8 +17,8 @@ export interface LiquidOptions {
   fetch?: typeof fetch
 }
 
-export function createLiquidProvider(options: LiquidOptions = {}): System1Provider {
-  return createSystemOneHttpProvider({
+export function createLiquidProvider(options: LiquidOptions = {}) {
+  return createSystemOneDecisionImplementation(LIQUID_MODELS, {
     providerName: 'Liquid AI',
     defaultBaseURL: options.baseURL ?? LIQUID_BASE_URL,
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? LIQUID_TIMEOUT_MS,

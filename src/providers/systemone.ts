@@ -1,10 +1,13 @@
 import { z } from 'zod'
 import { isDeepStrictEqual } from 'node:util'
-import type { ProviderRequest, ProviderResponse, System1Provider } from '../contracts/index.js'
+import type { ProviderRequest, ProviderResponse } from '../contracts/index.js'
 import type { ModelCapabilities, ProviderModel } from '../contracts/provider.js'
 import { System1ProviderError } from '../contracts/error.js'
+import { createJsonPost } from './http.js'
+import type { JsonProviderConnection } from './http.js'
 import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from './answers.js'
 import { normalizeRoundedDistributionRecord, normalizeRoundedScore } from './probabilities.js'
+import { decisionImplementation } from './decision-implementation.js'
 
 const wireAnswer = z.discriminatedUnion('type', [
   z.object({ type: z.literal('noul'), noul: z.number() }),
@@ -42,13 +45,8 @@ const wireResponse = z.object({
   }).optional(),
 }).passthrough()
 
-export interface SystemOneHttpProviderOptions {
-  readonly providerName: string
-  readonly defaultBaseURL: string
+export interface SystemOneHttpProviderOptions extends JsonProviderConnection {
   readonly timeoutMs: () => number
-  readonly resolveApiKey: () => string | undefined | Promise<string | undefined>
-  readonly resolveBaseURL?: () => string | undefined
-  readonly apiKeyRequired?: boolean
   readonly resolveModel: (model: string) => ProviderModel | undefined
   readonly requestModel?: (model: string) => string | undefined
   readonly capabilities?:
@@ -62,7 +60,6 @@ export interface SystemOneHttpProviderOptions {
   readonly selectResponseModel?: (
     response: z.infer<typeof wireResponse>,
   ) => string | undefined
-  readonly fetch?: typeof fetch
 }
 
 /**
@@ -71,27 +68,20 @@ export interface SystemOneHttpProviderOptions {
  */
 export function createSystemOneHttpProvider(
   options: SystemOneHttpProviderOptions,
-): System1Provider {
-  const fetchFn = options.fetch ?? globalThis.fetch
+) {
+  const post = createJsonPost(options)
   return {
     timeoutMs: options.timeoutMs,
-    async describe(model) {
+    async describe(model: string, _signal: AbortSignal): Promise<ModelCapabilities> {
       const selectedModel = options.resolveModel(model)
       if (!selectedModel)
         throw new System1ProviderError({
           code: 'unsupported',
           message: `${options.providerName} model is not supported.`,
         })
-      return typeof options.capabilities === 'function'
-        ? options.capabilities(selectedModel.id)
-        : options.capabilities ?? {
-            primitives: ['noul', 'choice', 'score'],
-            maxQuestions: null,
-            maxChoiceOptions: null,
-            maxScoreLevels: null,
-          }
+      return capabilitiesFor(options, selectedModel.id)
     },
-    async evaluate(request, signal) {
+    async evaluate(request: ProviderRequest, signal: AbortSignal): Promise<ProviderResponse> {
       const selectedModel = options.resolveModel(request.model)
       if (!selectedModel)
         throw new System1ProviderError({
@@ -103,73 +93,20 @@ export function createSystemOneHttpProvider(
           ? request
           : { ...request, model: selectedModel.id }
 
-      let apiKey: string | undefined
-      try {
-        apiKey = await options.resolveApiKey()
-      } catch {
-        throw new System1ProviderError({
-          code: 'unavailable',
-          message: `${options.providerName} API key could not be resolved.`,
-        })
-      }
-      if (options.apiKeyRequired !== false && !apiKey?.trim())
-        throw new System1ProviderError({
-          code: 'unavailable',
-          message: `${options.providerName} API key is not configured.`,
-        })
-
-      const baseURL = options.resolveBaseURL?.() ?? options.defaultBaseURL
-      const serialized = options.serializeRequest?.(canonicalRequest) ?? {
-        body: { state: canonicalRequest.state, questions: canonicalRequest.questions },
-      }
-      let response: Response
-      try {
-        response = await fetchFn(`${trimTrailingSlashes(baseURL)}/v1/systemone`, {
-          method: 'POST',
-          redirect: 'error',
-          headers: {
-            'Content-Type': 'application/json',
-            ...serialized.headers,
-            ...(apiKey?.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
-          },
-          body: JSON.stringify({
+      const raw = await post('/v1/systemone', () => {
+        const serialized = options.serializeRequest?.(canonicalRequest) ?? {
+          body: { state: canonicalRequest.state, questions: canonicalRequest.questions },
+        }
+        return {
+          ...serialized,
+          body: {
             ...serialized.body,
             ...(options.requestModel
               ? modelField(options.requestModel(canonicalRequest.model))
               : { model: canonicalRequest.model }),
-          }),
-          signal,
-        })
-      } catch {
-        signal.throwIfAborted()
-        throw new System1ProviderError({
-          code: 'provider_error',
-          message: `${options.providerName} transport failed.`,
-          retryable: true,
-        })
-      }
-
-      if (!response.ok) {
-        await response.body?.cancel()
-        throw new System1ProviderError({
-          code: response.status === 401 || response.status === 403
-            ? 'unavailable'
-            : 'provider_error',
-          message: `${options.providerName} request failed.`,
-          httpStatus: response.status,
-          retryable: response.status === 429 || response.status >= 500,
-        })
-      }
-
-      let raw: unknown
-      try {
-        raw = await response.json()
-      } catch {
-        throw new System1ProviderError({
-          code: 'invalid_response',
-          message: `${options.providerName} returned an invalid response.`,
-        })
-      }
+          },
+        }
+      }, signal)
       return normalizeSystemOneResponse(
         canonicalRequest,
         raw,
@@ -179,6 +116,25 @@ export function createSystemOneHttpProvider(
       )
     },
   }
+}
+
+export function createSystemOneDecisionImplementation(
+  models: readonly ProviderModel[],
+  options: SystemOneHttpProviderOptions,
+) {
+  return decisionImplementation(models, ({ id }) => capabilitiesFor(options, id),
+    createSystemOneHttpProvider(options), options.providerName)
+}
+
+function capabilitiesFor(options: SystemOneHttpProviderOptions, id: string): ModelCapabilities {
+  return typeof options.capabilities === 'function'
+    ? options.capabilities(id)
+    : options.capabilities ?? {
+        primitives: ['noul', 'choice', 'score'],
+        maxQuestions: null,
+        maxChoiceOptions: null,
+        maxScoreLevels: null,
+      }
 }
 
 /** Shared response normalization for providers that return the System One payload. */
@@ -284,8 +240,4 @@ function normalizeAnswers(
 
 function modelField(model: string | undefined): { model?: string } {
   return model ? { model } : {}
-}
-
-function trimTrailingSlashes(value: string): string {
-  return value.trim().replace(/\/+$/u, '')
 }
