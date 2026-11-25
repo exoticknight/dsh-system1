@@ -4,7 +4,7 @@
 
 ## Set up the project
 
-Use Node.js 22.19+ in the 22.x line or Node.js 24, install the pnpm version declared in `package.json`, then run:
+Use Node.js 22.19+ (22.x), 24.x, or 26.13.1+ (26.x) and the pnpm version declared in `package.json`. Then run:
 
 ```sh
 pnpm install --frozen-lockfile

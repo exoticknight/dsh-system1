@@ -21,6 +21,12 @@
         id: meragpt
         apiKeyEnv: MERAGPT_API_KEY
         baseURL: https://meragpt.com
+    - id: system1-liquid
+      name: dsh-system1/providers/liquid
+      config:
+        id: liquid
+        apiKeyEnv: LIQUID_API_KEY
+        baseURL: https://api.liquid.ai/decisions
     - id: system1-nace
       name: dsh-system1/providers/nace
       config:

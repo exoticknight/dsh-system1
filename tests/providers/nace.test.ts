@@ -19,7 +19,7 @@ const request: ProviderRequest = {
   questions: { q: { type: 'noul', instructions: 'Is this a support request?' } },
 }
 
-function uploadedRequest(size = 32, model = 'drex-max'): ProviderRequest {
+function uploadedRequest(size = 32, model = 'drex-max-v1.1'): ProviderRequest {
   const bytes = Buffer.alloc(size)
   PNG_SIGNATURE.copy(bytes)
   return {
@@ -116,27 +116,14 @@ function createUploadFixture(options: {
   }
 }
 
-test('Nace catalog pins stable model IDs and advertises per-model limits', async () => {
+test('Nace catalog lists the three supported models and their capabilities', async () => {
   assert.deepEqual(NACE_MODELS.map(({ id }) => id), [
     'drex-v2.0',
-    'drex-v1.5',
     'drex-max-v1.1',
     'drex-max-finance',
-    'drex-max',
   ])
   const provider = createNaceProvider({ apiKey: '' })
   assert.equal(provider.timeoutMs(), 60_000)
-  assert.deepEqual(await provider.describe('drex-v1.5', new AbortController().signal), {
-    primitives: ['noul', 'choice', 'score'],
-    maxQuestions: 512,
-    maxChoiceOptions: null,
-    maxScoreLevels: null,
-    context: {
-      maxTokens: 131_072,
-      includesQuestions: false,
-      maxStatePlusQuestionTokens: 139_264,
-    },
-  })
   assert.deepEqual(await provider.describe('drex-v2.0', new AbortController().signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
@@ -147,22 +134,6 @@ test('Nace catalog pins stable model IDs and advertises per-model limits', async
       includesQuestions: false,
       maxStatePlusQuestionTokens: 262_144,
     },
-  })
-  const max = await provider.describe('drex-max', new AbortController().signal)
-  assert.deepEqual(max.primitives, ['noul', 'choice', 'score'])
-  assert.equal(max.maxQuestions, 512)
-  assert.equal(max.maxChoiceOptions, 255)
-  assert.equal(max.maxScoreLevels, 255)
-  assert.deepEqual(max.images, {
-    formats: ['image/png', 'image/jpeg', 'image/webp'],
-    maxCount: 8,
-    maxBytesPerImage: 16 * 1024 * 1024,
-    maxTotalBytes: 32 * 1024 * 1024,
-  })
-  assert.deepEqual(max.context, {
-    maxTokens: 524_288,
-    includesQuestions: false,
-    maxStatePlusQuestionTokens: 262_144,
   })
   const maxV11 = await provider.describe('drex-max-v1.1', new AbortController().signal)
   assert.deepEqual(maxV11, {
@@ -563,7 +534,7 @@ test('missing credentials and unsupported requests stop before Nace I/O', async 
   )
   assert.equal(calls, 0)
 
-  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-max' } })
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-max-v1.1' } })
   engine.registerProvider('nace', provider)
   const result = await engine.decide({
     state: null,
@@ -578,7 +549,7 @@ test('missing credentials and unsupported requests stop before Nace I/O', async 
 test('combined providers component registers Nace capabilities without consulting credentials', async (t) => {
   const ctx = new Context()
   const service = await ctx.plugin(System1Service, {
-    defaultModel: { provider: 'nace', model: 'drex-max' },
+    defaultModel: { provider: 'nace', model: 'drex-max-v1.1' },
   })
   t.after(async () => { await service.dispose() })
   const bundle = await ctx.plugin(providerBundle, {
@@ -686,7 +657,7 @@ test('Max inlines images under 4 MiB and deletes account-level uploads after suc
       return systemOneResponse({ q: { type: 'noul', noul: 0.8 } })
     },
   })
-  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-max' } })
+  const engine = new System1Engine({ defaultModel: { provider: 'nace', model: 'drex-max-v1.1' } })
   engine.registerProvider('nace', createNaceProvider({
     apiKey: 'fixture-only',
     fetch: manyImagesFixture.fetch,
@@ -811,4 +782,29 @@ test('temporary-file deletion failure is sanitized and does not discard a valid 
   assert.equal(warnings.length, 1)
   assert.ok(!warnings[0]!.includes('fixture-only'))
   assert.ok(!warnings[0]!.includes('private delete response'))
+})
+
+test('retired Nace model IDs are rejected before credentials or network I/O', async () => {
+  let credentialReads = 0
+  let calls = 0
+  const provider = createNaceProvider({
+    apiKey: 'fixture-only',
+    resolveApiKey: () => {
+      credentialReads++
+      return 'fixture-only'
+    },
+    fetch: async () => {
+      calls++
+      return systemOneResponse({ q: { type: 'noul', noul: 0.8 } })
+    },
+  })
+  const signal = new AbortController().signal
+  const unsupported = (error: unknown) =>
+    error instanceof System1ProviderError && error.detail.code === 'unsupported'
+  for (const model of ['drex-v1.5', 'drex-max']) {
+    await assert.rejects(provider.describe(model, signal), unsupported)
+    await assert.rejects(provider.evaluate({ ...request, model }, signal), unsupported)
+  }
+  assert.equal(credentialReads, 0)
+  assert.equal(calls, 0)
 })

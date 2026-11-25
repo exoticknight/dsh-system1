@@ -1,40 +1,60 @@
 {
-  "0.5.1": {
-    "id": "0.5.1",
-    "version": "0.5.1",
+  "0.6.0": {
+    "id": "0.6.0",
+    "version": "0.6.0",
     "highlights": {
       "zh": [
         {
+          "kind": "migration",
+          "title": "重选已退役的 Drex 模型",
+          "description": "如果默认或备用模型仍用 drex-v1.5 或 drex-max，请改选 drex-max-v1.1。"
+        },
+        {
           "kind": "added",
-          "title": "新增 Drex Max Finance",
-          "description": "面向金融决策，支持文本和图片。在 Nace 设置中选择 drex-max-finance，整份请求上限为 262k tokens。"
+          "title": "新增 Liquid AI",
+          "description": "选择 d1.2 或 d1.2-ultra，用文本、图片和音频做判断。两款模型均已实测。"
         },
         {
           "kind": "improved",
-          "title": "明确 Clef 媒体支持范围",
-          "description": "Clef、Clef-flash 和 Clef-omni 均可用于文本决策；音频和视频请选择 Clef-omni。"
+          "title": "升级 meraGPT Decider 1.1",
+          "description": "新增图片输入，支持更长的上下文、更多分类选项和评分等级。"
         },
         {
           "kind": "improved",
-          "title": "支持 Laya 0.4.26 本地服务",
-          "description": "可连接 Laya 0.4.26，在本地进行中文判断、分类和评分。"
+          "title": "提前提示 Clef 超限",
+          "description": "每题最多 255 个分类选项或 10 个评分等级，超限会在发出请求前提示。"
+        },
+        {
+          "kind": "improved",
+          "title": "兼容新版 DSH 和 Laya",
+          "description": "已验证 DSH 0.2.3-alpha.2 的设置页和 Agent 工具，以及 Laya 0.5.3 的本地中文推理。"
         }
       ],
       "en": [
         {
+          "kind": "migration",
+          "title": "Replace retired Drex models",
+          "description": "If a default or fallback still uses drex-v1.5 or drex-max, switch it to drex-max-v1.1."
+        },
+        {
           "kind": "added",
-          "title": "Add Drex Max Finance",
-          "description": "For financial decisions with text and images. Select drex-max-finance in Nace settings; the whole-request limit is 262k tokens."
+          "title": "Add Liquid AI",
+          "description": "Choose d1.2 or d1.2-ultra for decisions on text, images, and audio. Both models passed live checks."
         },
         {
           "kind": "improved",
-          "title": "Clarify Clef media support",
-          "description": "Clef, Clef-flash, and Clef-omni support text decisions; choose Clef-omni for audio and video."
+          "title": "Update to meraGPT Decider 1.1",
+          "description": "Use image inputs, longer context, more classification options, and more score levels."
         },
         {
           "kind": "improved",
-          "title": "Support local Laya 0.4.26 servers",
-          "description": "Connect to Laya 0.4.26 for local Chinese yes/no decisions, classification, and scoring."
+          "title": "Catch Clef limits before sending",
+          "description": "Each question allows up to 255 classification options or 10 score levels. Requests over those limits are flagged before sending."
+        },
+        {
+          "kind": "improved",
+          "title": "Support newer DSH and Laya",
+          "description": "Verified settings and the agent tool on DSH 0.2.3-alpha.2, and local Chinese inference on Laya 0.5.3."
         }
       ]
     }

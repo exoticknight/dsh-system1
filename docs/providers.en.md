@@ -8,8 +8,9 @@ Choose the default provider and model in DSH plugin settings, and add fallback m
 | --- | --- | ---: | --- | --- |
 | `typesafe` | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | 800 ms | `https://api.typesafe.ai` | `TYPESAFE_API_KEY` |
 | `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | 800 ms | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
-| `meragpt` | `decider-1` (aliases: `sd-1`, `state-decider-1`) | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
-| `nace` | `drex-v2.0`, `drex-v1.5`, `drex-max`, `drex-max-v1.1`, `drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `meragpt` | `decider-1`, `decider-1.1` | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
+| `liquid` | `d1.2`, `d1.2-ultra` | 10,000 ms | `https://api.liquid.ai/decisions` | `LIQUID_API_KEY` |
+| `nace` | `drex-v2.0`, `drex-max-v1.1`, `drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`, `clef-flash`, `clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` and `jev-1.13.0` are version-pinned IDs. `jev-latest` points to the newest stable release, while `jev-preview` points to the newest release; TypeSafe can move either alias over time. Choose a version ID when you need a fixed model. See TypeSafe's [model catalog](https://docs.typesafe.ai/models).
@@ -22,7 +23,7 @@ Providers resolve keys through DSH credentials when available, otherwise through
 
 See [local services and live validation](testing.en.md) for setup, probes, and validation boundaries.
 
-Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. The repository's local wrapper mirrors the Workers AI REST route, so the same `cloudflare` provider can use it by pointing `baseURL` at the local service. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
+Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Laya 0.5.3 passed the Chinese multilingual probe on CPU. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. The repository's local wrapper mirrors the Workers AI REST route, so the same `cloudflare` provider can use it by pointing `baseURL` at the local service. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
 
 TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/quickstart) describe a hosted API. Its [model documentation](https://docs.typesafe.ai/models) does not provide a deployable local Jev release. This project validates TypeSafe through real hosted calls and does not count protocol fixtures as local Jev inference.
 
@@ -36,17 +37,17 @@ In DSH, save the key on the `nace` provider's settings page; it is stored in DSH
 
 | Model | Questions per request | Token limit | Images |
 | --- | ---: | --- | --- |
-| `drex-v1.5` | 512 | Up to 131,072 for state; up to 139,264 for state plus the longest question | No |
 | `drex-v2.0` | 512 | Up to 131,072 for state; up to 262,144 for state plus the longest question | No |
-| `drex-max` | 512 | State selection up to 524,288; up to 262,144 for state plus each question | Up to 8 |
 | `drex-max-v1.1` | 512 | 262,144 for the whole packed request, including state, all questions, images, and formatting | Up to 8 |
 | `drex-max-finance` | 512 | Same whole-request 262,144-token limit as v1.1; specialized for financial decisions | Up to 8 |
 
-Use the versioned IDs for reproducible calls; the provider does not list the moving `drex-latest` alias. `box` is not supported. The DSH service exposes Nace's token limits as capability metadata but has no Drex tokenizer, so Nace enforces those token limits.
+If a default, fallback, or per-call model still specifies the retired ID `drex-v1.5` or `drex-max`, switch to `drex-max-v1.1`. The plugin returns `unsupported` for retired IDs and leaves saved settings as they are. Choose a listed version ID to pin a model; Nace may move the `drex-latest` alias.
 
 Drex may round each probability in a `choice` or `score` distribution to four decimal places, so the entries can add up slightly above or below 1. DSH renormalizes totals only within the maximum error from that per-entry rounding; larger deviations follow the regular answer validation rules.
 
-All three Max models accept PNG, JPEG, and WebP images (up to 8 images, 16 MiB each, 32 MiB total, and 40 megapixels per image). Each permits up to 255 options per `choice` question and 255 levels per `score` question. Original Max can select from state up to 524,288 tokens; state plus each question may use up to 262,144 tokens, with a 1,048,576-token combined cap across questions above 131,072 tokens, including image tokens. Max v1.1 and Finance instead cap the whole packed request at 262,144 tokens, including state, all questions, images, and formatting. Nace enforces these limits; DSH does not tokenize Drex input. Nace limits the serialized UTF-8 JSON body to 4 MiB, counting `state`, `questions`, and non-empty `images`, but not the top-level `model`. Small images stay inline; when inline images would exceed the body limit, the adapter uploads only enough images to fit and sends account-level file references. The upload endpoint does not use a workspace. The adapter attempts to delete uploads after inference; if cleanup fails, Nace keeps account-level uploads for 24 hours by default. Removed files can take up to 35 days to disappear from backups. Avoid this provider path for images that policy does not allow to be temporarily uploaded. See Nace's [model catalog](https://console.nace.ai/docs/drex/reference/models), [request limits](https://console.nace.ai/docs/drex/reference/limits), [Drex Max image guide](https://console.nace.ai/docs/drex/guides/drex-max), and [data retention policy](https://console.nace.ai/docs/perception/data-retention).
+`drex-max-v1.1` and `drex-max-finance` accept PNG, JPEG, and WebP (up to eight images, 16 MiB each, 32 MiB total, and 40 megapixels per image). Each question allows up to 255 `choice` options or `score` levels. Nace enforces the token limits in the table.
+
+Nace limits the serialized UTF-8 JSON body to 4 MiB, counting `state`, `questions`, and non-empty `images`, but not the top-level `model`. Small images stay inline; when inline images would exceed the body limit, the adapter uploads only enough images to fit and sends account-level file references. The upload endpoint does not use a workspace. The adapter attempts to delete uploads after inference; if cleanup fails, Nace keeps account-level uploads for 24 hours by default. Removed files can take up to 35 days to disappear from backups. Avoid this provider path for images that policy does not allow to be temporarily uploaded. See Nace's [model catalog](https://console.nace.ai/docs/drex/reference/models), [request limits](https://console.nace.ai/docs/drex/reference/limits), [Drex Max image guide](https://console.nace.ai/docs/drex/guides/drex-max), and [data retention policy](https://console.nace.ai/docs/perception/data-retention).
 
 For example, choose Nace per call without changing the service default:
 
@@ -60,11 +61,11 @@ const result = await ctx.system1.decide({
 })
 ```
 
-For image input, select `drex-max`, `drex-max-v1.1`, or `drex-max-finance` and use the shared request `images` field:
+For image input, select `drex-max-v1.1` or `drex-max-finance` and use the shared request `images` field:
 
 ```ts
 const result = await ctx.system1.decide({
-  model: { provider: 'nace', model: 'drex-max' },
+  model: { provider: 'nace', model: 'drex-max-v1.1' },
   state: 'Inspect Image 1.',
   images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
   questions: {
@@ -75,11 +76,21 @@ const result = await ctx.system1.decide({
 
 See [testing and live model validation](testing.en.md#nace-credentials-and-live-probe) before sending a real request.
 
-## meraGPT Decider 1
+## meraGPT Decider 1.1
 
-Save the API key on the `meragpt` provider settings page. DSH stores it under `MERAGPT_API_KEY`; without the DSH credentials service, the provider reads the same process environment variable. The default API root is `https://meragpt.com` and can be overridden with `baseURL`. The sole canonical model is `decider-1`; it also accepts `sd-1` and the legacy alias `state-decider-1`, while Settings shows only the canonical ID.
+Save your API key on the `meragpt` settings page under `MERAGPT_API_KEY`. The default API root is `https://meragpt.com`; override it with `baseURL`. Choose `decider-1` to follow the latest 1.x release, or `decider-1.1` to pin the model. The provider also accepts `sd-1` and `state-decider-1` as aliases for `decider-1`.
 
-Decider 1 supports `noul`, `choice`, and `score`, up to 64 questions, 10 choice options or score levels per question, and a 4,096-token whole-request limit covering state and all questions. It declares no image, audio, or video input. The API uses prepaid credit: check the account balance before probing or inferring. Insufficient credit returns HTTP 402 and is not retried; rate limits and server errors use the shared retry policy. See [testing and live model validation](testing.en.md#meragpt-credentials-and-live-probe) before running a real probe.
+Decider supports `noul`, `choice`, and `score`. Send up to 64 questions, with up to 255 `choice` options or 32 `score` levels per question. The state and any one question share a 32,768-token budget, including images. You can attach up to eight PNG, JPEG, or WebP images of at most 8 MB (8,000,000 bytes) each.
+
+The API uses prepaid credit. Check your balance before inference; HTTP 402 indicates insufficient credit. See the [Decider API](https://meragpt.com/docs/decider) and [meraGPT live probe](testing.en.md#meragpt-credentials-and-live-probe).
+
+## Liquid AI
+
+Save your API key on the `liquid` settings page under `LIQUID_API_KEY`. The default `baseURL` is `https://api.liquid.ai/decisions`. Include the compatible path prefix in custom base URLs; the plugin appends `/v1/systemone`. Choose `d1.2` or `d1.2-ultra`. The default timeout is 10,000 ms.
+
+Both models support `noul`, `choice`, and `score`. Send up to 128 questions; the shared state and media plus any one question can use up to 65,536 tokens. A request can include up to eight PNG/JPEG/WebP images and up to eight WAV/MP3 clips, with up to 300 seconds of audio total. Keep the whole JSON body, including encoded attachments, under 4.5 MB (4,500,000 bytes). For formats and backend limits, see the [Liquid API reference](https://docs.liquid.ai/lfm/models/d1).
+
+Both models passed live text scoring, image classification, and audio checks. See [the probe and live example results](testing.en.md#liquid-ai-live-probe).
 
 ## Cloudflare Clef
 
@@ -98,9 +109,9 @@ const result = await ctx.system1.decide({
 })
 ```
 
-Cloudflare accepts up to 64 questions per request. Question IDs are at most 100 characters and use letters, digits, underscores, dots, or hyphens. The context limit is 65,536 tokens for `clef`, 24,576 for `clef-flash`, and 64,000 for `clef-omni`; the backend may truncate long inputs, so control input size in your application. The shared `images` field supports PNG, JPEG, and WebP, with up to four images, 4 MiB per image, and 8 MiB total; the provider converts them to Cloudflare's base64 data URLs.
+Cloudflare accepts up to 64 questions per request, with up to 255 `choice` options or 10 `score` levels per question. Question IDs are at most 100 characters and use letters, digits, underscores, dots, or hyphens. The context limit is 65,536 tokens for `clef`, 24,576 for `clef-flash`, and 64,000 for `clef-omni`; the backend may truncate long inputs, so control input size in your application. The shared `images` field supports PNG, JPEG, and WebP, with up to four images, 4 MiB per image, and 8 MiB total; the provider converts them to Cloudflare's base64 data URLs.
 
-Only `clef-omni` accepts audio and video: audio uses `audio/wav` or `audio/mpeg`, up to four clips of 8 MiB each; video uses `video/mp4` or `video/webm`, up to two clips of 16 MiB each. Decoded audio and video share a 16 MiB limit. Cloudflare validates the 300-second audio and 60-second video duration limits; video is sampled at 2 fps. The image budget is separate. Pass each attachment as Base64 without a prefix; the provider adds the data URL prefix and sends top-level `audio` and `videos` fields. Other models are skipped before a request is sent, using the existing fallback chain. See the [Clef API](https://developers.cloudflare.com/workers-ai/models/clef/), [Clef-omni API](https://developers.cloudflare.com/workers-ai/models/clef-omni/), and [Workers AI REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
+In the Clef family, `clef-omni` handles audio and video: audio uses `audio/wav` or `audio/mpeg`, up to four clips of 8 MiB each; video uses `video/mp4` or `video/webm`, up to two clips of 16 MiB each. Decoded audio and video share a 16 MiB limit. Cloudflare validates the 300-second audio and 60-second video duration limits; video is sampled at 2 fps. The image budget is separate. Pass each attachment as Base64 without a prefix; the provider adds the data URL prefix and sends top-level `audio` and `videos` fields. Other models are skipped before a request is sent, using the existing fallback chain. See the [Clef API](https://developers.cloudflare.com/workers-ai/models/clef/), [Clef-omni API](https://developers.cloudflare.com/workers-ai/models/clef-omni/), and [Workers AI REST setup](https://developers.cloudflare.com/workers-ai/get-started/rest-api/).
 
 Cloudflare's public examples explicitly show `audio/mpeg` and `video/mp4`. This package maps WAV and WebM to `audio/wav` and `video/webm`, respectively, but those exact MIME values have not yet been validated against an account schema or live request. Validate WAV or WebM with a small sample before relying on it; MP3 and MP4 have official request examples.
 

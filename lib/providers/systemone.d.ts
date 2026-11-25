@@ -23,6 +23,7 @@ export interface SystemOneHttpProviderOptions {
         readonly body: Readonly<Record<string, unknown>>;
         readonly headers?: Readonly<Record<string, string>>;
     };
+    readonly roundedProbabilities?: boolean;
     readonly selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined;
     readonly fetch?: typeof fetch;
 }
@@ -32,6 +33,6 @@ export interface SystemOneHttpProviderOptions {
  */
 export declare function createSystemOneHttpProvider(options: SystemOneHttpProviderOptions): System1Provider;
 /** Shared response normalization for providers that return the System One payload. */
-export declare function normalizeSystemOneResponse(request: ProviderRequest, raw: unknown, providerName: string, selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined): ProviderResponse;
+export declare function normalizeSystemOneResponse(request: ProviderRequest, raw: unknown, providerName: string, selectResponseModel?: (response: z.infer<typeof wireResponse>) => string | undefined, roundedProbabilities?: boolean): ProviderResponse;
 export {};
 //# sourceMappingURL=systemone.d.ts.map

@@ -21,6 +21,7 @@
 | `typesafe` | 托管 API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`，默认 `jev-1.13.0` |
 | `nace` | 托管 API | `NACE_API_KEY` | `NACE_MODEL`，默认 `drex-v2.0`；`NACE_BASE_URL` |
 | `meragpt` | 托管 API | `MERAGPT_API_KEY` | `MERAGPT_MODEL`，默认 `decider-1`；`MERAGPT_BASE_URL` |
+| `liquid` | 托管 API | `LIQUID_API_KEY` | `LIQUID_MODEL`，默认 `d1.2`；`LIQUID_BASE_URL` |
 | `cloudflare` | 托管 API | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`，默认 `clef-flash` |
 | `laya` | 本地服务 | Python；首次运行自动准备 | `LAYA_BASE_URL`、`LAYA_MODEL`（默认 `auto`）、`LAYA_TIMEOUT_MS`、`LAYA_API_KEY` |
 | `clef-local` | 本地服务 | Python、Git LFS；首次运行自动准备 | `CLEF_LOCAL_PORT`（默认 `8765`）、`CLEF_DEVICE` |
@@ -29,7 +30,7 @@
 
 - `noul`、`choice`、`score` 三道题均为 `ok`，概率在 [0, 1] 内，分布之和为 1；
 - 服务报告实际执行的 provider 与模型；
-- 预取消返回 `cancelled`，未知模型在网络调用前返回 `unsupported`，1 ms 预算返回 `timeout`。`clef-local` 跳过超时检查以免留下长时间运行的 CPU 推理；`nace` 和 `meragpt` 跳过此检查，避免额外发送计费请求，其超时和取消由本地 fixture 覆盖。
+- 预取消返回 `cancelled`，未知模型在网络调用前返回 `unsupported`，1 ms 预算返回 `timeout`。`clef-local` 跳过超时检查以免留下长时间运行的 CPU 推理；`nace`、`meragpt` 和 `liquid` 跳过此检查，避免额外发送计费请求。
 
 本地服务还会检查 `/health`：`laya` 要求实际模型是服务已加载的 checkpoint，并输出 revision 与设备；`clef-local` 要求固定的权重 revision 并输出量化信息。
 
@@ -54,6 +55,19 @@ Finance 文本推理可将 `NACE_MODEL` 设为 `drex-max-finance` 后运行同�
 
 在仓库根目录 `.env.local` 配置 `MERAGPT_API_KEY`，可用 `MERAGPT_MODEL` 选择模型（默认 `decider-1`），也可用 `MERAGPT_BASE_URL` 覆盖 API 根地址。`pnpm probe meragpt` 会发送一次同时覆盖三种原语的真实推理请求；为避免额外使用预付费额度，它会跳过短超时推理。运行前确认账户余额；余额不足会返回 HTTP 402。探针不会输出密钥。
 
+## Liquid AI 真实探针
+
+在仓库根目录的 `.env.local` 设置 `LIQUID_API_KEY`。运行 `pnpm build` 后，用 `pnpm probe liquid` 测试默认模型 `d1.2`；要测试 `d1.2-ultra`，先设置 `LIQUID_MODEL=d1.2-ultra`。探针会发送一次含三种原语的文本请求，可能使用账户额度。要检查多模态，用 [Liquid 模型](providers.md#liquid-ai)调用 `decide()`，同时传入 `state`、`images` 和 `audio`。
+
+一次多模态验收中，两款模型各收到一份标记为高优先级的合成工单、一张纯红 PNG 和一段 2.8 秒的英文合成 WAV，内容是「我看见的是一只斑马」。同一请求中分别验证了文本评分、图片分类和音频的是非判断。
+
+| 实际返回的模型 | 高优先级评分（满分 2） | 红色概率 | 录音说「斑马」的概率 | 本次耗时 |
+| --- | ---: | ---: | ---: | ---: |
+| `d1.2` | 1.9888 | 99.90% | 96.52% | 1.04 秒 |
+| `d1.2-ultra` | 1.9996 | 99.91% | 97.61% | 4.78 秒 |
+
+两款模型对「录音说了大象」的反向检查均低于 1.2%。两次成功请求各使用 236 个输入 tokens、0 个输出 tokens，API 报告的总费用约为 0.000015 美元。Ultra 首次返回 HTTP 429，等待后单独重试成功。
+
 ## 宿主 Loader 探针
 
 在独立目录安装 `dsh.compatibility.dshReleases` 中列出的 DSH 版本，然后运行：
@@ -63,7 +77,7 @@ pnpm build
 pnpm probe:host <绝对路径到测试宿主/node_modules/@deepseek-ai/dsh/package.json>
 ```
 
-它通过实际 Loader 加载 `cordis.patch.yml`，验证四个 provider 注册、`system1_decide` 工具在宿主真实工具注册表中注册和调用、各组件在插件页显示的中英文标题和描述、预取消和卸载，不调用模型。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
+它通过实际 Loader 加载 `cordis.patch.yml`，验证所有内置 provider 注册、`system1_decide` 工具在宿主真实工具注册表中注册和调用、各组件在插件页显示的中英文标题和描述、预取消和卸载，不调用模型。测试 DSH `0.2.3-alpha.2` 时，请使用 Node.js 24.22.3 或以上的 24.x，或 26.13.1 或以上的 26.x。仓库内安装测试宿主时使用 pnpm 的 `--ignore-workspace`：
 
 ```powershell
 New-Item -ItemType Directory -Force .scratch/local-providers/host | Out-Null
@@ -71,7 +85,7 @@ if (-not (Test-Path .scratch/local-providers/host/package.json)) {
   '{"name":"dsh-system1-host-probe","private":true,"version":"0.0.0"}' |
     Set-Content -Encoding utf8 .scratch/local-providers/host/package.json
 }
-pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.1-rc.2
+pnpm --dir .scratch/local-providers/host add --ignore-workspace --save-exact @deepseek-ai/dsh@0.2.3-alpha.2
 ```
 
 pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的原生构建脚本，应检查包是否已安装后单独运行探针。
@@ -105,7 +119,7 @@ pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的
 
 ### Laya
 
-[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.4.26` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
+[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.5.3` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
 
 Laya 响应顶层的 `model` 是服务名 `laya-rl-agent`，插件优先使用 `routing.model` 作为实际执行模型。
 

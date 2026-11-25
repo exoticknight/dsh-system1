@@ -4,11 +4,11 @@
 
 ## Requests and results
 
-`decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds. Its precedence is the per-call value, the selected provider's `timeoutMs` setting, then that provider's own default. TypeSafe, Laya, and Cloudflare default to 800 ms; meraGPT defaults to 10,000 ms and Nace to 60,000 ms. Each model attempt gets the full budget, including capability checks and the backend call.
+`decide({ state, questions, images?, audio?, videos?, longContext?, model?, signal?, timeoutMs? })` accepts a named set of questions. `model` has the shape `{ provider, model }`; when omitted, the service tries its `defaultModel` and `fallbackModels` in order. If no model is available, the call throws `System1InputError`. `timeoutMs` is a positive integer in milliseconds. Its precedence is the per-call value, the selected provider's `timeoutMs` setting, then that provider's own default. TypeSafe, Laya, and Cloudflare default to 800 ms; meraGPT and Liquid AI default to 10,000 ms, and Nace to 60,000 ms. Each model attempt gets the full budget, including capability checks and the backend call.
 
 0.4.0 migration: service-level `timeoutMs` has been removed, and residual values in older service configuration are ignored. Move custom timeouts to the matching provider settings page. Third-party `System1Provider` implementations must replace `defaultTimeoutMs` with `timeoutMs(): number`; `ModelCapabilities` now requires explicit question limits and count/byte limits for every supported attachment type.
 
-Public entry points: the package root exports the service, error classes, and types; `dsh-system1/contracts` exports types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. The `dsh-system1/providers/typesafe`, `dsh-system1/providers/laya`, `dsh-system1/providers/meragpt`, `dsh-system1/providers/nace`, and `dsh-system1/providers/cloudflare` entry points each export their provider plugin, a `create…Provider` factory, and the model array for that provider, including `MERAGPT_MODELS`. See [provider setup](providers.en.md) for connection details and model selection.
+The package root exports the service, error classes, and types. `dsh-system1/contracts` exports the public types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. Each `dsh-system1/providers/<id>` subpath exports the Cordis plugin, a `create…Provider` factory, and its model catalog. Use `typesafe`, `laya`, `nace`, `meragpt`, `liquid`, or `cloudflare` for `<id>`. See [provider setup](providers.en.md) for connection details and model selection.
 
 Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
 
@@ -39,7 +39,13 @@ if (result.answers.topic.status === 'ok') {
 
 `noul` returns `probabilityTrue`; `choice` returns the candidate key and full `probabilities`; `score` returns an expected zero-based level and a distribution ordered by `criteria`. A `box` question returns `{ type: 'box', box: { top, bottom, left, right }, confidence? }`, with edges as fractions from 0 to 1. Probabilities and coordinates are model outputs, so consumers choose their own action thresholds.
 
-`images`, `audio`, and `videos` are optional request-wide attachment lists. Each item is `{ mediaType, data }`, where `data` is standard padded Base64 without a data-URL prefix. The shared layer checks structure and sets resource-safety ceilings: up to 16 items per type, 16 MiB per item, and 64 MiB total decoded across all attachments. These are not provider capabilities. Images support `image/png`, `image/jpeg`, and `image/webp`; every question can use them, and a `box` question requires at least one image. Providers check format, count, and size against model capabilities: Nace accepts images only on `drex-max`, `drex-max-v1.1`, and `drex-max-finance` (up to eight each), while TypeSafe and Cloudflare allow up to four. meraGPT declares no attachment support. Audio supports `audio/wav` and `audio/mpeg`; video supports `video/mp4` and `video/webm`. Only Cloudflare `clef-omni` currently accepts audio and video: up to four audio clips (8 MiB and 300 seconds each) and two videos (16 MiB and 60 seconds each). Decoded audio and video share a 16 MiB limit; the image budget is separate. Cloudflare validates durations and samples video at 2 fps. Providers preflight format, count, and byte limits against model capabilities, and fallback chains skip models that cannot accept the requested attachments. Set `longContext: true` to request extended context. TypeSafe Jev currently supports up to 262k tokens; requests without this option use standard context limits.
+`images`, `audio`, and `videos` are shared across all questions in a request. Each attachment is `{ mediaType, data }`, with standard padded Base64 in `data` and no data-URL prefix. The shared layer allows up to 16 items per type, 16 MiB per item, and 64 MiB decoded across all attachments. Providers can impose tighter limits:
+
+- **Images**: PNG, JPEG, or WebP. Nace Max, meraGPT, and Liquid allow up to eight images; TypeSafe and Cloudflare allow up to four. TypeSafe accepts PNG and JPEG. A `box` question requires at least one image and a model that supports that primitive.
+- **Audio**: WAV (`audio/wav`) or MP3 (`audio/mpeg`), on [Liquid AI](providers.en.md#liquid-ai) and [Cloudflare `clef-omni`](providers.en.md#cloudflare-clef).
+- **Video**: MP4 (`video/mp4`) or WebM (`video/webm`), on `clef-omni` among the built-in models. Cloudflare shares a 16 MiB decoded budget across audio and video and treats images separately.
+
+Providers preflight attachment format, count, and byte limits. The fallback chain skips models that cannot accept the required attachments. Set `longContext: true` to request the 262k-token extended context on TypeSafe Jev.
 
 Cloudflare's public examples explicitly use MP3=`audio/mpeg` and MP4=`video/mp4`. This package maps WAV and WebM to `audio/wav` and `video/webm`, respectively, but those two MIME values have not been verified against an account schema or live request. Validate WAV or WebM with a small sample before relying on it.
 
@@ -82,7 +88,7 @@ Arguments:
 - `state`: the text or JSON value to judge.
 - `questions`: an array of questions. Each has an `id` (the unique result key), a `type` (`noul`, `choice`, `score`, or `box`), string `instructions`, and the same optional `criteria` as `decide()`. `choice` requires an object mapping candidate keys to descriptions; `score` requires an array of levels from lowest to highest; `box` requires an image attachment.
 - `images`: an optional list of image attachments in the same format as `decide()`.
-- `audio`, `videos`: optional audio and video attachment lists in the same format as `decide()`; currently supported only by Cloudflare `clef-omni`.
+- `audio`, `videos`: optional audio and video attachment lists in the same format as `decide()`; Liquid AI and Cloudflare `clef-omni` accept audio; choose `clef-omni` for video.
 - `longContext`: an optional boolean; when `true`, it requests extended context from TypeSafe Jev.
 - `model`: an optional `{ provider, model }`; the service default is used when omitted.
 
@@ -122,10 +128,37 @@ The provider plugin accepts `id`, `apiKeyEnv`, and optional `baseURL`; the first
 
 ## Nace.AI Drex capabilities and limits
 
-The `dsh-system1/providers/nace` entry exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, and the `NACE_MODELS` array (`drex-v2.0`, `drex-v1.5`, `drex-max`, `drex-max-v1.1`, `drex-max-finance`). Nace accepts `noul`, `choice`, and `score`; it does not support `box`. Structured DSH descriptions are serialized as compact JSON text for Nace, and `choice` criteria set to `null` remain `null`. Score levels and returned probabilities retain their array order.
+`dsh-system1/providers/nace` exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, and `NACE_MODELS` (`drex-v2.0`, `drex-max-v1.1`, `drex-max-finance`). Nace supports `noul`, `choice`, and `score`. The adapter serializes structured descriptions as compact JSON text, preserves `null` choice descriptions, and returns score probabilities in level order.
 
-`drex-v1.5` and `drex-v2.0` accept up to 512 questions and no images; all three Max models accept up to 512 questions and up to eight PNG/JPEG/WebP images (16 MiB per image, 32 MiB total, and 40 megapixels per image). Max permits 255 choice options or score levels per question. Original `drex-max` can select from state up to 524,288 tokens and allows up to 262,144 tokens for state plus each question; across questions above 131,072 tokens, the total is capped at 1,048,576, including image tokens. `drex-max-v1.1` and `drex-max-finance` cap the whole packed request at 262,144 tokens, including state, all questions, images, and formatting. DSH exposes these limits as provider capability metadata but does not tokenize Drex input, so Nace enforces them. The UTF-8 request body limit is 4 MiB over `state`, `questions`, and a non-empty `images` array, excluding top-level `model`. Max image payloads remain inline while the request fits; larger requests upload only enough images to account-level files. Nace errors for token or other request limits are returned safely as provider errors. See [Nace provider setup](providers.en.md#naceai-drex) for model token limits, upload behavior, and retention.
+All three models accept up to 512 questions. Use Max v1.1 or Finance for images; both allow 255 options or levels per question and 262,144 tokens per packed request. The adapter keeps images inline within the 4 MiB JSON request budget and uploads only as many as needed to fit. See [Nace setup](providers.en.md#naceai-drex) for context, image limits, and retention. Requests naming retired IDs return `unsupported` before sending HTTP requests. Token and other request-limit errors from Nace map to `provider_error`.
 
-## meraGPT Decider 1 capabilities and limits
+## meraGPT Decider 1.1 capabilities and limits
 
-The `dsh-system1/providers/meragpt` entry exports the Cordis plugin, `createMeraGptProvider`, and `MERAGPT_MODELS`. It has one canonical model, `decider-1`, and resolves both `sd-1` and the legacy alias `state-decider-1` to that ID; upstream requests always use `decider-1`. meraGPT accepts `noul`, `choice`, and `score`, up to 64 questions and 10 options or score levels per question. Its 4,096-token context covers state and all questions. It does not accept image, audio, or video inputs. The API uses prepaid credit; HTTP 402 for insufficient credit is not retried, while rate limits and server errors follow the shared retry policy. See [provider setup](providers.en.md#meragpt-decider-1) for connection and credit details.
+`dsh-system1/providers/meragpt` exports the Cordis plugin, `createMeraGptProvider`, `MeraGptOptions`, and `MERAGPT_MODELS`. The adapter resolves `sd-1` and `state-decider-1` to `decider-1` and sends `decider-1.1` as-is when pinned.
+
+Send up to 64 `noul`, `choice`, or `score` questions. The maximums are 255 choice options and 32 score levels. The state plus any one question can use up to 32,768 tokens. Pass images in the shared `images` field; the adapter converts them to `image_url` items inside the upstream state and keeps the original state in a separate field. See [meraGPT setup](providers.en.md#meragpt-decider-11).
+
+## Liquid AI capabilities and limits
+
+`dsh-system1/providers/liquid` exports the Cordis plugin, `createLiquidProvider`, `LiquidOptions`, and `LIQUID_MODELS` (`d1.2`, `d1.2-ultra`). The plugin supports `noul`, `choice`, and `score` on both models, up to 128 questions. The state, shared media, and any one question can use up to 65,536 tokens. The backend enforces option and level counts.
+
+Pass media in `images` and `audio`. The adapter returns `limit_exceeded` if the encoded JSON body reaches 4.5 MB. See [Liquid AI setup](providers.en.md#liquid-ai) for connection and media limits, and [live text, image, and audio results](testing.en.md#liquid-ai-live-probe) for both models.
+
+For example, ask separate questions about a photo and a recording from the same ticket:
+
+```ts
+const result = await ctx.system1.decide({
+  model: { provider: 'liquid', model: 'd1.2' },
+  state: 'The customer reports receiving a damaged package.',
+  images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
+  audio: [{ mediaType: 'audio/wav', data: clipBase64 }],
+  questions: {
+    damage: { type: 'noul', instructions: 'Is the package visibly damaged in the photo?' },
+    refund: { type: 'noul', instructions: 'Does the caller ask for a refund?' },
+  },
+})
+```
+
+## Cloudflare Clef capabilities and limits
+
+All three Clef models support `noul`, `choice`, and `score`, up to 64 questions with up to 255 options or 10 levels per question. Choose `clef-omni` for audio or video. See [Cloudflare Clef setup](providers.en.md#cloudflare-clef).

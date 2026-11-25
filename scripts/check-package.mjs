@@ -58,6 +58,7 @@ import { findProviderModel } from 'dsh-system1/providers'
 import * as typesafe from 'dsh-system1/providers/typesafe'
 import { TYPESAFE_MODELS } from 'dsh-system1/providers/typesafe'
 import { LAYA_MODELS } from 'dsh-system1/providers/laya'
+import * as liquid from 'dsh-system1/providers/liquid'
 import * as meragpt from 'dsh-system1/providers/meragpt'
 import { MERAGPT_MODELS } from 'dsh-system1/providers/meragpt'
 import * as nace from 'dsh-system1/providers/nace'
@@ -75,8 +76,13 @@ if(result.answers.topic.status!=='ok')throw new Error('Consumer failed')
 const value:'a'|'b'=result.answers.topic.answer.value
 if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
 if(!TYPESAFE_MODELS.some(({id})=>id==='jev-latest')||!LAYA_MODELS.some(({id})=>id==='auto'))throw new Error('Missing provider model catalog')
+if(typeof liquid.apply!=='function'||typeof liquid.createLiquidProvider!=='function'||liquid.LIQUID_MODELS[0]?.id!=='d1.2')throw new Error('Missing Liquid AI provider entry')
+for(const entry of ['icon','locale/en.json','locale/zh.json']) {
+  const url=import.meta.resolve('dsh-system1/providers/liquid/'+entry)
+  if(!existsSync(new URL(url)))throw new Error('Missing Liquid AI provider asset: '+entry)
+}
 if(!MERAGPT_MODELS.some(({id})=>id==='decider-1')||typeof meragpt.apply!=='function'||typeof meragpt.createMeraGptProvider!=='function')throw new Error('Missing meraGPT provider entry')
-if(NACE_MODELS.map(({id})=>id).join(',')!=='drex-v2.0,drex-v1.5,drex-max-v1.1,drex-max-finance,drex-max')throw new Error('Missing pinned Nace model catalog')
+if(NACE_MODELS.map(({id})=>id).join(',')!=='drex-v2.0,drex-max-v1.1,drex-max-finance')throw new Error('Missing pinned Nace model catalog')
 if(findProviderModel(CLOUDFLARE_MODELS,'@cf/cloudflare/clef')?.id!=='clef')throw new Error('Provider model alias did not resolve')
 if(typeof tool.apply!=='function'||tool.TOOL_NAME!=='system1_decide')throw new Error('Invalid agent tool public entry')
 await service.dispose()

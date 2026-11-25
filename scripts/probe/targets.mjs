@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import * as cloudflare from '../../lib/providers/cloudflare/index.js'
 import * as laya from '../../lib/providers/laya/index.js'
+import * as liquid from '../../lib/providers/liquid/index.js'
 import * as meragpt from '../../lib/providers/meragpt/index.js'
 import * as nace from '../../lib/providers/nace/index.js'
 import * as typesafe from '../../lib/providers/typesafe/index.js'
@@ -67,6 +68,17 @@ export const targets = {
     timeoutMs: 20_000,
     sample: english,
     mount: (ctx) => ctx.plugin(cloudflare, { id: 'cloudflare' }),
+  },
+
+  liquid: {
+    kind: 'hosted',
+    requiredEnv: ['LIQUID_API_KEY'],
+    model: () => process.env.LIQUID_MODEL || 'd1.2',
+    timeoutMs: 30_000,
+    skipShortTimeout: true,
+    sample: english,
+    endpoint: () => process.env.LIQUID_BASE_URL || 'https://api.liquid.ai/decisions',
+    mount: (ctx, baseURL) => ctx.plugin(liquid, { id: 'liquid', baseURL }),
   },
 
   meragpt: {

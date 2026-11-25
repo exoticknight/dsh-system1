@@ -5,6 +5,7 @@ declare const en: {
     providerTypesafe: string;
     providerLaya: string;
     providerMeraGpt: string;
+    providerLiquid: string;
     providerNace: string;
     providerCloudflare: string;
     providerUnknown: string;
@@ -52,6 +53,10 @@ declare const en: {
     keyUnavailable: string;
     typesafeSummary: string;
     layaSummary: string;
+    liquidSummary: string;
+    liquidEndpoint: string;
+    liquidEndpointHint: string;
+    timeoutLiquidHint: string;
     meragptSummary: string;
     naceSummary: string;
     typesafeEndpoint: string;

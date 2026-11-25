@@ -143,7 +143,7 @@ test('agent tool is registered by default and unregistered on dispose', async (t
   const expectedLimits = `${MAX_ATTACHMENT_COUNT_PER_TYPE} items, ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB per item, ${MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024)} MiB total decoded across all attachment types`
   assert.equal(inputProperties.images?.maxItems, MAX_ATTACHMENT_COUNT_PER_TYPE)
   assert.match(inputProperties.images?.description ?? '', new RegExp(expectedLimits))
-  assert.match(inputProperties.images?.description ?? '', /TypeSafe supports PNG and JPEG; Cloudflare and Nace drex-max also support WebP/u)
+  assert.match(inputProperties.images?.description ?? '', /TypeSafe supports PNG and JPEG; Cloudflare, Drex Max, meraGPT, and Liquid AI also support WebP/u)
   assert.equal(inputProperties.audio?.type, 'array')
   assert.equal(inputProperties.audio?.maxItems, MAX_ATTACHMENT_COUNT_PER_TYPE)
   assert.match(inputProperties.audio?.description ?? '', new RegExp(expectedLimits))

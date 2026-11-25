@@ -12,8 +12,8 @@ importers:
         specifier: 3.18.4
         version: 3.18.4
       nace-sdk:
-        specifier: 0.2.0
-        version: 0.2.0
+        specifier: 0.11.1
+        version: 0.11.1
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -518,8 +518,8 @@ packages:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
 
-  nace-sdk@0.2.0:
-    resolution: {integrity: sha512-WAuxC9UraSs6vUJtdC/JS3iI83nro1+DhAnNQNIGMwka4Zih3fgKPU72zmueezA4MXE+A4eMtYIG2fL7LYQe3Q==}
+  nace-sdk@0.11.1:
+    resolution: {integrity: sha512-Uf5Pt871Ipsey4fxo35hzdoi4qxfQpqMMiTCRD7zdLVW2jTZeucP3Qsnhh+cpnIsvgXmjXhwBjrwb253NddZKw==}
     engines: {node: '>=20'}
 
   node-addon-native-custom-loader@0.1.6:
@@ -927,7 +927,7 @@ snapshots:
     dependencies:
       js-tokens: 4.0.0
 
-  nace-sdk@0.2.0: {}
+  nace-sdk@0.11.1: {}
 
   node-addon-native-custom-loader@0.1.6:
     optional: true

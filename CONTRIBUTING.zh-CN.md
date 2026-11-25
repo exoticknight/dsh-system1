@@ -4,7 +4,7 @@
 
 ## 准备项目环境
 
-使用 Node.js 22.19+（22.x）或 Node.js 24，安装 `package.json` 中指定版本的 pnpm，然后执行：
+使用 Node.js 22.19+（22.x）、24.x 或 26.13.1+（26.x），并安装 `package.json` 中指定版本的 pnpm。然后执行：
 
 ```sh
 pnpm install --frozen-lockfile
