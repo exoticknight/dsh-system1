@@ -1,6 +1,6 @@
 {
   "name": "dsh-system1",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Let agents and plugins apply your criteria to content—for example, to filter for matching items or find passages that support a judgment. Enable features as needed and choose models for different tasks.",
   "icon": "./icon.png",
   "license": "Apache-2.0",
