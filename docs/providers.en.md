@@ -150,3 +150,9 @@ ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare
 ```
 
 See [testing and live model validation](testing.en.md#cloudflare-credentials) for creating credentials and running the live probe.
+
+## Choose OpenRouter for one call
+
+Load `dsh-system1/providers/openrouter` separately, then pass `{ provider: 'openrouter', model: 'perplexity/pplx-decider-v1.3:free' }` as the `model` for `decide()`. The component resolves `OPENROUTER_API_KEY` through the DSH credential service when present, otherwise from the environment. Set `apiKeyEnv` to use another credential reference. Before calling, use a dedicated OpenRouter API key from a workspace with no upstream provider credentials (BYOK), including credentials shared from another workspace.
+
+The route supports text and JSON (serialized as text), with `noul`, `choice`, and `score`. It calls the OpenRouter Decisions alpha endpoint and accepts only the pinned Perplexity build with reported zero cost and `is_byok:false`. The BYOK flag is checked after the call and cannot prevent or reverse an upstream charge. Check each `answers[id].status` for refusals and missing distributions. OpenRouter controls free quota and endpoint availability. This route will not switch to another OpenRouter model or supplier. Passing an explicit model also skips any fallback chain you configured in the service.

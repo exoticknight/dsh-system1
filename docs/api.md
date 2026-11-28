@@ -10,7 +10,7 @@
 
 根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出公开类型（含 `ProviderModel`）；`dsh-system1/providers` 导出 `findProviderModel`。内置 provider 的子路径 `dsh-system1/providers/<id>` 导出 Cordis 插件、`create…Provider` 工厂和模型目录；`<id>` 可用 `typesafe`、`laya`、`nace`、`meragpt`、`liquid` 或 `cloudflare`。连接参数与模型选择见[模型服务配置](providers.md)。
 
-也可以显式加载可选的 [Chinese Decision 本地 provider](providers.md#chinese-decision-08b可选本地-provider)。
+也可以显式加载可选的 [Chinese Decision 本地 provider](providers.md#chinese-decision-08b可选本地-provider)或 [OpenRouter 免费路由](providers.md#按调用使用-openrouter)。
 
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 

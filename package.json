@@ -84,6 +84,10 @@
     },
     "./providers/cloudflare/locale/*.json": "./locale/providers/cloudflare/*.json",
     "./providers/cloudflare/icon": "./assets/provider-icons/cloudflare-clef.svg",
+    "./providers/openrouter": {
+      "types": "./lib/providers/openrouter/index.d.ts",
+      "import": "./lib/providers/openrouter/index.js"
+    },
     "./tool": {
       "types": "./lib/tool/index.d.ts",
       "import": "./lib/tool/index.js"

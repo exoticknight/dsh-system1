@@ -150,3 +150,20 @@ ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare
 ```
 
 凭据申请和真实调用探针见[测试与真实模型验证](testing.md#cloudflare-凭据)。
+
+## 按调用使用 OpenRouter
+
+独立加载 `dsh-system1/providers/openrouter`，然后对这次 `decide()` 显式选用 `perplexity/pplx-decider-v1.3:free`。插件默认从 `OPENROUTER_API_KEY` 读取凭据，开启 DSH credentials 服务时解析同名凭据引用；可通过 `apiKeyEnv` 指定另一引用。使用专用 OpenRouter API key；先确认该 key 所属工作空间没有任何自配或共享的上游供应商凭据（BYOK）。
+
+```ts
+import * as openrouter from 'dsh-system1/providers/openrouter'
+
+await ctx.plugin(openrouter, {})
+const decision = await ctx.system1.decide({
+  state: '顾客要求退还重复扣款。',
+  questions: { refund: { type: 'noul', instructions: '顾客是否要求退款？' } },
+  model: { provider: 'openrouter', model: 'perplexity/pplx-decider-v1.3:free' },
+})
+```
+
+使用文本或 JSON（JSON 会序列化成文本），支持 `noul`、`choice`、`score`。请求固定发到 OpenRouter Decisions alpha 的 Perplexity 免费端点；仅接收指定版本、费用为零且 `is_byok:false` 的响应。该字段在调用后检查结果，不能阻止或撤销供应商已经产生的费用。逐题拒答或缺失概率时检查 `answers[id].status`。免费额度或端点可能调整；遇到限流或路由不可用请按错误处理。这一路由不会在 OpenRouter 内改用其他模型或供应商。显式 `model` 也不会进入你自己配置的服务兜底链。

@@ -1,0 +1,1 @@
+{"version":3,"file":"models.js","sourceRoot":"","sources":["../../../src/providers/openrouter/models.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,MAAM,qBAAqB,GAAG,mCAAmC,CAAA;AACxE,MAAM,CAAC,MAAM,yBAAyB,GAAG,uCAAuC,CAAA;AAEhF,MAAM,CAAC,MAAM,iBAAiB,GAAG;IAC/B,EAAE,EAAE,EAAE,qBAAqB,EAAE;CACc,CAAA"}
