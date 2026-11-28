@@ -13,7 +13,7 @@ import type {
 } from '../contracts/operation.js'
 import type { ModelRef, System1Options } from '../contracts/request.js'
 import { execute } from './execution.js'
-import { findFixedModel, OperationRegistry } from './registry.js'
+import { currentDeployment, findFixedModel, OperationRegistry } from './registry.js'
 import { errorSchema, modelSchema, timeoutSchema } from './validation.js'
 
 const missingProvider: DecisionError = {
@@ -65,17 +65,24 @@ export class OperationRuntime {
         agentAvailable: definition.id === 'decide'
           ? this.isOperationEnabled(definition.id, config) && mountedTools.has('system1_decide')
           : !!definition.tool && mountedTools.has(definition.tool.name) && this.isAgentRouteAvailable(definition, config),
-        providers: Array.from(implementations, ([id, { provider }]) => ({
-          id,
-          models: provider.models.kind === 'deployment'
-            ? { kind: 'deployment' as const, inputs: provider.models.inputs }
-            : {
-                kind: 'fixed' as const,
-                models: provider.models.models.map(({ id, aliases, inputs }) => ({
-                  id, ...(aliases ? { aliases } : {}), inputs,
-                })),
-              },
-        })),
+        providers: [...implementations].flatMap(([id, { provider }]) => {
+          try {
+            const { models } = currentDeployment(provider)
+            return [{
+              id,
+              models: models.kind === 'deployment'
+                ? { kind: 'deployment' as const, inputs: models.inputs }
+                : {
+                    kind: 'fixed' as const,
+                    models: models.models.map(({ id, aliases, inputs }) => ({
+                      id, ...(aliases ? { aliases } : {}), inputs,
+                    })),
+                  },
+            }]
+          } catch {
+            return [] // Other deployments are still usable if this catalog cannot be read.
+          }
+        }),
       })),
     })
   }
@@ -165,12 +172,20 @@ export class OperationRuntime {
       }
       if (!registered) { skip(missingProvider); continue }
       const provider = registered.provider
-      const fixedModel = findFixedModel(provider.models, model.model)
-      if (provider.models.kind === 'fixed' && !fixedModel) {
-        skip(provider.models.unknownModelMessage ? { ...unsupported, message: provider.models.unknownModelMessage } : unsupported)
+      let deployment
+      try {
+        deployment = currentDeployment(provider)
+      } catch {
+        skip({ code: 'invalid_response', message: 'Implementation returned an invalid deployment.' })
         continue
       }
-      const declared = provider.models.kind === 'deployment' ? provider.models.inputs : fixedModel!.inputs
+      const { models } = deployment
+      const fixedModel = findFixedModel(models, model.model)
+      if (models.kind === 'fixed' && !fixedModel) {
+        skip(models.unknownModelMessage ? { ...unsupported, message: models.unknownModelMessage } : unsupported)
+        continue
+      }
+      const declared = models.kind === 'deployment' ? models.inputs : fixedModel!.inputs
       if (inputKind !== undefined && !declared.includes(inputKind)) { skip(unsupported); continue }
       if (fixedModel) {
         const seen = aliasesSeen.get(model.provider) ?? new Set<string>()
@@ -190,8 +205,8 @@ export class OperationRuntime {
           [entry.controller.signal, registered.controller.signal, ...(signal ? [signal] : [])],
           budget,
           async (attemptSignal) => {
-            const selected = provider.models.kind === 'deployment'
-              ? await provider.models.resolve(model.model, attemptSignal)
+            const selected = models.kind === 'deployment'
+              ? await models.resolve(model.model, attemptSignal)
               : fixedModel!
             if (!selected || typeof selected.id !== 'string' || !selected.id.trim() || !Array.isArray(selected.inputs))
               throw new System1ProviderError({ code: 'invalid_response', message: 'Implementation returned an invalid model.' }, 'fallback')
@@ -202,7 +217,7 @@ export class OperationRuntime {
             attemptSignal.throwIfAborted()
             const attemptInput = structuredClone(parsed)
             sent = true
-            const response = await provider.execute(attemptInput, { model: selected.id, requestId, signal: attemptSignal })
+            const response = await deployment.execute(attemptInput, { model: selected.id, requestId, signal: attemptSignal })
             attemptSignal.throwIfAborted()
             try {
               if (!response || typeof response.model !== 'string' || !response.model.trim()
@@ -274,10 +289,16 @@ export class OperationRuntime {
   private isAgentRouteAvailable<I, O, C>(definition: OperationDefinition<I, O, C>, options: System1Options): boolean {
     const route = this.route(definition, options)
     if (!route.enabled || !route.compatible || !route.agentEnabled || !route.defaultModel) return false
-    const models = this.registry.get(definition)?.implementations.get(route.defaultModel.provider)?.provider.models
-    return !!models && (models.kind === 'deployment'
-      ? route.defaultModel.model.trim().length > 0
-      : !!findFixedModel(models, route.defaultModel.model))
+    const provider = this.registry.get(definition)?.implementations.get(route.defaultModel.provider)?.provider
+    if (!provider) return false
+    try {
+      const { models } = currentDeployment(provider)
+      return models.kind === 'deployment'
+        ? route.defaultModel.model.trim().length > 0
+        : !!findFixedModel(models, route.defaultModel.model)
+    } catch {
+      return false
+    }
   }
 }
 

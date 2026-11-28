@@ -165,6 +165,35 @@ test('deployment resolves inside the attempt; invalid output can fall back but a
   assert.equal(skipped.status, 'ok')
 })
 
+test('an invalid refreshed deployment leaves other providers and its fallback usable', async (t) => {
+  const ctx = new Context()
+  const fiber = await ctx.plugin(System1Service, {
+    operations: { [operation.id]: { defaultModel: model('dynamic'), fallbackModels: [model('backup')] } },
+  })
+  t.after(() => fiber.dispose())
+  const svc = ctx.system1
+  svc.registerOperation(operation)
+  const base = implementation(async () => { throw Error('unbound transport') })
+  let available = true
+  svc.registerImplementation(operation, 'dynamic', {
+    ...base,
+    resolveDeployment() {
+      if (!available) throw Error('private resolution error')
+      return { models: base.models, execute: async () => ({ model: 'current', result: ['bound'] }) }
+    },
+  })
+  svc.registerImplementation(operation, 'backup', implementation(async (_input, { model }) => ({ model, result: [] })))
+  assert.deepEqual((await svc.run(operation, text)).meta.executed, model('dynamic', 'current'))
+  available = false
+  assert.deepEqual(svc.getCatalog().operations.find(({ id }) => id === operation.id)?.providers.map(({ id }) => id), ['backup'])
+  const recovered = await svc.run(operation, text)
+  assert.deepEqual(recovered.meta.executed, model('backup'))
+  assert.deepEqual(recovered.meta.attempts[0], {
+    ...model('dynamic'), kind: 'skipped',
+    error: { code: 'invalid_response', message: 'Implementation returned an invalid deployment.' },
+  })
+})
+
 test('unregistering an actively executing implementation cancels the whole chain within its budget', async (t) => {
   const ctx = new Context()
   const fiber = await ctx.plugin(System1Service, {

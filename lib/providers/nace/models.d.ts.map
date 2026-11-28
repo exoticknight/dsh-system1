@@ -1,1 +1,1 @@
-{"version":3,"file":"models.d.ts","sourceRoot":"","sources":["../../../src/providers/nace/models.ts"],"names":[],"mappings":"AAEA,eAAO,MAAM,WAAW;iBAChB,WAAW;;iBACX,eAAe;;iBACf,kBAAkB;EACmB,CAAA"}
+{"version":3,"file":"models.d.ts","sourceRoot":"","sources":["../../../src/providers/nace/models.ts"],"names":[],"mappings":"AAEA,eAAO,MAAM,WAAW;iBAChB,eAAe;;;iBACf,kBAAkB;EACmB,CAAA;AAE7C,eAAO,MAAM,sBAAsB;iBAC3B,WAAW;;iBACX,eAAe;;iBACf,kBAAkB;EACmB,CAAA"}

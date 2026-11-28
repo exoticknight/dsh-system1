@@ -21,7 +21,7 @@ Choose a built-in provider or add one that implements the public provider contra
 | --- | --- | --- |
 | TypeSafe (`typesafe`) | `jev-latest`, `jev-preview`, `jev-1.14.0`, `jev-1.13.0` | Hosted Jev; PNG/JPEG; `box` requires `jev-1.14.0` or `jev-preview`; optional 262k context. |
 | Cloudflare (`cloudflare`) | `clef`, `clef-flash`, `clef-omni` | Workers AI or a compatible local Clef service; PNG/JPEG/WebP; `clef-omni` also accepts audio and video. |
-| Nace.AI (`nace`) | `drex-v2.0`, `drex-max-v1.1`, `drex-max-finance` | Hosted Drex; Max v1.1 and Finance accept images and up to 262,144 tokens per request. |
+| Nace.AI (`nace`) | `drex-max-v1.2`, `drex-max-finance` | Hosted Drex; both models accept images and up to 262,144 tokens per request. |
 | meraGPT (`meragpt`) | `decider-1`, `decider-1.1` | Hosted Decider 1.1; accepts PNG/JPEG/WebP and up to 32,768 tokens for state plus any one question. |
 | Liquid AI (`liquid`) | `d1.2`, `d1.2-ultra` | Hosted decision models; accept text, images, and WAV/MP3 audio. |
 | Laya (`laya`) | `auto`, `english`, `multilingual`, `typed-decisions` | Self-hosted [Laya server](https://github.com/NandhaKishorM/laya); text only; API key optional. |

@@ -63,6 +63,9 @@ export interface OperationProviderResult<O> {
 export interface OperationImplementation<I, O, C> {
     readonly version: number;
     readonly models: OperationModels<C>;
+    /** Bind the catalog and execution to the same runtime deployment snapshot.
+     * Catalogs are immutable; use a different catalog object when it changes. */
+    resolveDeployment?(): Pick<OperationImplementation<I, O, C>, 'models' | 'execute'>;
     timeoutMs(): number;
     execute(input: I, context: OperationExecution): Promise<OperationProviderResult<O>>;
 }

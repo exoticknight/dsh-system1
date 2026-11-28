@@ -10,6 +10,8 @@
 
 根入口导出服务、错误类和类型；`dsh-system1/contracts` 导出公开类型（含 `ProviderModel`）；`dsh-system1/providers` 导出 `findProviderModel`。内置 provider 的子路径 `dsh-system1/providers/<id>` 导出 Cordis 插件、`create…Provider` 工厂和模型目录；`<id>` 可用 `typesafe`、`laya`、`nace`、`meragpt`、`liquid` 或 `cloudflare`。连接参数与模型选择见[模型服务配置](providers.md)。
 
+也可以显式加载可选的 [Chinese Decision 本地 provider](providers.md#chinese-decision-08b可选本地-provider)。
+
 消费插件声明 `inject: ['system1']`。参见[消费插件示例](../examples/consumer.ts)。
 
 ### 启用操作
@@ -119,6 +121,7 @@ ctx.effect(() => ctx.system1.registerImplementation(decideOperation, 'cloudflare
 
 - 固定目录使用 `models: { kind: 'fixed', models: [...] }`。每个模型声明规范 `id`、可选 `aliases`、支持的 `inputs` 及该操作的 `capabilities`。菜单显示规范 ID。
 - 部署目录使用 `models: { kind: 'deployment', inputs, resolve(model, signal) }`。设置页接受用户填写的部署名。解析时不要发送任务材料，返回同样的模型描述；解析和执行共用本次超时预算。
+- 如果连接设置会切换模型目录，可以实现同步 `resolveDeployment()`。同时返回不可变的 `models` 和绑定到同一次端点快照的 `execute`。目录变化时返回另一个目录对象。
 
 决策实现用 `DecideImplementation`：在结果中返回标准逐题 `answers`，可带 `usage`、`approximate` 和 `degraded`。用 `ModelCapabilities` 声明题数、选项或等级限制（`maxQuestions`、`maxChoiceOptions`、`maxScoreLevels`）：填写正整数可在本地预检，填 `null` 交给后端。对支持的附件声明数量和字节上限。通用上限仍为每类 16 项、单项 16 MiB、解码后共 64 MiB；`audioVideo` 可收紧音视频的共用预算，`longContext.maxTokens` 声明扩展上下文。Token 数仅供参考，精确预算由后端执行。参见[自定义 provider 示例](../examples/provider.ts)。
 
@@ -148,9 +151,11 @@ provider 插件接受 `id`、`apiKeyEnv` 和可选的 `baseURL`；前两者默�
 
 ## Nace.AI Drex 能力与限制
 
-`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions`、`createNaceLocateProvider` 和决策目录 `NACE_MODELS`（`drex-v2.0`、`drex-max-v1.1`、`drex-max-finance`）。Nace 支持 `noul`、`choice`、`score`。适配器将结构化描述序列化为紧凑 JSON 文本，保留 `choice` 描述中的 `null`，并按原顺序返回评分等级的概率。
+`dsh-system1/providers/nace` 导出 Cordis 插件、`createNaceProvider`、`NaceOptions`、`createNaceLocateProvider` 和托管决策目录 `NACE_MODELS`（`drex-max-v1.2`、`drex-max-finance`）。Nace 支持 `noul`、`choice`、`score`。适配器将结构化描述序列化为紧凑 JSON 文本，保留 `choice` 描述中的 `null`，并按原顺序返回评分等级的概率。
 
-三款模型每次最多接受 512 道题。图片请求使用 Max v1.1 或 Finance；两者每题最多 255 个选项或等级，整份请求最多 262,144 tokens。插件在 4 MiB JSON 请求预算内优先内联图片，超过时只上传足够数量的图片以缩小请求体。[Nace 模型服务配置](providers.md#naceai-drex)列出各模型的上下文、图片和留存限制。调用已退役的 ID 会在发出 HTTP 请求前返回 `unsupported`。Nace 返回的 token 或其他请求限制错误映射为 `provider_error`。
+官方端点上的两款模型都支持图片，每次最多 512 道题，每题最多 255 个选项或等级，整份请求最多 262,144 tokens。旧 ID `drex-v2.0` 和 `drex-max-v1.1` 解析到 `drex-max-v1.2`，同一个 provider 实例的这些 ID 在一次路由中最多向上游发送一次；明确未派发的失败不计。`meta.requested` 记录原请求模型，`meta.executed` 使用响应中的模型。自定义端点仍使用原目录、原 ID 和能力，见 [Nace 模型服务配置](providers.md#naceai-drex)。
+
+图片在 4 MiB JSON 请求预算内优先内联，超出时只上传足够数量的图片。未知 ID 在发出 HTTP 请求前返回 `unsupported`。Nace 返回的 token 或其他请求限制错误映射为 `provider_error`。
 
 ## meraGPT Decider 1.1 能力与限制
 

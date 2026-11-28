@@ -19,7 +19,7 @@
 | Target | 类型 | 需要 | 可选环境变量 |
 | --- | --- | --- | --- |
 | `typesafe` | 托管 API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`，默认 `jev-1.13.0` |
-| `nace` | 托管 API | `NACE_API_KEY` | `NACE_MODEL`，默认 `drex-v2.0`；`NACE_BASE_URL` |
+| `nace` | 托管 API | `NACE_API_KEY` | `NACE_MODEL`，官方端点默认 `drex-max-v1.2`；`NACE_BASE_URL` |
 | `meragpt` | 托管 API | `MERAGPT_API_KEY` | `MERAGPT_MODEL`，默认 `decider-1`；`MERAGPT_BASE_URL` |
 | `liquid` | 托管 API | `LIQUID_API_KEY` | `LIQUID_MODEL`，默认 `d1.2`；`LIQUID_BASE_URL` |
 | `cloudflare` | 托管 API | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`，默认 `clef-flash` |
@@ -38,7 +38,7 @@
 
 ## Nace 凭据与真实探针
 
-DSH 的 `nace` provider 将 API Key 存入 DSH credentials，引用名为 `NACE_API_KEY`；真实探针从仓库根目录的 `.env.local` 读取该变量。将密钥写入被 Git 忽略的 `.env.local`，不要提交。探针默认使用 `drex-v2.0`；可通过 `NACE_MODEL` 选择其他支持的模型，通过 `NACE_BASE_URL` 覆盖 API 根地址。
+DSH 的 `nace` provider 将 API Key 存入 DSH credentials，引用名为 `NACE_API_KEY`；真实探针从仓库根目录的 `.env.local` 读取该变量。将密钥写入被 Git 忽略的 `.env.local`，不要提交。探针在官方端点默认使用 `drex-max-v1.2`；如用 `NACE_BASE_URL` 指定兼容服务，则默认使用 `drex-v2.0`。通过 `NACE_MODEL` 显式指定该部署支持的模型。
 
 运行推理前，可先检查 key 是否有效以及该账户可用的模型。Nace 的只读 `GET /v1/models` 在账户余额为零时也可用，且不计入速率限制（见[身份验证说明](https://console.nace.ai/docs/drex/guides/authentication)和[请求限制](https://console.nace.ai/docs/drex/reference/limits)）：
 
@@ -119,7 +119,7 @@ pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的
 
 ### Laya
 
-[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.5.3` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
+[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.5.6` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
 
 Laya 响应顶层的 `model` 是服务名 `laya-rl-agent`，插件优先使用 `routing.model` 作为实际执行模型。
 

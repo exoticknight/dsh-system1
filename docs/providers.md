@@ -14,7 +14,7 @@
 | `laya` | `auto`、`english`、`multilingual`、`typed-decisions` | 800 ms | `http://127.0.0.1:8000` | `LAYA_API_KEY`，可选 |
 | `meragpt` | `decider-1`、`decider-1.1` | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
 | `liquid` | `d1.2`、`d1.2-ultra` | 10,000 ms | `https://api.liquid.ai/decisions` | `LIQUID_API_KEY` |
-| `nace` | `drex-v2.0`、`drex-max-v1.1`、`drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `nace` | `drex-max-v1.2`、`drex-max-finance`（托管） | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`、`clef-flash`、`clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` 和 `jev-1.13.0` 是固定版本。`jev-latest` 指向最新稳定版，`jev-preview` 指向最新发布版；别名映射会随 TypeSafe 更新。需要固定行为时选择版本 ID。详见 TypeSafe 的[模型目录](https://docs.typesafe.ai/models)。
@@ -27,9 +27,15 @@ provider 模型目录与能力由本项目显式维护，不会在运行时自�
 
 启动、复测与验证边界见[测试与真实模型验证](testing.md)。
 
-Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Laya 0.5.3 已通过 CPU 上的中文多语言探针。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
+Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Laya 0.5.6 已通过 CPU 上的中文多语言探针。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
 
 TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstart)目前提供托管 API；[模型文档](https://docs.typesafe.ai/models)未提供可据此部署的 Jev 本地发行版。本项目通过真实托管调用验证 TypeSafe，不将本地协议模拟计作 Jev 本地推理。
+
+### Chinese Decision 0.8B（可选本地 provider）
+
+先用 [上游 CPU / GGUF 说明](https://github.com/yanqiangmiffy/chinese-decision#readme)启动 Chinese Decision 0.8B Q8_0 HTTP 服务，再显式挂载 `dsh-system1/providers/chinese-decision`。默认连接 `http://127.0.0.1:8787`，不改现有默认路由。调用时指定 `{ provider: 'chinese-decision', model: 'chinese-decision-0.8b' }`，完整示例见 [chinese-decision.mjs](../examples/chinese-decision.mjs)。
+
+支持文本 `noul`、`choice`、`score`。每次最多 64 题，choice／score 每题 2–26 项，score 档位描述使用字符串。每题连同共享 state 编译后的输入最多 16,384 tokens。默认超时 10 秒，批量题较多时按本机实测调大。建议先用实际中文样本做离线或影子评估，再决定是否用于生产路由。
 
 ### Jev 图片、Box 与长上下文
 
@@ -37,19 +43,20 @@ TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstar
 
 ## Nace.AI Drex
 
-在 DSH 的 `nace` provider 设置页保存 API Key；密钥写入 DSH credentials，引用名为 `NACE_API_KEY`。没有 DSH credentials 服务时会读取进程环境中的 `NACE_API_KEY`。默认 API 根地址 `https://console.nace.ai` 通常无需修改；兼容服务可通过 `baseURL` 覆盖。Nace provider 的模型选择首选 `drex-v2.0`，但不改变服务全局默认的 TypeSafe `jev-latest`。创建或轮换 key 见 Nace 的[身份验证说明](https://console.nace.ai/docs/drex/guides/authentication)。
+在 DSH 的 `nace` provider 设置页保存 API Key，凭据引用为 `NACE_API_KEY`。没有 DSH credentials 服务时，插件读取同名进程环境变量。使用官方 API 根地址 `https://console.nace.ai` 时，新选 Nace 首选 `drex-max-v1.2`；服务全局默认仍是 TypeSafe 的 `jev-latest`。创建或轮换 key 见 Nace 的[身份验证说明](https://console.nace.ai/docs/drex/guides/authentication)。
 
-| 模型 | 每次请求题数 | Token 限制 | 图片 |
+| 托管模型 | 每次请求题数 | Token 限制 | 图片 |
 | --- | ---: | --- | --- |
-| `drex-v2.0` | 512 | state 最多 131,072；state + 最长单题最多 262,144 tokens | 不支持 |
-| `drex-max-v1.1` | 512 | 整份请求最多 262,144 tokens，包含 state、所有问题、图片和格式标记 | 最多 8 张 |
-| `drex-max-finance` | 512 | 与 v1.1 相同的整份请求 262,144-token 上限；面向金融决策 | 最多 8 张 |
+| `drex-max-v1.2` | 512 | 整份请求最多 262,144 tokens，包含 state、所有问题、图片和格式标记 | 最多 8 张 |
+| `drex-max-finance` | 512 | 同为整份请求 262,144 tokens；金融模型使用独立服务容量 | 最多 8 张 |
 
-如果默认模型、备用模型或显式调用仍使用已退役的 `drex-v1.5` 或 `drex-max`，请改用 `drex-max-v1.1`。插件对旧 ID 返回 `unsupported`，不会替换已保存的配置。选择目录中的版本 ID 可固定模型；`drex-latest` 会随上游变动。
+在官方端点上，已有默认、备用路由和显式调用中的 `drex-v2.0`、`drex-max-v1.1` 继续有效。插件用 `drex-max-v1.2` 发起请求，已保存的 ID 保持原样。**原先首选 `drex-v2.0` 的图片请求现在可能发给 Nace，而不再跳到原图片备用模型。** 如果图片应交给别的 provider，请在升级后检查有效路由并调整顺序。若托管调用仍使用 `drex-v1.5` 或 `drex-max`，请改选 `drex-max-v1.2`。
+
+如果通过 `baseURL` 接入兼容服务，按该部署选择模型：插件保留原来的 `drex-v2.0`（仅文本）、`drex-max-v1.1` 和 `drex-max-finance` 目录，按所选原 ID 发送请求。
 
 Drex 可能把 `choice` 或 `score` 分布中的每项概率舍入到四位小数，因此总和可能略高于或低于 1。DSH 仅在偏差不超过逐项舍入的最大误差时重新归一化；更大的偏差仍按常规答案校验规则处理。
 
-`drex-max-v1.1` 和 `drex-max-finance` 均支持 PNG、JPEG、WebP（最多 8 张、每张 16 MiB、总计 32 MiB、单图最高 4,000 万像素），每题最多 255 个 `choice` 选项或 `score` 等级。Nace 执行表中的 token 上限。
+`drex-max-v1.2` 和 `drex-max-finance` 均支持 PNG、JPEG、WebP（最多 8 张、每张 16 MiB、总计 32 MiB、单图最高 4,000 万像素），每题最多 255 个 `choice` 选项或 `score` 等级。Nace 执行表中的 token 上限。
 
 Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`questions` 和非空 `images`，但不计顶层 `model`。小图以内联方式发送；内联图像会超出请求体上限时，adapter 只上传足够数量的图片并传递账号级文件引用，不使用 workspace。推理结束后 adapter 会尝试删除上传文件；清理失败时，Nace 默认在 24 小时后清除账号级上传，已删除文件的备份最多还需 35 天清除。对不允许临时上传到第三方服务的图片，不要使用该路径。详见 Nace 的[模型目录](https://console.nace.ai/docs/drex/reference/models)、[请求限制](https://console.nace.ai/docs/drex/reference/limits)、[Drex Max 图片说明](https://console.nace.ai/docs/drex/guides/drex-max)和[数据留存政策](https://console.nace.ai/docs/perception/data-retention)。
 
@@ -57,7 +64,7 @@ Nace 将序列化后的 UTF-8 JSON 请求体限制为 4 MiB，计入 `state`、`
 
 ```ts
 const result = await ctx.system1.decide({
-  model: { provider: 'nace', model: 'drex-v2.0' },
+  model: { provider: 'nace', model: 'drex-max-v1.2' },
   state: '客户称退款已等待两周，并请求帮助。',
   questions: {
     refund: { type: 'noul', instructions: '客户是否在询问退款？' },
@@ -65,11 +72,11 @@ const result = await ctx.system1.decide({
 })
 ```
 
-图片输入请选择 `drex-max-v1.1` 或 `drex-max-finance`，并使用请求共享的 `images` 字段：
+托管图片输入请选择 `drex-max-v1.2` 或 `drex-max-finance`，并使用请求共享的 `images` 字段：
 
 ```ts
 const result = await ctx.system1.decide({
-  model: { provider: 'nace', model: 'drex-max-v1.1' },
+  model: { provider: 'nace', model: 'drex-max-v1.2' },
   state: '请检查图片 1。',
   images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
   questions: {
