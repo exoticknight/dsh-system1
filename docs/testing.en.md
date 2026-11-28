@@ -19,7 +19,7 @@ Probes load the built `lib/`, so run `pnpm build` first, then `pnpm probe <targe
 | Target | Kind | Requires | Optional environment |
 | --- | --- | --- | --- |
 | `typesafe` | Hosted API | `TYPESAFE_API_KEY` | `TYPESAFE_MODEL`, default `jev-1.13.0` |
-| `nace` | Hosted API | `NACE_API_KEY` | `NACE_MODEL`, default `drex-v2.0`; `NACE_BASE_URL` |
+| `nace` | Hosted API | `NACE_API_KEY` | `NACE_MODEL`, defaults to `drex-max-v1.2` at the official endpoint; `NACE_BASE_URL` |
 | `meragpt` | Hosted API | `MERAGPT_API_KEY` | `MERAGPT_MODEL`, default `decider-1`; `MERAGPT_BASE_URL` |
 | `liquid` | Hosted API | `LIQUID_API_KEY` | `LIQUID_MODEL`, default `d1.2`; `LIQUID_BASE_URL` |
 | `cloudflare` | Hosted API | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | `CLOUDFLARE_MODEL`, default `clef-flash` |
@@ -38,7 +38,7 @@ Exit codes: `0` verified, `1` the result failed the contract or the call failed,
 
 ## Nace credentials and live probe
 
-The DSH provider stores its API key in DSH credentials under `NACE_API_KEY`; the live probe instead reads `NACE_API_KEY` from the repository-root `.env.local`. Add the key there without committing the file. The probe defaults to `drex-v2.0`; set `NACE_MODEL` to another supported ID or `NACE_BASE_URL` to a compatible API root if needed.
+The DSH provider stores its API key in DSH credentials under `NACE_API_KEY`; the live probe instead reads `NACE_API_KEY` from the repository-root `.env.local`. Add the key there without committing the file. The probe defaults to `drex-max-v1.2` at the official endpoint, or to `drex-v2.0` when `NACE_BASE_URL` points to a compatible deployment. Set `NACE_MODEL` to select a different model supported by that deployment.
 
 Check a key and the models enabled for it before spending credit on inference. Nace's read-only `GET /v1/models` works even when the account has no credit and does not count toward its rate limit ([authentication](https://console.nace.ai/docs/drex/guides/authentication), [limits](https://console.nace.ai/docs/drex/reference/limits)):
 

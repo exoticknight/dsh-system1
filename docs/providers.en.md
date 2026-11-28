@@ -14,7 +14,7 @@ An enabled operation can use a per-call `model: { provider, model }` instead of 
 | `laya` | `auto`, `english`, `multilingual`, `typed-decisions` | 800 ms | `http://127.0.0.1:8000` | Optional `LAYA_API_KEY` |
 | `meragpt` | `decider-1`, `decider-1.1` | 10,000 ms | `https://meragpt.com` | `MERAGPT_API_KEY` |
 | `liquid` | `d1.2`, `d1.2-ultra` | 10,000 ms | `https://api.liquid.ai/decisions` | `LIQUID_API_KEY` |
-| `nace` | `drex-v2.0`, `drex-max-v1.1`, `drex-max-finance` | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
+| `nace` | `drex-max-v1.2`, `drex-max-finance` (hosted) | 60,000 ms | `https://console.nace.ai` | `NACE_API_KEY` |
 | `cloudflare` | `clef`, `clef-flash`, `clef-omni` | 800 ms | `https://api.cloudflare.com/client/v4` | `CLOUDFLARE_API_TOKEN` |
 
 `jev-1.14.0` and `jev-1.13.0` are version-pinned IDs. `jev-latest` points to the newest stable release, while `jev-preview` points to the newest release; TypeSafe can move either alias over time. Choose a version ID when you need a fixed model. See TypeSafe's [model catalog](https://docs.typesafe.ai/models).
@@ -37,19 +37,20 @@ The public request has resource-safety ceilings of 16 items per attachment type,
 
 ## Nace.AI Drex
 
-In DSH, save the key on the `nace` provider's settings page; it is stored in DSH credentials under `NACE_API_KEY`. The provider falls back to the `NACE_API_KEY` process environment variable. Keep the default API root `https://console.nace.ai`, or override it with `baseURL` for a compatible endpoint. The provider settings default to `drex-v2.0`; this does not change the service-wide default of TypeSafe `jev-latest`. See Nace's [authentication guide](https://console.nace.ai/docs/drex/guides/authentication) to create or rotate keys.
+Save the API key on the `nace` provider settings page under the `NACE_API_KEY` credential reference. If DSH credentials are unavailable, the plugin reads the process environment variable of the same name. At the official API root, `https://console.nace.ai`, the first model offered for new Nace routes is `drex-max-v1.2`; the service-wide default stays TypeSafe `jev-latest`. See Nace's [authentication guide](https://console.nace.ai/docs/drex/guides/authentication) to create or rotate keys.
 
-| Model | Questions per request | Token limit | Images |
+| Hosted model | Questions per request | Token limit | Images |
 | --- | ---: | --- | --- |
-| `drex-v2.0` | 512 | Up to 131,072 for state; up to 262,144 for state plus the longest question | No |
-| `drex-max-v1.1` | 512 | 262,144 for the whole packed request, including state, all questions, images, and formatting | Up to 8 |
-| `drex-max-finance` | 512 | Same whole-request 262,144-token limit as v1.1; specialized for financial decisions | Up to 8 |
+| `drex-max-v1.2` | 512 | 262,144 for the whole request, including state, all questions, images, and formatting | Up to 8 |
+| `drex-max-finance` | 512 | Same 262,144-token whole-request limit; separate serving capacity for finance | Up to 8 |
 
-If a default, fallback, or per-call model still specifies the retired ID `drex-v1.5` or `drex-max`, switch to `drex-max-v1.1`. The plugin returns `unsupported` for retired IDs and leaves saved settings as they are. Choose a listed version ID to pin a model; Nace may move the `drex-latest` alias.
+At the official endpoint, `drex-v2.0` and `drex-max-v1.1` still work in saved defaults, fallback routes, and explicit calls. The plugin sends `drex-max-v1.2` and leaves your saved IDs in place. **An image request with `drex-v2.0` as its primary can now go to Nace instead of the previous image fallback.** If another provider should receive images, check the effective route after upgrading and adjust its order. For hosted calls, replace `drex-v1.5` or `drex-max` with `drex-max-v1.2`.
+
+When `baseURL` points to a compatible deployment, use its original catalog: `drex-v2.0` (text only), `drex-max-v1.1`, and `drex-max-finance`. The plugin sends the selected ID unchanged.
 
 Drex may round each probability in a `choice` or `score` distribution to four decimal places, so the entries can add up slightly above or below 1. DSH renormalizes totals only within the maximum error from that per-entry rounding; larger deviations follow the regular answer validation rules.
 
-`drex-max-v1.1` and `drex-max-finance` accept PNG, JPEG, and WebP (up to eight images, 16 MiB each, 32 MiB total, and 40 megapixels per image). Each question allows up to 255 `choice` options or `score` levels. Nace enforces the token limits in the table.
+`drex-max-v1.2` and `drex-max-finance` accept PNG, JPEG, and WebP (up to eight images, 16 MiB each, 32 MiB total, and 40 megapixels per image). Each question allows up to 255 `choice` options or `score` levels. Nace enforces the token limits in the table.
 
 Nace limits the serialized UTF-8 JSON body to 4 MiB, counting `state`, `questions`, and non-empty `images`, but not the top-level `model`. Small images stay inline; when inline images would exceed the body limit, the adapter uploads only enough images to fit and sends account-level file references. The upload endpoint does not use a workspace. The adapter attempts to delete uploads after inference; if cleanup fails, Nace keeps account-level uploads for 24 hours by default. Removed files can take up to 35 days to disappear from backups. Avoid this provider path for images that policy does not allow to be temporarily uploaded. See Nace's [model catalog](https://console.nace.ai/docs/drex/reference/models), [request limits](https://console.nace.ai/docs/drex/reference/limits), [Drex Max image guide](https://console.nace.ai/docs/drex/guides/drex-max), and [data retention policy](https://console.nace.ai/docs/perception/data-retention).
 
@@ -57,7 +58,7 @@ For example, choose Nace per call without changing the service default:
 
 ```ts
 const result = await ctx.system1.decide({
-  model: { provider: 'nace', model: 'drex-v2.0' },
+  model: { provider: 'nace', model: 'drex-max-v1.2' },
   state: 'A customer says a refund has been pending for two weeks.',
   questions: {
     refund: { type: 'noul', instructions: 'Is the customer asking about a refund?' },
@@ -65,11 +66,11 @@ const result = await ctx.system1.decide({
 })
 ```
 
-For image input, select `drex-max-v1.1` or `drex-max-finance` and use the shared request `images` field:
+For hosted image input, select `drex-max-v1.2` or `drex-max-finance` and use the shared request `images` field:
 
 ```ts
 const result = await ctx.system1.decide({
-  model: { provider: 'nace', model: 'drex-max-v1.1' },
+  model: { provider: 'nace', model: 'drex-max-v1.2' },
   state: 'Inspect Image 1.',
   images: [{ mediaType: 'image/jpeg', data: photoBase64 }],
   questions: {

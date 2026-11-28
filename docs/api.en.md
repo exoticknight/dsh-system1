@@ -122,6 +122,7 @@ For a custom implementation, declare the operation's major `version`, the model 
 
 - A fixed catalog uses `models: { kind: 'fixed', models: [...] }`. Each entry declares canonical `id`, optional `aliases`, supported `inputs`, and operation-specific `capabilities`. Menus show canonical IDs.
 - A deployment catalog uses `models: { kind: 'deployment', inputs, resolve(model, signal) }`. Settings accept a deployment name. Resolve it to the same model descriptor without sending task input, and use the selected model within the shared attempt timeout.
+- If a connection setting switches the catalog, add a synchronous `resolveDeployment()`. Return immutable `models` and an `execute` function bound to the same endpoint snapshot. Use a different catalog object when the catalog changes.
 
 For Decision, implement `DecideImplementation`: the result carries standard per-question `answers` and may include `usage`, `approximate`, and `degraded`. Use `ModelCapabilities` to declare question limits (`maxQuestions`, `maxChoiceOptions`, `maxScoreLevels`); a positive integer enables local checks, or `null` delegates to the backend. Declare count and byte limits for supported media. The shared ceilings remain 16 items per type, 16 MiB per item, and 64 MiB decoded in total. `audioVideo` can tighten the combined audio and video limit; `longContext.maxTokens` declares extended context. Token counts are informational; the backend enforces its tokenizer budget. See the [custom provider example](../examples/provider.ts).
 
@@ -151,9 +152,11 @@ The provider plugin accepts `id`, `apiKeyEnv`, and optional `baseURL`; the first
 
 ## Nace.AI Drex capabilities and limits
 
-`dsh-system1/providers/nace` exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, `createNaceLocateProvider`, and the Decision catalog `NACE_MODELS` (`drex-v2.0`, `drex-max-v1.1`, `drex-max-finance`). Nace supports `noul`, `choice`, and `score`. The adapter serializes structured descriptions as compact JSON text, preserves `null` choice descriptions, and returns score probabilities in level order.
+`dsh-system1/providers/nace` exports the Cordis plugin, `createNaceProvider`, `NaceOptions`, `createNaceLocateProvider`, and the hosted Decision catalog `NACE_MODELS` (`drex-max-v1.2`, `drex-max-finance`). Nace supports `noul`, `choice`, and `score`. The adapter serializes structured descriptions as compact JSON text, preserves `null` choice descriptions, and returns score probabilities in level order.
 
-All three models accept up to 512 questions. Use Max v1.1 or Finance for images; both allow 255 options or levels per question and 262,144 tokens per packed request. The adapter keeps images inline within the 4 MiB JSON request budget and uploads only as many as needed to fit. See [Nace setup](providers.en.md#naceai-drex) for context, image limits, and retention. Requests naming retired IDs return `unsupported` before sending HTTP requests. Token and other request-limit errors from Nace map to `provider_error`.
+Both models at the official endpoint support images, up to 512 questions, 255 options or levels per question, and 262,144 tokens per packed request. The old IDs `drex-v2.0` and `drex-max-v1.1` resolve to `drex-max-v1.2`; a route sends at most one upstream request through those equivalent IDs on the same provider instance. A failure before dispatch does not count. `meta.requested` records the original requested model; `meta.executed` uses the model in the response. Custom endpoints retain their previous catalog, IDs, and capabilities; see [Nace setup](providers.en.md#naceai-drex).
+
+The adapter keeps images inline within the 4 MiB JSON budget and uploads only as many as needed to fit. Unknown IDs return `unsupported` before HTTP I/O. Token and other request-limit errors from Nace map to `provider_error`.
 
 ## meraGPT Decider 1.1 capabilities and limits
 

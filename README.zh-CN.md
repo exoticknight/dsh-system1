@@ -21,7 +21,7 @@
 | --- | --- | --- |
 | TypeSafe（`typesafe`） | `jev-latest`、`jev-preview`、`jev-1.14.0`、`jev-1.13.0` | 托管 Jev；支持 PNG/JPEG；`box` 需要 `jev-1.14.0` 或 `jev-preview`；可选 262k 上下文。 |
 | Cloudflare（`cloudflare`） | `clef`、`clef-flash`、`clef-omni` | Workers AI 或兼容的本地 Clef 服务；支持 PNG/JPEG/WebP；`clef-omni` 还支持音频和视频。 |
-| Nace.AI（`nace`） | `drex-v2.0`、`drex-max-v1.1`、`drex-max-finance` | 托管 Drex；Max v1.1 与 Finance 支持图片，整份请求最多 262,144 tokens。 |
+| Nace.AI（`nace`） | `drex-max-v1.2`、`drex-max-finance` | 托管 Drex；支持图片，整份请求最多 262,144 tokens。 |
 | meraGPT（`meragpt`） | `decider-1`、`decider-1.1` | 托管 Decider 1.1；支持 PNG/JPEG/WebP，state 加任一单题最多 32,768 tokens。 |
 | Liquid AI（`liquid`） | `d1.2`、`d1.2-ultra` | 托管决策模型；支持文本、图片与 WAV/MP3 音频。 |
 | Laya（`laya`） | `auto`、`english`、`multilingual`、`typed-decisions` | 自建 [Laya 服务](https://github.com/NandhaKishorM/laya)；仅支持文本；API Key 可选。 |
