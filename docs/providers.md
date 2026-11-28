@@ -27,9 +27,15 @@ provider 模型目录与能力由本项目显式维护，不会在运行时自�
 
 启动、复测与验证边界见[测试与真实模型验证](testing.md)。
 
-Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Laya 0.5.3 已通过 CPU 上的中文多语言探针。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
+Laya 提供[官方本地 HTTP 服务](https://github.com/NandhaKishorM/laya)，可直接接入本插件的 `/v1/systemone` 传输。Laya 0.5.6 已通过 CPU 上的中文多语言探针。Cloudflare 发布了 [Clef-flash 权重和决策推理代码](https://huggingface.co/Cloudflare/clef-flash)；本地运行需要同时加载 backbone 和 joint schema head，普通聊天模型服务不能替代该决策接口。仓库提供的本地包装复刻 Workers AI REST 路径，同一个 `cloudflare` provider 将 `baseURL` 指向本地即可使用；本地 Clef 推理与 Cloudflare Workers AI 云端接口需要分别验证。
 
 TypeSafe 的[公开部署说明](https://docs.typesafe.ai/introduction/quickstart)目前提供托管 API；[模型文档](https://docs.typesafe.ai/models)未提供可据此部署的 Jev 本地发行版。本项目通过真实托管调用验证 TypeSafe，不将本地协议模拟计作 Jev 本地推理。
+
+### Chinese Decision 0.8B（可选本地 provider）
+
+先用 [上游 CPU / GGUF 说明](https://github.com/yanqiangmiffy/chinese-decision#readme)启动 Chinese Decision 0.8B Q8_0 HTTP 服务，再显式挂载 `dsh-system1/providers/chinese-decision`。默认连接 `http://127.0.0.1:8787`，不改现有默认路由。调用时指定 `{ provider: 'chinese-decision', model: 'chinese-decision-0.8b' }`，完整示例见 [chinese-decision.mjs](../examples/chinese-decision.mjs)。
+
+支持文本 `noul`、`choice`、`score`。每次最多 64 题，choice／score 每题 2–26 项，score 档位描述使用字符串。每题连同共享 state 编译后的输入最多 16,384 tokens。默认超时 10 秒，批量题较多时按本机实测调大。建议先用实际中文样本做离线或影子评估，再决定是否用于生产路由。
 
 ### Jev 图片、Box 与长上下文
 

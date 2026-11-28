@@ -119,7 +119,7 @@ Everything lives in the Git-ignored `.scratch/local-providers/<laya|cloudflare>/
 
 ### Laya
 
-The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.5.3` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
+The [official service](https://github.com/NandhaKishorM/laya) implements `/v1/systemone` directly. Pinned dependencies are `laya[serve]==0.5.6` and `torch==2.14.1+cpu`, verified with a local probe on Python 3.13. The service runs on CPU (override with `LAYA_DEVICE`) and preloads `multilingual`; the official service downloads its checkpoint on first start. The probe uses a Chinese sample, so `auto` routes to that checkpoint; other models may load lazily.
 
 The top-level `model` in a Laya response is the service name `laya-rl-agent`; the plugin prefers `routing.model` as the executed model.
 

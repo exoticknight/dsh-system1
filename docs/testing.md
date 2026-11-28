@@ -119,7 +119,7 @@ pnpm 可能报告 `ERR_PNPM_IGNORED_BUILDS`。Loader 探针不依赖被跳过的
 
 ### Laya
 
-[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.5.3` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
+[官方服务](https://github.com/NandhaKishorM/laya)直接实现 `/v1/systemone`。固定依赖为 `laya[serve]==0.5.6` 与 `torch==2.14.1+cpu`，已在 Python 3.13 上通过本地探针验证。服务以 CPU 启动（`LAYA_DEVICE` 可改），预加载 `multilingual`；官方服务首次启动时自行下载 checkpoint。探针使用中文样例，`auto` 路由到该 checkpoint；其他模型可能被懒加载。
 
 Laya 响应顶层的 `model` 是服务名 `laya-rl-agent`，插件优先使用 `routing.model` 作为实际执行模型。
 
