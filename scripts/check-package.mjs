@@ -67,6 +67,7 @@ import * as nace from 'dsh-system1/providers/nace'
 import { NACE_MODELS } from 'dsh-system1/providers/nace'
 import * as cloudflare from 'dsh-system1/providers/cloudflare'
 import { CLOUDFLARE_MODELS } from 'dsh-system1/providers/cloudflare'
+import * as openrouter from 'dsh-system1/providers/openrouter'
 import * as tool from 'dsh-system1/tool'
 import example, { countWords } from './operation.js'
 const ctx=new Context()
@@ -159,6 +160,38 @@ globalThis.fetch=async (resource,init)=>{
   }
   return Response.json(id==='cloudflare'?{success:true,result:payload,errors:[],messages:[]}:payload)
 }
+const originalFixtureFetch=globalThis.fetch
+globalThis.fetch=async (resource,init)=>{
+  const req=new Request(resource,init)
+  if(req.url!=='https://openrouter.ai/api/alpha/decisions')return originalFixtureFetch(resource,init)
+  assert.equal(req.headers.get('authorization'),'Bearer offline-fixture-key')
+  const body=await req.json() as Record<string,unknown>
+  assert.equal(body.model,'perplexity/pplx-decider-v1.3:free')
+  assert.deepEqual(body.provider,{only:['perplexity'],allow_fallbacks:false,max_price:{prompt:'0',completion:'0',request:'0'}})
+  return Response.json({
+    model:'perplexity/pplx-decider-v1.3-20261112',
+    provider:'Perplexity',
+    usage:{input_tokens:2,output_tokens:1,cost:0,is_byok:false},
+    answers:{q:{type:'noul',noul:0.75}},
+  })
+}
+const optIn=new Context()
+const optInService=await optIn.plugin(Service,{})
+const openrouterModel='perplexity/pplx-decider-v1.3:free'
+assert.equal(typeof openrouter.createOpenRouterProvider,'function')
+assert.equal(openrouter.OPENROUTER_MODELS[0]?.id,openrouterModel)
+process.env.OPENROUTER_API_KEY='offline-fixture-key'
+const openrouterFork=await optIn.plugin(openrouter,{})
+const openrouterAnswer=await optIn.system1.decide({
+  state:'fixture',questions:{q:{type:'noul',instructions:'?'}},model:{provider:'openrouter',model:openrouterModel},
+})
+assert.equal(openrouterAnswer.answers.q.status,'ok')
+assert.equal(openrouterAnswer.meta.executed?.provider,'openrouter')
+assert.equal(openrouterAnswer.meta.executed?.model,'perplexity/pplx-decider-v1.3-20261112')
+await openrouterFork.dispose()
+await optInService.dispose()
+globalThis.fetch=originalFixtureFetch
+
 const sample={state:'fixture',questions:{q:{type:'noul',instructions:'?'},bad:{type:'noul',instructions:'missing'}}} as const
 for(const route of cases){
   const context=new Context()
@@ -273,7 +306,7 @@ assert.equal(combined.system1.getCatalog().operations.find(({id})=>id==='locate'
 await toolHost.dispose()
 await combinedProviders.dispose()
 await combinedService.dispose()
-console.log('Packed entry points, six standalone and combined mounts, decision and locate calls, and dynamic Agent tools passed against offline fixtures.')
+console.log('Packed entry points, standalone (including opt-in OpenRouter) and bundled mounts, decision and locate calls, and dynamic Agent tools passed against offline fixtures.')
 `
   writeFileSync(join(work, 'consumer.ts'), consumer)
   writeFileSync(join(work, 'operation.ts'), readFileSync(join(work, 'node_modules/dsh-system1/examples/operation.ts')))
