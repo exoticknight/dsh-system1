@@ -1,110 +1,50 @@
 {
-  "0.7.0": {
-    "id": "0.7.0",
-    "version": "0.7.0",
+  "0.8.0": {
+    "id": "0.8.0",
+    "version": "0.8.0",
     "highlights": {
       "zh": [
         {
           "kind": "migration",
-          "title": "第三方服务商插件需同步升级",
-          "description": "旧服务商注册接口已替换。使用第三方服务商时，先确认有兼容版本再升级。已保存的决策路由和凭据无需迁移。"
+          "title": "升级后检查 Nace 图片路由",
+          "description": "托管端的 drex-v2.0 和 drex-max-v1.1 跟随 Max v1.2。已有设置不改写；旧 v2.0 主模型现在可能先于原备用模型接收图片。自定义端点行为不变。"
         },
         {
           "kind": "added",
-          "title": "定位文本片段和图片区域",
-          "description": "用 Nace Drex 或 Liquid AI 在原文中找片段，或在单张图片中标出匹配区域。启用后可由插件调用，也可单独向 Agent 开放定位工具。"
+          "title": "在本机用 Chinese Decision 做中文判断",
+          "description": "显式加载 Chinese Decision 0.8B 服务商，连接自己启动的 CPU 服务，对中文文本做是非判断、分类和评分。"
+        },
+        {
+          "kind": "added",
+          "title": "按需试用 OpenRouter 免费决策路由",
+          "description": "显式加载 OpenRouter 服务商，用 Perplexity Decider v1.3 免费路由做文本判断。请使用未配置供应商自带密钥（BYOK）的工作空间。"
         },
         {
           "kind": "improved",
-          "title": "为每项操作单独设置模型路由",
-          "description": "决策和定位可独立启停，分别选择主模型和备用顺序。关闭会保留配置；定位设置可按文本和图片预览路由。"
-        },
-        {
-          "kind": "improved",
-          "title": "在服务商子插件查看模型用途",
-          "description": "查看每个模型支持的输入，以及它是已保存路由的主模型、第几个备用，还是未被选用。"
+          "title": "更新 Laya 本地开发探针",
+          "description": "探针固定到 Laya 0.5.6，已验证首次安装和 CPU 中文推理。现有 Laya 路由和默认超时不变。"
         }
       ],
       "en": [
         {
           "kind": "migration",
-          "title": "Upgrade third-party provider plugins together",
-          "description": "The old provider registration API has been replaced. Check for a compatible version of any third-party provider before upgrading. Saved Decision routes and credentials carry over."
+          "title": "Check Nace image routing after upgrading",
+          "description": "Hosted drex-v2.0 and drex-max-v1.1 now follow Max v1.2. Saved settings stay in place, but a v2.0 primary may now receive images before its previous fallback. Custom endpoints keep their existing behavior."
         },
         {
           "kind": "added",
-          "title": "Locate passages and image regions",
-          "description": "Use Nace Drex or Liquid AI to find matching passages in the original text or mark matching regions in one image. Enable Locate for plugin calls, and optionally expose it as an Agent tool."
-        },
-        {
-          "kind": "improved",
-          "title": "Set a separate model route for each operation",
-          "description": "Switch Decision and Locate on or off independently, and choose a primary model and ordered fallbacks for each. Switching off keeps the settings. Locate previews routes for text and images separately."
-        },
-        {
-          "kind": "improved",
-          "title": "See model usage in the provider component",
-          "description": "Check each model's supported inputs and whether it is a primary model, a numbered fallback, or not selected in saved routes."
-        }
-      ]
-    }
-  },
-  "0.6.0": {
-    "id": "0.6.0",
-    "version": "0.6.0",
-    "highlights": {
-      "zh": [
-        {
-          "kind": "migration",
-          "title": "重选已退役的 Drex 模型",
-          "description": "如果默认或备用模型仍用 drex-v1.5 或 drex-max，请改选 drex-max-v1.1。"
+          "title": "Run Chinese Decision locally",
+          "description": "Load the optional Chinese Decision 0.8B provider and connect it to your own CPU server for yes/no judgments, classification, and scoring on Chinese text."
         },
         {
           "kind": "added",
-          "title": "新增 Liquid AI",
-          "description": "选择 d1.2 或 d1.2-ultra，用文本、图片和音频做判断。两款模型均已实测。"
+          "title": "Try the OpenRouter free decision route",
+          "description": "Load the optional OpenRouter provider to use the free Perplexity Decider v1.3 route for text. Use a workspace without bring-your-own provider keys (BYOK)."
         },
         {
           "kind": "improved",
-          "title": "升级 meraGPT Decider 1.1",
-          "description": "新增图片输入，支持更长的上下文、更多分类选项和评分等级。"
-        },
-        {
-          "kind": "improved",
-          "title": "提前提示 Clef 超限",
-          "description": "每题最多 255 个分类选项或 10 个评分等级，超限会在发出请求前提示。"
-        },
-        {
-          "kind": "improved",
-          "title": "兼容新版 DSH 和 Laya",
-          "description": "已验证 DSH 0.2.3-alpha.2 的设置页和 Agent 工具，以及 Laya 0.5.3 的本地中文推理。"
-        }
-      ],
-      "en": [
-        {
-          "kind": "migration",
-          "title": "Replace retired Drex models",
-          "description": "If a default or fallback still uses drex-v1.5 or drex-max, switch it to drex-max-v1.1."
-        },
-        {
-          "kind": "added",
-          "title": "Add Liquid AI",
-          "description": "Choose d1.2 or d1.2-ultra for decisions on text, images, and audio. Both models passed live checks."
-        },
-        {
-          "kind": "improved",
-          "title": "Update to meraGPT Decider 1.1",
-          "description": "Use image inputs, longer context, more classification options, and more score levels."
-        },
-        {
-          "kind": "improved",
-          "title": "Catch Clef limits before sending",
-          "description": "Each question allows up to 255 classification options or 10 score levels. Requests over those limits are flagged before sending."
-        },
-        {
-          "kind": "improved",
-          "title": "Support newer DSH and Laya",
-          "description": "Verified settings and the agent tool on DSH 0.2.3-alpha.2, and local Chinese inference on Laya 0.5.3."
+          "title": "Update the local Laya development probe",
+          "description": "The probe now pins Laya 0.5.6, verified from first-time setup through Chinese CPU inference. Existing Laya routes and the default timeout stay the same."
         }
       ]
     }
