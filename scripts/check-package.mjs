@@ -60,6 +60,7 @@ import * as typesafe from 'dsh-system1/providers/typesafe'
 import { TYPESAFE_MODELS } from 'dsh-system1/providers/typesafe'
 import * as laya from 'dsh-system1/providers/laya'
 import { LAYA_MODELS } from 'dsh-system1/providers/laya'
+import * as chineseDecision from 'dsh-system1/providers/chinese-decision'
 import * as liquid from 'dsh-system1/providers/liquid'
 import * as meragpt from 'dsh-system1/providers/meragpt'
 import { MERAGPT_MODELS } from 'dsh-system1/providers/meragpt'
@@ -86,6 +87,7 @@ if(result.answers.topic.status!=='ok')throw new Error('Consumer failed')
 const value:'a'|'b'=result.answers.topic.answer.value
 if(value!=='a'||typeof typesafe.apply!=='function')throw new Error('Invalid TypeSafe public entry')
 if(!TYPESAFE_MODELS.some(({id})=>id==='jev-latest')||!LAYA_MODELS.some(({id})=>id==='auto'))throw new Error('Missing provider model catalog')
+if(typeof chineseDecision.apply!=='function'||typeof chineseDecision.createChineseDecisionProvider!=='function'||chineseDecision.CHINESE_DECISION_MODELS[0]?.id!=='chinese-decision-0.8b')throw new Error('Missing Chinese Decision opt-in provider entry')
 if(typeof liquid.apply!=='function'||typeof liquid.createLiquidProvider!=='function'||liquid.LIQUID_MODELS[0]?.id!=='d1.2')throw new Error('Missing Liquid AI provider entry')
 for(const entry of ['icon','locale/en.json','locale/zh.json']) {
   const url=import.meta.resolve('dsh-system1/providers/liquid/'+entry)

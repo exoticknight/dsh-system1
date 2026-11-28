@@ -62,6 +62,10 @@
     },
     "./providers/laya/locale/*.json": "./locale/providers/laya/*.json",
     "./providers/laya/icon": "./assets/provider-icons/laya.png",
+    "./providers/chinese-decision": {
+      "types": "./lib/providers/chinese-decision/index.d.ts",
+      "import": "./lib/providers/chinese-decision/index.js"
+    },
     "./providers/meragpt": {
       "types": "./lib/providers/meragpt/index.d.ts",
       "import": "./lib/providers/meragpt/index.js"
