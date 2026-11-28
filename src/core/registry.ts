@@ -75,7 +75,7 @@ export class OperationRegistry {
     const entry = {
       provider: {
         version: implementation.version,
-        models: snapshotModels(implementation.models, operation.inputKinds.map(({ id }) => id)),
+        ...deploymentResolver(implementation, operation.inputKinds.map(({ id }) => id)),
         timeoutMs: implementation.timeoutMs.bind(implementation),
         execute: implementation.execute.bind(implementation),
       },
@@ -134,6 +134,29 @@ export class OperationRegistry {
     entry.implementations.clear()
     for (const implementation of implementations) implementation.controller.abort()
   }
+}
+
+export function currentDeployment<I, O, C>(provider: OperationImplementation<I, O, C>) {
+  return provider.resolveDeployment?.() ?? provider
+}
+
+function deploymentResolver<I, O, C>(
+  implementation: OperationImplementation<I, O, C>,
+  inputs: readonly string[],
+): Pick<OperationImplementation<I, O, C>, 'models' | 'resolveDeployment'> {
+  const resolve = implementation.resolveDeployment?.bind(implementation)
+  if (!resolve) return { models: snapshotModels(implementation.models, inputs) }
+  const snapshots = new WeakMap<OperationModels<C>, OperationModels<C>>()
+  const current = () => {
+    const deployment = resolve()
+    if (typeof deployment?.execute !== 'function')
+      throw new System1InputError('An implementation deployment needs an execute method.')
+    const { models } = deployment
+    const snapshot = snapshots.get(models) ?? snapshotModels(models, inputs)
+    snapshots.set(models, snapshot)
+    return { models: snapshot, execute: deployment.execute.bind(deployment) }
+  }
+  return { models: current().models, resolveDeployment: current }
 }
 
 function snapshotModels<C>(models: OperationModels<C>, allInputs: readonly string[]): OperationModels<C> {

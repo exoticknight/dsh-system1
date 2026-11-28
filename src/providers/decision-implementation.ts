@@ -39,9 +39,14 @@ export function decisionImplementation<M extends ProviderModel>(
         }
       }),
     },
-    async execute(input, { model, requestId, signal }) {
-      const { model: executed, revision, ...result } = await transport.evaluate({ ...input, model, requestId }, signal)
-      return { model: executed, ...(revision !== undefined ? { revision } : {}), result }
-    },
+    execute: decisionExecutor((request, signal) => transport.evaluate(request, signal)),
+  }
+}
+
+/** Execute with a bound transport, including an endpoint chosen for this attempt. */
+export function decisionExecutor(evaluate: DecisionTransport['evaluate']): DecideImplementation['execute'] {
+  return async (input, { model, requestId, signal }) => {
+    const { model: executed, revision, ...result } = await evaluate({ ...input, model, requestId }, signal)
+    return { model: executed, ...(revision !== undefined ? { revision } : {}), result }
   }
 }

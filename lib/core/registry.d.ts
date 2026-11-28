@@ -25,6 +25,7 @@ export declare class OperationRegistry {
     private assertActive;
     private retire;
 }
+export declare function currentDeployment<I, O, C>(provider: OperationImplementation<I, O, C>): Pick<OperationImplementation<I, O, C>, "execute" | "models">;
 export declare function findFixedModel<C>(models: OperationModels<C>, name: string): OperationModel<C> | undefined;
 export {};
 //# sourceMappingURL=registry.d.ts.map
