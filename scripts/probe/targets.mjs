@@ -131,7 +131,8 @@ export const targets = {
   nace: {
     kind: 'hosted',
     requiredEnv: ['NACE_API_KEY'],
-    model: () => process.env.NACE_MODEL || 'drex-v2.0',
+    model: (baseURL) => process.env.NACE_MODEL
+      || nace.createNaceProvider({ apiKey: '', baseURL }).models.models[0].id,
     timeoutMs: 60_000,
     // Avoid a second metered inference just to exercise the short-timeout path.
     skipShortTimeout: true,

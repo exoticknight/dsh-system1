@@ -9,6 +9,8 @@ import System1Service from '../../src/index.js'
 import * as providerBundle from '../../src/providers/index.js'
 import { createNaceProvider } from '../../src/providers/nace/adapter.js'
 import { NACE_MODELS } from '../../src/providers/nace/models.js'
+import { projectCatalog } from '../../src/settings-wire.js'
+import { describeCandidate, previewRoute } from '../../src/client/operation-routes.js'
 
 const UUID_WORKSPACE = '00000000-0000-4000-8000-000000000001'
 const UUID_FILE = '00000000-0000-4000-8000-000000000002'
@@ -117,15 +119,16 @@ function createUploadFixture(options: {
   }
 }
 
-test('Nace catalog lists the three supported models and their capabilities', async () => {
+test('Nace catalog separates hosted aliases from a compatible deployment', async () => {
   assert.deepEqual(NACE_MODELS.map(({ id }) => id), [
-    'drex-v2.0',
-    'drex-max-v1.1',
+    'drex-max-v1.2',
     'drex-max-finance',
   ])
   const provider = createNaceProvider({ apiKey: '' })
+  const compatible = createNaceProvider({ apiKey: '', baseURL: 'https://nace.fixture.test' })
+  const signal = new AbortController().signal
   assert.equal(provider.timeoutMs(), 60_000)
-  assert.deepEqual(await provider.describe('drex-v2.0', new AbortController().signal), {
+  assert.deepEqual(await compatible.describe('drex-v2.0', signal), {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
     maxChoiceOptions: null,
@@ -136,8 +139,8 @@ test('Nace catalog lists the three supported models and their capabilities', asy
       maxStatePlusQuestionTokens: 262_144,
     },
   })
-  const maxV11 = await provider.describe('drex-max-v1.1', new AbortController().signal)
-  assert.deepEqual(maxV11, {
+  const max = await provider.describe('drex-max-v1.2', signal)
+  assert.deepEqual(max, {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
     maxChoiceOptions: 255,
@@ -150,9 +153,12 @@ test('Nace catalog lists the three supported models and their capabilities', asy
     },
     context: { maxTokens: 262_144, includesQuestions: true },
   })
-  assert.deepEqual(await provider.describe('drex-max-finance', new AbortController().signal), maxV11)
+  assert.deepEqual(await provider.describe('drex-v2.0', signal), max)
+  assert.deepEqual(await provider.describe('drex-max-v1.1', signal), max)
+  assert.deepEqual(await provider.describe('drex-max-finance', signal), max)
+  assert.deepEqual(await compatible.describe('drex-max-v1.1', signal), max)
   await assert.rejects(
-    provider.describe('drex-latest', new AbortController().signal),
+    provider.describe('drex-latest', signal),
     (error: unknown) =>
       error instanceof System1ProviderError && error.detail.code === 'unsupported',
   )
@@ -251,29 +257,142 @@ test('Nace serializes structured descriptions, retains null criteria, and normal
   assert.deepEqual(result.usage, { inputTokens: 12, outputTokens: 4 })
 })
 
-test('Drex Max v1.1 sends images through the Max request path', async () => {
+test('hosted Nace uses the Max v1.2 image path for a saved Drex v2.0 primary', async () => {
   const fixture = createUploadFixture({
     onSystemOne(body) {
-      assert.equal(body.model, 'drex-max-v1.1')
+      assert.equal(body.model, 'drex-max-v1.2')
       assert.deepEqual(body.images, [
         `data:image/png;base64,${uploadedRequest().images![0]!.data}`,
       ])
       return Response.json({
-        model: 'drex-max-v1.1',
+        model: 'drex-max-v1.2',
         answers: { q: { type: 'noul', noul: 0.8 } },
       })
     },
   })
   const provider = createNaceProvider({ apiKey: 'fixture-only', fetch: fixture.fetch })
-  const result = await provider.evaluate(
-    uploadedRequest(32, 'drex-max-v1.1'),
-    new AbortController().signal,
-  )
-  assert.equal(result.model, 'drex-max-v1.1')
-  assert.deepEqual(result.answers.q, {
+  const primary = { provider: 'nace', model: 'drex-v2.0' }
+  const fallback = { provider: 'nace', model: 'drex-max-v1.1' }
+  const engine = new System1Engine({ defaultModel: primary, fallbackModels: [fallback] })
+  engine.registerImplementation(decideOperation, 'nace', provider)
+  const { state, questions, images } = uploadedRequest()
+  const result = await engine.run(decideOperation, { state, questions, images })
+  assert.equal(result.status, 'ok')
+  assert.deepEqual(result.meta.requested, primary)
+  assert.deepEqual(result.meta.executed, { provider: 'nace', model: 'drex-max-v1.2' })
+  assert.deepEqual(result.meta.attempts, [{ ...primary, kind: 'executed' }])
+  assert.equal(fixture.calls.length, 1)
+  assert.deepEqual(result.status === 'ok' && result.value.answers.q, {
     status: 'ok',
     answer: { type: 'noul', probabilityTrue: 0.8 },
   })
+  engine.dispose()
+})
+
+test('a failed hosted Max request does not send the same input again through its other IDs', async () => {
+  const ids: unknown[] = []
+  let missFirstCredential = false
+  const provider = createNaceProvider({
+    apiKey: '',
+    resolveApiKey() {
+      if (!missFirstCredential) return 'fixture-only'
+      missFirstCredential = false
+      return undefined
+    },
+    fetch: async (_input, init) => {
+      const { model } = JSON.parse(String(init?.body))
+      ids.push(model)
+      return model === 'drex-max-finance'
+        ? Response.json({ model, answers: { q: { type: 'noul', noul: 0.8 } } })
+        : Response.json({ error: { message: 'offline overload' } }, { status: 529 })
+    },
+  })
+  const candidates = ['drex-v2.0', 'drex-max-v1.1', 'drex-max-v1.2', 'drex-max-finance']
+    .map((model) => ({ provider: 'nace', model }))
+  const engine = new System1Engine({ defaultModel: candidates[0], fallbackModels: candidates.slice(1) })
+  engine.registerImplementation(decideOperation, 'nace', provider)
+  const result = await engine.run(decideOperation, { state: request.state, questions: request.questions })
+  assert.equal(result.status, 'ok')
+  assert.deepEqual(ids, ['drex-max-v1.2', 'drex-max-finance'])
+  assert.deepEqual(result.meta.requested, candidates[0])
+  assert.deepEqual(result.meta.executed, candidates[3])
+
+  ids.length = 0
+  missFirstCredential = true
+  const recovered = await engine.run(decideOperation, { state: request.state, questions: request.questions })
+  assert.deepEqual(ids, ['drex-max-v1.2', 'drex-max-finance'])
+  assert.deepEqual(recovered.meta.attempts.map(({ model, kind }) => [model, kind]), [
+    ['drex-v2.0', 'skipped'],
+    ['drex-max-v1.1', 'executed'],
+    ['drex-max-finance', 'executed'],
+  ])
+  engine.dispose()
+})
+
+test('changing the Nace base URL updates saved routes without moving an in-flight image', async () => {
+  let baseURL = 'https://console.nace.ai:0443/.'
+  let readBaseURL = () => baseURL
+  let readingKey!: () => void
+  const keyStarted = new Promise<void>((resolve) => { readingKey = resolve })
+  let finishLookup!: (key: string) => void
+  const key = new Promise<string>((resolve) => { finishLookup = resolve })
+  const traffic: [string, string, boolean][] = []
+  const provider = createNaceProvider({
+    apiKey: '',
+    resolveBaseURL: () => readBaseURL(),
+    resolveApiKey: () => { readingKey(); return key },
+    fetch: async (input, init) => {
+      const body = JSON.parse(String(init?.body))
+      traffic.push([new URL(String(input)).href, body.model, !!body.images?.length])
+      return Response.json({ model: body.model, answers: { q: { type: 'noul', noul: 0.8 } } })
+    },
+  })
+  const primary = { provider: 'nace', model: 'drex-v2.0' }
+  const fallback = { provider: 'nace', model: 'drex-max-v1.1' }
+  const engine = new System1Engine({ defaultModel: primary, fallbackModels: [fallback] })
+  engine.registerImplementation(decideOperation, 'nace', provider)
+  const entry = () => projectCatalog(engine.operations.getCatalog(new Set(), false)).operations[0]!
+  const hosted = entry()
+  const hostedModels = hosted.providers[0]!.models
+  assert.deepEqual(hostedModels.kind === 'fixed' && hostedModels.models.map(({ id }) => id),
+    ['drex-max-v1.2', 'drex-max-finance'])
+  assert.deepEqual(describeCandidate(hosted, primary)?.inputs, ['text', 'image'])
+  assert.deepEqual(previewRoute(hosted, [primary, fallback]).find(({ input }) => input.id === 'image')?.candidates.map(({ model }) => model),
+    ['drex-max-v1.2'])
+
+  const { state, questions, images } = uploadedRequest()
+  const pending = engine.run(decideOperation, { state, questions, images })
+  await keyStarted
+  baseURL = 'https://nace.fixture.test'
+  finishLookup('fixture-only')
+  assert.deepEqual((await pending).meta.executed, { provider: 'nace', model: 'drex-max-v1.2' })
+
+  const compatible = entry()
+  const compatibleModels = compatible.providers[0]!.models
+  assert.deepEqual(compatibleModels.kind === 'fixed' && compatibleModels.models.map(({ id }) => id),
+    ['drex-v2.0', 'drex-max-v1.1', 'drex-max-finance'])
+  assert.deepEqual(compatible.route.defaultModel, primary)
+  assert.deepEqual(compatible.route.fallbackModels, [fallback])
+  assert.deepEqual(describeCandidate(compatible, primary)?.inputs, ['text'])
+  assert.deepEqual((await engine.run(decideOperation, { state, questions, images })).meta.executed, fallback)
+  assert.deepEqual((await engine.run(decideOperation, { state, questions })).meta.executed, primary)
+  const unsupported = await engine.run(decideOperation, { state, questions }, { model: { ...primary, model: 'drex-max-v1.2' } })
+  assert.equal(unsupported.status === 'error' && unsupported.error.code, 'unsupported')
+
+  // A change between the catalog read and execute must not send a model shared
+  // by both directories (Finance) to the second deployment.
+  let reads = 0
+  readBaseURL = () => ++reads === 1 ? 'https://console.nace.ai' : 'https://nace.fixture.test'
+  const finance = { ...primary, model: 'drex-max-finance' }
+  assert.deepEqual((await engine.run(decideOperation, { state, questions, images }, { model: finance })).meta.executed, finance)
+  assert.equal(reads, 1)
+  assert.deepEqual(traffic, [
+    ['https://console.nace.ai/v1/systemone', 'drex-max-v1.2', true],
+    ['https://nace.fixture.test/v1/systemone', 'drex-max-v1.1', true],
+    ['https://nace.fixture.test/v1/systemone', 'drex-v2.0', false],
+    ['https://console.nace.ai/v1/systemone', 'drex-max-finance', true],
+  ])
+  engine.dispose()
 })
 
 test('Drex Max Finance sends images through the Max request path', async () => {
@@ -515,6 +634,7 @@ test('missing credentials and unsupported requests stop before Nace I/O', async 
   let calls = 0
   const provider = createNaceProvider({
     apiKey: '',
+    baseURL: 'https://nace.fixture.test',
     fetch: async () => {
       calls++
       return systemOneResponse({ q: { type: 'noul', noul: 1 } })

@@ -19,8 +19,9 @@ import { System1ProviderError } from '../../contracts/error.js'
 import { findProviderModel } from '../models.js'
 import { choiceAnswer, invalidAnswer, noulAnswer, scoreAnswer } from '../answers.js'
 import { normalizeRoundedDistribution, normalizeRoundedDistributionRecord } from '../probabilities.js'
-import { NACE_MODELS } from './models.js'
-import { decisionImplementation } from '../decision-implementation.js'
+import { COMPATIBLE_NACE_MODELS, NACE_MODELS } from './models.js'
+import { decisionExecutor, decisionImplementation } from '../decision-implementation.js'
+import type { DecisionTransport } from '../decision-implementation.js'
 
 const DEFAULT_BASE_URL = 'https://console.nace.ai'
 const MAX_REQUEST_BYTES = 4_194_304
@@ -70,7 +71,8 @@ const MAX_CAPABILITIES: ModelCapabilities = {
   context: { maxTokens: 262_144, includesQuestions: true },
 }
 
-const MODEL_CAPABILITIES: Readonly<Record<(typeof NACE_MODELS)[number]['id'], ModelCapabilities>> = {
+type NaceModel = (typeof NACE_MODELS | typeof COMPATIBLE_NACE_MODELS)[number]
+const MODEL_CAPABILITIES: Readonly<Record<NaceModel['id'], ModelCapabilities>> = {
   'drex-v2.0': {
     primitives: ['noul', 'choice', 'score'],
     maxQuestions: 512,
@@ -83,6 +85,7 @@ const MODEL_CAPABILITIES: Readonly<Record<(typeof NACE_MODELS)[number]['id'], Mo
     },
   },
   'drex-max-v1.1': MAX_CAPABILITIES,
+  'drex-max-v1.2': MAX_CAPABILITIES,
   'drex-max-finance': MAX_CAPABILITIES,
 }
 
@@ -99,93 +102,110 @@ export interface NaceOptions {
 
 /** Nace Drex adapter: the official SDK owns API and temporary-file transport. */
 export function createNaceProvider(options: NaceOptions) {
-  return decisionImplementation(NACE_MODELS, ({ id }) => MODEL_CAPABILITIES[id], {
+  async function evaluate(baseURL: string, request: ProviderRequest, signal: AbortSignal) {
+    const selected = selectModel(baseURL, request.model)
+    if (request.images?.length && !MODEL_CAPABILITIES[selected.id].images)
+      throw new System1ProviderError({
+        code: 'unsupported',
+        message: 'Nace images require a Drex Max model.',
+      })
+
+    let apiKey: string | undefined
+    try {
+      apiKey = await (options.resolveApiKey ?? (() => options.apiKey))()
+    } catch {
+      throw new System1ProviderError({
+        code: 'unavailable',
+        message: 'Nace API key could not be resolved.',
+      }, 'stop', false)
+    }
+    if (!apiKey?.trim())
+      throw new System1ProviderError({
+        code: 'unavailable',
+        message: 'Nace API key is not configured.',
+      }, 'stop', false)
+
+    const client = new NaceClient({
+      apiKey: apiKey.trim(),
+      baseURL,
+      defaultModel: selected.id,
+      timeout: SDK_TIMEOUT_MS,
+      retry: { maxRetries: 0 },
+      logLevel: 'off',
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    })
+    const uploaded: UploadedFile[] = []
+    try {
+      const questions = toNaceQuestions(request)
+      const images = await prepareImages(
+        client,
+        request,
+        questions,
+        signal,
+        uploaded,
+      )
+      signal.throwIfAborted()
+      const response = await client.systemOne(
+        {
+          model: selected.id,
+          state: request.state as NaceEntryType,
+          questions,
+          ...(images?.length ? { images } : {}),
+        },
+        {
+          signal,
+          timeout: SDK_TIMEOUT_MS,
+          retry: { maxRetries: 0 },
+        },
+      )
+      signal.throwIfAborted()
+      return normalizeNaceResponse(
+        { ...request, model: selected.id },
+        response,
+      )
+    } catch (error) {
+      if (signal.aborted) signal.throwIfAborted()
+      if (error instanceof System1ProviderError) throw error
+      throw mapNaceError(error)
+    } finally {
+      // Deletion is best-effort and must not consume the inference deadline or replace its result.
+      void deleteTemporaryFiles(client, uploaded, options.warn)
+    }
+  }
+  const transport: DecisionTransport = {
     timeoutMs: () => options.resolveTimeoutMs?.() ?? options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     async describe(model) {
-      const selected = findProviderModel(NACE_MODELS, model)
-      if (!selected)
-        throw new System1ProviderError({
-          code: 'unsupported',
-          message: 'Nace model is not supported.',
-        })
-      return MODEL_CAPABILITIES[selected.id]
+      return MODEL_CAPABILITIES[selectModel(resolveBaseURL(options), model).id]
     },
-    async evaluate(request, signal) {
-      const selected = findProviderModel(NACE_MODELS, request.model)
-      if (!selected)
-        throw new System1ProviderError({
-          code: 'unsupported',
-          message: 'Nace model is not supported.',
-        })
-      if (request.images?.length && !MODEL_CAPABILITIES[selected.id].images)
-        throw new System1ProviderError({
-          code: 'unsupported',
-          message: 'Nace images require a Drex Max model.',
-        })
-
-      let apiKey: string | undefined
-      try {
-        apiKey = await (options.resolveApiKey ?? (() => options.apiKey))()
-      } catch {
-        throw new System1ProviderError({
-          code: 'unavailable',
-          message: 'Nace API key could not be resolved.',
-        }, 'stop', false)
-      }
-      if (!apiKey?.trim())
-        throw new System1ProviderError({
-          code: 'unavailable',
-          message: 'Nace API key is not configured.',
-        }, 'stop', false)
-
-      const client = new NaceClient({
-        apiKey: apiKey.trim(),
-        baseURL: resolveBaseURL(options),
-        defaultModel: selected.id,
-        timeout: SDK_TIMEOUT_MS,
-        retry: { maxRetries: 0 },
-        logLevel: 'off',
-        ...(options.fetch ? { fetch: options.fetch } : {}),
-      })
-      const uploaded: UploadedFile[] = []
-      try {
-        const questions = toNaceQuestions(request)
-        const images = await prepareImages(
-          client,
-          request,
-          questions,
-          signal,
-          uploaded,
-        )
-        signal.throwIfAborted()
-        const response = await client.systemOne(
-          {
-            model: selected.id,
-            state: request.state as NaceEntryType,
-            questions,
-            ...(images?.length ? { images } : {}),
-          },
-          {
-            signal,
-            timeout: SDK_TIMEOUT_MS,
-            retry: { maxRetries: 0 },
-          },
-        )
-        signal.throwIfAborted()
-        return normalizeNaceResponse(
-          { ...request, model: selected.id },
-          response,
-        )
-      } catch (error) {
-        if (signal.aborted) signal.throwIfAborted()
-        if (error instanceof System1ProviderError) throw error
-        throw mapNaceError(error)
-      } finally {
-        // Deletion is best-effort and must not consume the inference deadline or replace its result.
-        void deleteTemporaryFiles(client, uploaded, options.warn)
+    evaluate: (request, signal) => evaluate(resolveBaseURL(options), request, signal),
+  }
+  const capabilitiesFor = ({ id }: NaceModel) => MODEL_CAPABILITIES[id]
+  const hosted = decisionImplementation(NACE_MODELS, capabilitiesFor, transport, 'Nace')
+  const compatible = decisionImplementation(COMPATIBLE_NACE_MODELS, capabilitiesFor, transport, 'Nace')
+  const modelsAt = (baseURL: string) => isHosted(baseURL) ? hosted.models : compatible.models
+  return {
+    ...hosted,
+    get models() { return modelsAt(resolveBaseURL(options)) },
+    resolveDeployment() {
+      const baseURL = resolveBaseURL(options)
+      return {
+        models: modelsAt(baseURL),
+        execute: decisionExecutor((request, signal) => evaluate(baseURL, request, signal)),
       }
     },
-  }, 'Nace')
+  }
+}
+
+function selectModel(baseURL: string, model: string): NaceModel {
+  const selected = findProviderModel(isHosted(baseURL) ? NACE_MODELS : COMPATIBLE_NACE_MODELS, model)
+  if (!selected)
+    throw new System1ProviderError({ code: 'unsupported', message: 'Nace model is not supported.' }, 'stop', false)
+  return selected
+}
+
+function isHosted(baseURL: string): boolean {
+  const url = URL.parse(baseURL.replace(/\/+$/u, ''))
+  return url?.href === `${DEFAULT_BASE_URL}/`
 }
 
 function normalizeNaceResponse(
