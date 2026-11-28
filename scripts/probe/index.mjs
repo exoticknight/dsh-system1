@@ -27,7 +27,7 @@ if (missing.length) {
 }
 
 const endpoint = target.endpoint?.()
-const model = { provider: name, model: target.model() }
+const model = { provider: name, model: target.model(endpoint) }
 const { state, questions } = target.sample
 const ctx = new Context()
 let service

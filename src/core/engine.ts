@@ -8,13 +8,13 @@ import type {
   System1Options,
 } from '../contracts/request.js'
 import type { Questions } from '../contracts/question.js'
-import type { DecideInput, DecideOutput } from '../contracts/provider.js'
+import type { DecideInput, DecideOutput, ModelCapabilities } from '../contracts/provider.js'
 import { decideOperation, decideOutputSchema } from '../contracts/decide.js'
-import type { OperationAttempt, OperationDefinition, OperationImplementation, OperationResult, OperationRunOptions } from '../contracts/operation.js'
+import type { OperationAttempt, OperationDefinition, OperationImplementation, OperationModel, OperationResult, OperationRunOptions } from '../contracts/operation.js'
 import type { QuestionResult } from '../contracts/answer.js'
 import type { DecisionError } from '../contracts/error.js'
 import { System1InputError, System1ProviderError } from '../contracts/error.js'
-import { findFixedModel } from './registry.js'
+import { currentDeployment, findFixedModel } from './registry.js'
 import { modelChain, OperationRuntime } from './operations.js'
 import { execute } from './execution.js'
 import {
@@ -149,6 +149,7 @@ export class System1Engine {
     if (req.signal?.aborted || this.operations.registry.disposed)
       return failure({ code: 'cancelled', message: 'Decision cancelled.' })
     const attempts: FallbackAttempt[] = []
+    const seen = new Set<OperationModel<ModelCapabilities>>()
     let lastError: DecisionError | undefined
     for (const model of chain) {
       if (req.signal?.aborted || this.operations.registry.disposed) {
@@ -162,7 +163,9 @@ export class System1Engine {
         req,
         model,
         meta.requestId,
+        seen,
       )
+      if (!outcome) continue // An earlier ID already attempted this same fixed model.
       if ('error' in outcome) {
         lastError = outcome.error
         operationAttempts?.push({
@@ -225,7 +228,8 @@ export class System1Engine {
     req: DecideRequest,
     model: ModelRef,
     requestId: string,
-  ): Promise<AttemptOutcome> {
+    seen: Set<OperationModel<ModelCapabilities>>,
+  ): Promise<AttemptOutcome | undefined> {
     const entry = this.operations.registry.get(decideOperation)?.implementations.get(model.provider)
     if (!entry)
       return {
@@ -236,6 +240,7 @@ export class System1Engine {
         sent: false,
       }
     let sent = false
+    let aliasTarget: OperationModel<ModelCapabilities> | undefined
     try {
       const timeoutMs = req.timeoutMs ?? entry.provider.timeoutMs()
       if (!timeoutSchema.safeParse(timeoutMs).success)
@@ -250,15 +255,21 @@ export class System1Engine {
         [entry.controller.signal, ...(req.signal ? [req.signal] : [])],
         timeoutMs,
         async (signal) => {
-          const selected = entry.provider.models.kind === 'deployment'
-            ? await entry.provider.models.resolve(model.model, signal)
-            : findFixedModel(entry.provider.models, model.model)
+          const deployment = currentDeployment(entry.provider)
+          const { models } = deployment
+          const selected = models.kind === 'deployment'
+            ? await models.resolve(model.model, signal)
+            : findFixedModel(models, model.model)
           if (!selected)
             throw new System1ProviderError({
               code: 'unsupported',
-              message: (entry.provider.models.kind === 'fixed' && entry.provider.models.unknownModelMessage)
+              message: (models.kind === 'fixed' && models.unknownModelMessage)
                 || 'Provider model is not supported.',
             })
+          if (entry.provider.resolveDeployment && models.kind === 'fixed' && selected.aliases?.length) {
+            aliasTarget = selected
+            if (seen.has(aliasTarget)) return undefined
+          }
           const described = capabilitiesSchema.safeParse(selected.capabilities)
           if (!described.success) {
             if (!entry.warnedInvalidCapabilities) {
@@ -280,7 +291,7 @@ export class System1Engine {
           if (limitation) throw new System1ProviderError(limitation)
           signal.throwIfAborted()
           sent = true
-          const raw = await entry.provider.execute(
+          const raw = await deployment.execute(
             structuredClone({
               state: req.state,
               questions: req.questions,
@@ -306,11 +317,13 @@ export class System1Engine {
           return parsed.data
         },
       )
-      return { result }
+      return result ? { result } : undefined
     } catch (error) {
+      if (error instanceof System1ProviderError && error.requestSent === false) sent = false
+      if (sent && aliasTarget) seen.add(aliasTarget)
       if (error instanceof System1ProviderError) {
         const detail = errorSchema.safeParse(error.detail)
-        if (detail.success) return { error: detail.data, sent: sent && error.requestSent !== false }
+        if (detail.success) return { error: detail.data, sent }
       }
       return {
         error: {

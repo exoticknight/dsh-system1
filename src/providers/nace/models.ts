@@ -1,6 +1,11 @@
 import type { ProviderModel } from '../../contracts/provider.js'
 
 export const NACE_MODELS = [
+  { id: 'drex-max-v1.2', aliases: ['drex-v2.0', 'drex-max-v1.1'] },
+  { id: 'drex-max-finance' },
+] as const satisfies readonly ProviderModel[]
+
+export const COMPATIBLE_NACE_MODELS = [
   { id: 'drex-v2.0' },
   { id: 'drex-max-v1.1' },
   { id: 'drex-max-finance' },
