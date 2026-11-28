@@ -27,9 +27,15 @@ Providers resolve keys through DSH credentials when available, otherwise through
 
 See [local services and live validation](testing.en.md) for setup, probes, and validation boundaries.
 
-Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Laya 0.5.3 passed the Chinese multilingual probe on CPU. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. The repository's local wrapper mirrors the Workers AI REST route, so the same `cloudflare` provider can use it by pointing `baseURL` at the local service. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
+Laya provides an [official local HTTP server](https://github.com/NandhaKishorM/laya) compatible with this plugin's `/v1/systemone` transport. Laya 0.5.6 passed the Chinese multilingual probe on CPU. Cloudflare publishes [Clef-flash weights and decision inference code](https://huggingface.co/Cloudflare/clef-flash). Local inference requires both the backbone and the joint schema head; a generic chat server does not implement that decision interface. The repository's local wrapper mirrors the Workers AI REST route, so the same `cloudflare` provider can use it by pointing `baseURL` at the local service. Local Clef inference and the Cloudflare Workers AI endpoint require separate validation.
 
 TypeSafe's [public setup instructions](https://docs.typesafe.ai/introduction/quickstart) describe a hosted API. Its [model documentation](https://docs.typesafe.ai/models) does not provide a deployable local Jev release. This project validates TypeSafe through real hosted calls and does not count protocol fixtures as local Jev inference.
+
+### Chinese Decision 0.8B (opt-in local provider)
+
+Start the [upstream Chinese Decision 0.8B Q8_0 CPU service](https://github.com/yanqiangmiffy/chinese-decision#readme), then mount `dsh-system1/providers/chinese-decision` explicitly. It connects to `http://127.0.0.1:8787` by default and leaves existing routes unchanged. Select `{ provider: 'chinese-decision', model: 'chinese-decision-0.8b' }` as in [chinese-decision.mjs](../examples/chinese-decision.mjs).
+
+The provider supports text `noul`, `choice`, and `score`: up to 64 questions per request and 2–26 choices or plain-text score levels per question. The compiled prompt for each question, including shared state, can contain up to 16,384 tokens. The default timeout is 10 seconds; measure heavier batches before increasing it. Evaluate on your own Chinese inputs offline or in shadow mode before routing production traffic.
 
 ### Jev images, Box, and long context
 

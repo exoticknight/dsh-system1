@@ -10,6 +10,8 @@ Move any legacy service-level `timeoutMs` to the corresponding provider settings
 
 The package root exports the service, error classes, and types. `dsh-system1/contracts` exports the public types, including `ProviderModel`; `dsh-system1/providers` exports `findProviderModel`. Each `dsh-system1/providers/<id>` subpath exports the Cordis plugin, a `create…Provider` factory, and its model catalog. Use `typesafe`, `laya`, `nace`, `meragpt`, `liquid`, or `cloudflare` for `<id>`. See [provider setup](providers.en.md) for connection details and model selection.
 
+You can also explicitly load the optional [Chinese Decision local provider](providers.en.md#chinese-decision-08b-opt-in-local-provider).
+
 Consumer plugins declare `inject: ['system1']`. See the [consumer example](../examples/consumer.ts).
 
 ### Enable an operation
