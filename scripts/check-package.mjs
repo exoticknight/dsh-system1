@@ -172,7 +172,7 @@ globalThis.fetch=async (resource,init)=>{
     model:'perplexity/pplx-decider-v1.3-20261112',
     provider:'Perplexity',
     usage:{input_tokens:2,output_tokens:1,cost:0,is_byok:false},
-    answers:{q:{type:'noul',noul:0.75}},
+    answers:{q:{type:'noul',noul:0.75},unexpected:{type:'noul',noul:0.5}},
   })
 }
 const optIn=new Context()
@@ -186,6 +186,8 @@ const openrouterAnswer=await optIn.system1.decide({
   state:'fixture',questions:{q:{type:'noul',instructions:'?'}},model:{provider:'openrouter',model:openrouterModel},
 })
 assert.equal(openrouterAnswer.answers.q.status,'ok')
+assert.deepEqual(Object.keys(openrouterAnswer.answers),['q'])
+assert.deepEqual(openrouterAnswer.meta.warnings,['unexpected_answer_ids'])
 assert.equal(openrouterAnswer.meta.executed?.provider,'openrouter')
 assert.equal(openrouterAnswer.meta.executed?.model,'perplexity/pplx-decider-v1.3-20261112')
 await openrouterFork.dispose()

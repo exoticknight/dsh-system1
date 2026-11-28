@@ -37,7 +37,11 @@ export interface OpenRouterOptions {
   fetch?: typeof fetch
 }
 
-/** The opt-in, text-only Decider free route on OpenRouter's alpha Decisions API. */
+/**
+ * The opt-in, text-only Decider free route on OpenRouter's alpha Decisions API.
+ * Use a dedicated API key from a workspace with no upstream provider credentials,
+ * including shared BYOK. The response check cannot prevent an upstream charge.
+ */
 export function createOpenRouterProvider(options: OpenRouterOptions = {}) {
   const post = createJsonPost({
     providerName: 'OpenRouter',
@@ -71,7 +75,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions = {}) {
       })
 
       const result = normalizeSystemOneResponse(request, raw, 'OpenRouter')
-      const answers = Object.fromEntries(Object.entries(request.questions).map(([id, question]) => {
+      const checkedAnswers = Object.fromEntries(Object.entries(request.questions).map(([id, question]) => {
         const answer = wireAnswer.safeParse(route.data.answers[id])
         if (answer.success && answer.data.type === 'refusal') return [id, {
           status: 'error',
@@ -91,7 +95,8 @@ export function createOpenRouterProvider(options: OpenRouterOptions = {}) {
         }
         return [id, validateAnswer(question, result.answers[id])]
       }))
-      return { ...result, answers }
+      // Keep safe markers for unexpected IDs so the core can warn and omit them.
+      return { ...result, answers: { ...result.answers, ...checkedAnswers } }
     },
   }, 'OpenRouter')
 }
